@@ -207,6 +207,40 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .steps .d{grid-column:2;font-size:.8125rem;color:var(--ink-2);line-height:1.4}
 .steps button[aria-current="step"]{background:var(--panel);box-shadow:inset .3rem 0 0 var(--accent)}
 .card{display:grid;gap:.6rem;text-decoration:none}
+/* research window: a tall panel under "Inside the rig" that leads to the Research section of Work */
+.rwin{position:relative;display:grid;grid-template-rows:auto 1fr auto;min-height:26rem;border:1px solid var(--line);
+  background:color-mix(in srgb,var(--ground) 82%,transparent);backdrop-filter:blur(6px);text-decoration:none;color:var(--ink);
+  clip-path:polygon(0 0,calc(100% - 1.4rem) 0,100% 1.4rem,100% 100%,1.4rem 100%,0 calc(100% - 1.4rem))}
+.rwin::before,.rwin::after{content:"";position:absolute;width:1.4rem;height:1.4rem;pointer-events:none}
+.rwin::after{right:0;top:0;background:linear-gradient(45deg,transparent calc(50% - 1.5px),var(--accent) calc(50% - 1.5px) calc(50% + 1.5px),transparent calc(50% + 1.5px))}
+.rwin::before{left:0;bottom:0;background:linear-gradient(45deg,transparent calc(50% - .5px),var(--line) calc(50% - .5px) calc(50% + .5px),transparent calc(50% + .5px))}
+.rwin-h{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.6rem .9rem;border-bottom:1px solid var(--line);
+  font-size:.6875rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.rwin-live{display:inline-flex;align-items:center;gap:.4rem}
+.rwin-live i{width:.45rem;height:.45rem;background:var(--accent);animation:rw-blink 1.2s steps(2,start) infinite}
+@keyframes rw-blink{to{visibility:hidden}}
+.rwin-b{display:grid;grid-template-columns:auto minmax(0,1fr);gap:1rem;padding:1rem .9rem;min-height:0}
+.rwin-v{display:flex;flex-direction:row-reverse;align-items:flex-start;gap:.35rem;border-right:1px solid var(--line);padding-right:.8rem}
+.rwin-v small{writing-mode:vertical-rl;white-space:nowrap}
+.rwin-v b{display:grid;font-family:var(--display);font-weight:800;font-size:clamp(2.2rem,3vw,3.4rem);line-height:1.05;color:var(--accent)}
+.rwin-v b i{font-style:normal}
+.rwin-v small{font-size:.6875rem;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-2)}
+.rwin-c{display:grid;gap:.9rem;align-content:start;min-width:0}
+.rwin-t{font-family:var(--display);font-weight:700;font-size:1.15rem;line-height:1.2;overflow-wrap:anywhere}
+.rwin-flow{display:grid;counter-reset:rw}
+.rwin-flow li{position:relative;display:grid;grid-template-columns:1.7rem 1fr;gap:.5rem;align-items:baseline;padding:.45rem 0 .45rem;font-size:.8125rem}
+.rwin-flow li::before{counter-increment:rw;content:"0" counter(rw);font-size:.6875rem;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.rwin-flow li + li{border-top:1px dashed var(--line)}
+.rwin-flow b{font-weight:500;letter-spacing:.06em;text-transform:uppercase}
+.rwin-flow small{display:block;grid-column:2;color:var(--ink-2);font-size:.75rem;line-height:1.35}
+.rwin-f{display:flex;justify-content:space-between;align-items:center;gap:.8rem;padding:.75rem .9rem .75rem 1.6rem;border-top:1px solid var(--line);
+  font-size:.75rem;letter-spacing:.06em;text-transform:uppercase}
+.rwin-f > span:first-child{font-size:.625rem;line-height:1.4;color:var(--ink-2)}
+.rwin-f .go{display:inline-flex;align-items:center;gap:.5rem;padding:.45rem .8rem;background:var(--accent);color:var(--on-accent);white-space:nowrap}
+.rwin:hover,.rwin:focus-visible{border-color:var(--accent)}
+.rwin:hover .go,.rwin:focus-visible .go{filter:brightness(1.12)}
+.rwin:hover .rwin-v{text-shadow:2px 0 0 color-mix(in srgb,var(--accent) 45%,transparent),-2px 0 0 color-mix(in srgb,var(--ink) 25%,transparent)}
+@media (prefers-reduced-motion:reduce){.rwin-live i{animation:none}}
 .card h3{font-size:1.0625rem;font-weight:500;line-height:1.35}
 .slot{position:relative;display:grid;place-items:center;width:100%;aspect-ratio:16/10;border:1px solid var(--line);padding:.75rem;text-align:center;
   font-size:.75rem;color:var(--ink-2);background:var(--panel);isolation:isolate}
@@ -233,6 +267,11 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
   .inside{grid-column:1;grid-row:3;min-height:215vh;min-height:215svh}
   .latest{grid-column:4;grid-row:3}
   .pin{position:sticky;top:calc(var(--hdr) + 2rem)}
+  .rwin{min-height:min(30rem,calc(100svh - var(--hdr) - 17rem))}
+}
+@media (min-width:64rem) and (max-width:99.99rem){
+  .rwin-flow small{display:none}
+  .rwin-b{gap:.8rem}
 }
 
 /* ---------- credits ---------- */
@@ -531,6 +570,22 @@ body[data-view="page"] .lore--bg{display:none}
         <section class="inside" aria-labelledby="inside-h">
           <div class="pin">
             <h2 class="disp" id="inside-h">Inside the rig</h2>
+            <a class="rwin" id="rwin" href="#work" data-route="work" data-filter="research" aria-describedby="rwin-t">
+              <span class="rwin-h"><span data-i18n="rw.head">Research</span><span class="rwin-live"><i></i><span data-i18n="rw.live">In progress</span></span></span>
+              <span class="rwin-b">
+                <span class="rwin-v" aria-hidden="true"><b><i>研</i><i>究</i></b><small>R&amp;D / 01</small></span>
+                <span class="rwin-c">
+                  <span class="rwin-t" id="rwin-t"></span>
+                  <ol class="rwin-flow">
+                    <li><span><b data-i18n="rw.s1">Tag</b><small data-i18n="rw.s1d">Joint chains labelled as modules in Maya</small></span></li>
+                    <li><span><b data-i18n="rw.s2">Export</b><small data-i18n="rw.s2d">A manifest saved inside the FBX</small></span></li>
+                    <li><span><b data-i18n="rw.s3">Import</b><small data-i18n="rw.s3d">The skeleton arrives in Unreal Engine 5.6</small></span></li>
+                    <li><span><b data-i18n="rw.s4">Build</b><small data-i18n="rw.s4d">A Control Rig rebuilt automatically</small></span></li>
+                  </ol>
+                </span>
+              </span>
+              <span class="rwin-f"><span id="rwin-n"></span><span class="go"><span data-i18n="rw.go">Open research</span><span aria-hidden="true">&rarr;</span></span></span>
+            </a>
           </div>
         </section>
 
@@ -785,6 +840,9 @@ const T = {
     's1': 'Shaded', 's2': 'Wireframe', 's3': 'Skeleton', 's4': 'Controls',
     's1d': 'The final look.', 's2d': 'Topology and edge flow, laid out for deformation.',
     's3d': 'Joint placement and orientation.', 's4d': 'What the animator touches.',
+    'rw.head': 'Research', 'rw.live': 'In progress', 'rw.go': 'Open research', 'rw.n': 'Tokyo University of Technology',
+    'rw.s1': 'Tag', 'rw.s1d': 'Joint chains labelled as modules in Maya', 'rw.s2': 'Export', 'rw.s2d': 'A manifest saved inside the FBX',
+    'rw.s3': 'Import', 'rw.s3d': 'The skeleton arrives in Unreal Engine 5.6', 'rw.s4': 'Build', 'rw.s4d': 'A Control Rig rebuilt automatically',
     'latest.title': 'Latest additions', 'latest.all': 'See all work', 'slot.todo': 'add file',
     'wk.all': 'All', 'wk.empty': 'Empty slot', 'cat.rigs': 'Rigs', 'cat.tools': 'Tools', 'cat.animation': 'Animation', 'cat.research': 'Research',
     'pj.back': 'All work', 'pj.prev': 'Previous', 'pj.next': 'Next',
@@ -829,6 +887,9 @@ const T = {
     's1': 'シェーディング', 's2': 'ワイヤーフレーム', 's3': 'スケルトン', 's4': 'コントローラー',
     's1d': '完成時の見た目。', 's2d': '変形を考えたトポロジーとエッジフロー。',
     's3d': 'ジョイントの配置と軸の向き。', 's4d': 'アニメーターが触る部分。',
+    'rw.head': '研究', 'rw.live': '進行中', 'rw.go': '研究を見る', 'rw.n': '東京工科大学',
+    'rw.s1': 'タグ付け', 'rw.s1d': 'Mayaでジョイントチェーンをモジュールとして設定', 'rw.s2': '書き出し', 'rw.s2d': 'マニフェストをFBXに埋め込み',
+    'rw.s3': '読み込み', 'rw.s3d': 'スケルトンをUnreal Engine 5.6へ', 'rw.s4': '構築', 'rw.s4d': 'Control Rigを自動で再構築',
     'latest.title': '最新の追加', 'latest.all': 'すべての作品を見る', 'slot.todo': 'ファイル未設定',
     'wk.all': 'すべて', 'wk.empty': '空き枠', 'cat.rigs': 'リグ', 'cat.tools': 'ツール', 'cat.animation': 'アニメーション', 'cat.research': '研究',
     'pj.back': '作品一覧', 'pj.prev': '前へ', 'pj.next': '次へ',
@@ -918,7 +979,7 @@ function setLang(l) {
   $$('[data-lang]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
   store.set('lang', lang);
   renderLinks();
-  renderLatest();
+  renderLatest(); renderResearch();
   renderView(current);
 }
 $$('[data-lang]').forEach(b => b.addEventListener('click', () => setLang(b.dataset.lang)));
@@ -1053,6 +1114,13 @@ function renderLatest() {
     box.append(a);
   });
 }
+function renderResearch() {
+  const p = PROJECTS.find(q => q.cat === 'research'), w = $('#rwin');
+  if (!w) return;
+  w.hidden = !p; if (!p) return;
+  $('#rwin-t').textContent = L(p.title);
+  $('#rwin-n').textContent = tr('rw.n');
+}
 function renderWork() {
   const chips = $('#chips'), ul = $('#tiles');
   chips.textContent = ''; ul.textContent = '';
@@ -1177,7 +1245,7 @@ document.addEventListener('click', e => {
   const o = e.target.closest('[data-open]');
   if (o) { e.preventDefault(); closeMenu(); openDlg(o.dataset.open); return; }
   const r = e.target.closest('[data-route]');
-  if (r) { e.preventDefault(); closeMenu(); go(r.dataset.route); return; }
+  if (r) { e.preventDefault(); closeMenu(); if (r.dataset.filter) { filter = r.dataset.filter; if (r.dataset.route === 'work') renderWork(); } go(r.dataset.route); return; }
   const chip = e.target.closest('.chip');
   if (chip) { filter = chip.dataset.cat; renderWork(); const again = $('.chip[data-cat="' + filter + '"]'); if (again) again.focus(); return; }
   const c = e.target.closest('[data-close]');
