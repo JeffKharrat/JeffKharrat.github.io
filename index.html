@@ -719,9 +719,19 @@ const SITE = {
 /* One entry per project, newest first. The first two also show on the home page.
    cat: one of CATS below.   thumb and media src: an image, or an .mp4 / .webm clip. */
 /* Work page sections, in filter order. A section with no projects yet shows empty slots. */
-const CATS = ['rigs', 'animation', 'tools'];
+const CATS = ['rigs', 'animation', 'research', 'tools'];
 
 const ALL_PROJECTS = [
+  { id: 'kotsudo', cat: 'research', year: '2025 – now', thumb: 'media/kotsudo/thumb.jpg',
+    title: { en: 'JEFF 骨道 (Kotsudō): Maya to UE5 Control Rig', ja: 'JEFF 骨道：Maya → UE5 Control Rig' },
+    kind: { en: 'Research tool, work in progress', ja: '研究ツール（制作中）' },
+    role: { en: 'Research and development', ja: '研究・開発' },
+    software: ['Maya', 'Unreal Engine 5', 'Python'],
+    summary: { en: 'Work in progress. A tool that rebuilds a Maya rig as an Unreal Engine 5.6 Control Rig automatically. In Maya, each joint chain is tagged as a module (FK, IK, IK/FK switch, spline IK) and the tags are exported as a manifest inside the FBX. In Unreal, a Python builder reads the manifest, orders the modules, builds each one and compiles the Control Rig. Research at Tokyo University of Technology.',
+      ja: '制作中。MayaのリグをUnreal Engine 5.6のControl Rigとして自動で再構築するツール。Mayaで各ジョイントチェーンをモジュール（FK、IK、IK/FK切替、スプラインIK）としてタグ付けし、その情報をマニフェストとしてFBXに埋め込んで書き出します。Unreal側ではPythonのビルダーがマニフェストを読み込み、モジュールを順番に組み立ててControl Rigをコンパイルします。東京工科大学での研究。' },
+    media: [
+      { label: { en: 'How it works', ja: '仕組み' }, src: 'media/kotsudo/pipeline-diagram.png' },
+      { label: { en: 'Walkthrough: from Maya to Unreal', ja: '手順の紹介：MayaからUnrealへ' }, src: 'media/kotsudo/kotsudo-walkthrough.mp4' }] },
   { id: 'proto', cat: 'rigs', year: '2026.10.30', time: { en: '1 week', ja: '1週間' }, thumb: 'media/proto/thumb.jpg',
     title: { en: 'Proto', ja: 'Proto' },
     kind: { en: 'Fast rig workflow test', ja: 'スピードリグのワークフローテスト' },
@@ -751,17 +761,7 @@ const ALL_PROJECTS = [
       ja: 'David Torok と Jade Xu 徐慧慧 の素晴らしいパフォーマンスに着想を得たボディメカニクスの練習。Ramon Arango 氏による非常に扱いやすいリグを使用。' },
     media: [
       { label: { en: 'Animation', ja: 'アニメーション' }, src: 'media/fighting/fighting.mp4' },
-      { label: { en: 'Reference', ja: 'リファレンス' }, src: 'media/fighting/fighting-reference.mp4' }] },
-  { id: 'ue5-converter', cat: 'tools', year: '2025–26', thumb: '',
-    title: { en: 'Maya to UE5 Control Rig converter', ja: 'Maya → UE5 Control Rig 変換ツール' },
-    kind: { en: 'Research tool', ja: '研究ツール' },
-    role: { en: 'Research and development', ja: '研究・開発' },
-    software: ['Maya', 'Unreal Engine 5', 'Python'],
-    summary: { en: 'Rebuilds a Maya rig as an Unreal Engine 5 Control Rig automatically. Research at Tokyo University of Technology.',
-      ja: 'MayaのリグをUnreal Engine 5のControl Rigとして自動で再構築するツール。東京工科大学での研究。' },
-    media: [
-      { label: { en: 'Before and after', ja: '変換前と変換後' }, src: '' },
-      { label: { en: 'Walkthrough', ja: '手順の紹介' }, src: '' }] }
+      { label: { en: 'Reference', ja: 'リファレンス' }, src: 'media/fighting/fighting-reference.mp4' }] }
 ];
 
 const T = {
@@ -786,7 +786,7 @@ const T = {
     's1d': 'The final look.', 's2d': 'Topology and edge flow, laid out for deformation.',
     's3d': 'Joint placement and orientation.', 's4d': 'What the animator touches.',
     'latest.title': 'Latest additions', 'latest.all': 'See all work', 'slot.todo': 'add file',
-    'wk.all': 'All', 'wk.empty': 'Empty slot', 'cat.rigs': 'Rigs', 'cat.tools': 'Tools', 'cat.animation': 'Animation',
+    'wk.all': 'All', 'wk.empty': 'Empty slot', 'cat.rigs': 'Rigs', 'cat.tools': 'Tools', 'cat.animation': 'Animation', 'cat.research': 'Research',
     'pj.back': 'All work', 'pj.prev': 'Previous', 'pj.next': 'Next',
     'pj.type': 'Type', 'pj.year': 'Date', 'pj.time': 'Time spent', 'pj.role': 'Role', 'pj.soft': 'Software',
     'ab.bio1': 'I am a rigging artist and technical animator. Through research on 3D animation and rigging, I work on improving the workflow between Maya and Unreal Engine.',
@@ -830,7 +830,7 @@ const T = {
     's1d': '完成時の見た目。', 's2d': '変形を考えたトポロジーとエッジフロー。',
     's3d': 'ジョイントの配置と軸の向き。', 's4d': 'アニメーターが触る部分。',
     'latest.title': '最新の追加', 'latest.all': 'すべての作品を見る', 'slot.todo': 'ファイル未設定',
-    'wk.all': 'すべて', 'wk.empty': '空き枠', 'cat.rigs': 'リグ', 'cat.tools': 'ツール', 'cat.animation': 'アニメーション',
+    'wk.all': 'すべて', 'wk.empty': '空き枠', 'cat.rigs': 'リグ', 'cat.tools': 'ツール', 'cat.animation': 'アニメーション', 'cat.research': '研究',
     'pj.back': '作品一覧', 'pj.prev': '前へ', 'pj.next': '次へ',
     'pj.type': '種別', 'pj.year': '制作日', 'pj.time': '制作期間', 'pj.role': '担当', 'pj.soft': '使用ソフト',
     'ab.bio1': '3Dアニメーションとリギングの研究を通して、MayaとUnreal Engineのワークフローを改善することを目指しています。',
