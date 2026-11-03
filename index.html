@@ -20,7 +20,7 @@
 <style>[hidden]{display:none!important}img{max-width:100%}</style>
 </head>
 <body>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+1+Code:wght@300..700&family=Tektur:wdth,wght@75..100,400..900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+1+Code:wght@300..700&family=Tektur:wdth,wght@75..100,400..900&display=swap">
 <style>
 /* Layout: a four-column blueprint grid with visible hairlines between two rails.
    One pinned stage in the centre columns carries the character down the page
@@ -426,6 +426,9 @@ a.gtile:hover b{text-decoration:underline;text-decoration-color:var(--accent);te
 @media (max-width:40rem){.run-tl{right:var(--pad)}}
 
 /* Japanese headings fall back to the mono face, which sits taller: give them more line height. */
+/* Japanese for the two giant lines (role marquee, name at the foot): a heavy blocky face next to Tektur */
+html:lang(ja) .mq span,html:lang(ja) .sign p{font-family:'Dela Gothic One',var(--display);font-weight:400;letter-spacing:0}
+html:lang(ja) .sign p{font-size:calc(100cqi / 7.35)}
 html:lang(ja) h1.disp{line-height:1.2}
 
 /* Software logos next to their names: the PNG in the current theme's ink shows, the other hides. */
@@ -524,7 +527,7 @@ body[data-view="page"] .lore--bg{display:none}
       <section class="row band" aria-label="Role">
         <i class="dot"></i><i class="dot"></i><i class="dot"></i>
         <div class="mq disp" aria-hidden="true">
-          <span>Character rigging</span><span>Technical animation</span><span>Character rigging</span><span>Technical animation</span>
+          <span data-i18n="hero.role1">Character rigging</span><span data-i18n="hero.role2">Technical animation</span><span data-i18n="hero.role1">Character rigging</span><span data-i18n="hero.role2">Technical animation</span>
         </div>
       </section>
 
@@ -618,7 +621,7 @@ body[data-view="page"] .lore--bg{display:none}
           <h2 class="label" id="fd-h" data-i18n="ft.find" style="margin-bottom:.8rem">Find me</h2>
           <ul class="links" data-links></ul>
         </section>
-        <div class="sign"><p class="disp" aria-hidden="true">Jeff Kharrat</p></div>
+        <div class="sign"><p class="disp" aria-hidden="true" data-i18n="sign">Jeff Kharrat</p></div>
         <div class="foot">
           <span>&copy; 2026 Jean-François Kharrat</span>
           <button class="btn btn--line js-theme" type="button"><span data-i18n="ft.theme">Light / dark</span></button>
@@ -825,6 +828,7 @@ const T = {
     'logo.role': 'rigging / tech anim', 'home': 'Home',
     'nav.work': 'Work', 'nav.reel': 'Reel', 'nav.tools': 'Tools', 'nav.skills': 'Skill tree', 'nav.about': 'About',
     'nav.contact': 'Contact', 'nav.menu': 'Menu',
+    'sign': 'Jeff Kharrat',
     'hero.role1': 'Character rigging', 'hero.role2': 'Technical animation',
     'hero.intro': 'I strive to become a technical animator. I currently specialise in rigging in Maya and Unreal Engine, and I also animate at an amateur level.',
     'hero.cta': 'Play the reel',
@@ -872,6 +876,7 @@ const T = {
     'logo.role': 'リギング / テクニカルアニメ', 'home': 'ホーム',
     'nav.work': '作品', 'nav.reel': 'デモリール', 'nav.tools': 'ツール', 'nav.skills': 'スキルツリー', 'nav.about': 'プロフィール',
     'nav.contact': 'お問い合わせ', 'nav.menu': 'メニュー',
+    'sign': 'カラットジェフ',
     'hero.role1': 'キャラクターリギング', 'hero.role2': 'テクニカルアニメーション',
     'hero.intro': 'テクニカルアニメーターを目指しています。現在はMayaとUnreal Engineでのリギングを専門にしており、アニメーションもアマチュアレベルで手がけています。',
     'hero.cta': 'デモリールを再生',
