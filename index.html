@@ -768,7 +768,7 @@ const SITE = {
     controls: { dark: 'media/stage/oni_dark_controls.webm', light: 'media/stage/oni_light_controls.webm' },
     reel: 'https://youtu.be/6N0kjsM0SSk' },   // reel: a YouTube link or a video file
   intro: 'always', // the intro behind the home page: 'always' plays on every load, 'once' once per browser, 'off' never
-  intros: ['origin', 'vault', 'bloom', 'gimbal', 'matrix'],   // intros to pick from at random on each load (never the same one twice in a row)
+  intros: ['origin', 'vault', 'bloom', 'gimbal', 'matrix', 'hyper', 'hopf'],   // intros to pick from at random on each load (never the same one twice in a row)
   cast: 'Proto',   // the character the origin assembles: shown on the rack label and in the last caption
   cv: '',          // path to your CV PDF
   emptyTiles: 0    // the Work page pads its grid with empty slots up to this many tiles; set to 0 once it is full
@@ -839,6 +839,8 @@ const T = {
     'bloom.1': 'Signal', 'bloom.2': 'Rain', 'bloom.3': 'Notice', 'bloom.4': 'Chosen', 'bloom.5': '{cast} online',
     'gimbal.1': 'Three rings', 'gimbal.2': 'Gimbal lock', 'gimbal.3': 'Four dimensions', 'gimbal.4': 'One rotation', 'gimbal.5': '{cast} online',
     'matrix.1': 'Space', 'matrix.2': 'Transform', 'matrix.3': 'Multiply', 'matrix.4': 'Chain', 'matrix.5': '{cast} online',
+    'hyper.1': 'Fourth axis', 'hyper.2': 'Rotate in 4D', 'hyper.3': 'Inside', 'hyper.4': '120 cells', 'hyper.5': '{cast} online',
+    'hopf.1': 'Sheet', 'hopf.2': 'Glue', 'hopf.3': 'Fibres', 'hopf.4': 'Fibration', 'hopf.5': '{cast} online',
     'side.slot': 'Detail loop slot, 1:1', 'side.works': 'Works in',
     'inside.lede': 'Scroll to take the character apart, in the order a rig is built.',
     's1': 'Shaded', 's2': 'Wireframe', 's3': 'Skeleton', 's4': 'Controls',
@@ -887,6 +889,8 @@ const T = {
     'bloom.1': '信号', 'bloom.2': '雨', 'bloom.3': '気づき', 'bloom.4': '選ばれた一輪', 'bloom.5': '{cast} 起動',
     'gimbal.1': '三つの輪', 'gimbal.2': 'ジンバルロック', 'gimbal.3': '四次元', 'gimbal.4': 'ひとつの回転', 'gimbal.5': '{cast} 起動',
     'matrix.1': '空間', 'matrix.2': '変換', 'matrix.3': '乗算', 'matrix.4': '連鎖', 'matrix.5': '{cast} 起動',
+    'hyper.1': '第四の軸', 'hyper.2': '四次元の回転', 'hyper.3': '内側へ', 'hyper.4': '正百二十胞体', 'hyper.5': '{cast} 起動',
+    'hopf.1': '一枚の面', 'hopf.2': '貼り合わせ', 'hopf.3': 'ファイバー', 'hopf.4': 'ホップ束', 'hopf.5': '{cast} 起動',
     'side.slot': 'ディテールループ枠 1:1', 'side.works': '使用ツール',
     'inside.lede': 'スクロールすると、リグを組む順番でキャラクターが分解されていきます。',
     's1': 'シェーディング', 's2': 'ワイヤーフレーム', 's3': 'スケルトン', 's4': 'コントローラー',
@@ -2079,8 +2083,346 @@ const lore = (() => {
     return yF <= -.05 ? 1 : cl((y - G.y0) / H);
   }
 
+  /* ----- shared by the two 4D intros: lines in camera space, clipped at the near plane and stroked in a few batches ----- */
+  const XB = new Map();
+  function xline(a, b, F, px, py, col, al, w) {                          // a, b: [right, up, forward] in camera space
+    const n = .03;
+    if (al < .012 || (a[2] < n && b[2] < n)) return;
+    if (a[2] < n) { const k = (n - a[2]) / (b[2] - a[2]); a = [mix(a[0], b[0], k), mix(a[1], b[1], k), n]; }
+    else if (b[2] < n) { const k = (n - b[2]) / (a[2] - b[2]); b = [mix(b[0], a[0], k), mix(b[1], a[1], k), n]; }
+    const ai = Math.min(11, al * 12 | 0), wi = Math.min(9, Math.max(1, Math.round(w * 2))), key = col + '|' + ai + '|' + wi;
+    let L = XB.get(key);
+    if (!L) XB.set(key, L = { col, ai, al: (ai + .6) / 12, w: wi / 2, p: [] });
+    L.p.push(px + F * a[0] / a[2], py - F * a[1] / a[2], px + F * b[0] / b[2], py - F * b[1] / b[2]);
+  }
+  function xflush(A) {                                                    // faint and thin first, so the near lines end up on top
+    [...XB.values()].sort((x, y) => x.ai - y.ai || x.w - y.w).forEach(L => {
+      g.globalAlpha = A * L.al; g.strokeStyle = L.col; g.lineWidth = L.w; g.beginPath();
+      for (let i = 0; i < L.p.length; i += 4) { g.moveTo(L.p[i], L.p[i + 1]); g.lineTo(L.p[i + 2], L.p[i + 3]); }
+      g.stroke();
+    });
+    XB.clear();
+  }
+  function xread(G, R0, rows, al, w = 236) {                              // a read-out by the stage's left edge: [text, colour, alpha]
+    if (al <= .01 || G.B <= 230) return;
+    const sr = stage.getBoundingClientRect(), x = Math.max(24, sr.left - cv.getBoundingClientRect().left + 22), y = G.A[1] - R0 * .86;
+    g.globalAlpha = al * .82; g.fillStyle = C.ground; g.fillRect(x - 10, y - 14, w, rows.length * 15 + 14);
+    rows.forEach(([s, c, a = 1], i) => { if (s) text(s, x, y + i * 15, c, al * a); });
+  }
+  const r4 = (p, i, j, a) => { const c = Math.cos(a), s = Math.sin(a), o = p.slice(); o[i] = p[i] * c - p[j] * s; o[j] = p[i] * s + p[j] * c; return o; };
+
+  /* ===== intro 6: hyper =====
+     After Jeff Weeks' Curved Spaces (one of the programs on Jonathan Rogness's "Visualization of 3D Mathematics" page).
+     1. A point is pulled out into a segment, a square, a cube and, along a fourth axis W, a tesseract. The copy of the cube
+        goes inward: W is drawn as depth from a 4D eye at w = 2, so the far cube is the small one.
+     2. It turns in the XW plane, so the inner and outer cubes swap places, then in XW and YZ at once.
+     3. The camera flies in through the outer cube and the frustum around it to the centre of the inner one. From there the
+        4D perspective and the view from inside the 3-sphere S³ are the same picture: a point's screen position is
+        (x/z, y/z) either way, so the eye's distance drops out. Flying on along a great circle is then a rotation of the shape
+        in the ZW plane: the camera looks a little off the path (straight down it, every vertex of the 8-cell lines up with
+        another) and crosses one cube wall into the next cell, three cubes round every edge.
+     4. The cubes refine into the 120-cell: 120 dodecahedra filling S³. The camera keeps going along the same kind of great
+        circle, through the middle of a pentagon door every 36°, ten cells, all the way round and back into the first one.
+     5. It pulls out through the layers to the whole 120-cell, seen from a 4D eye just outside one cell, with the ten doors
+        it flew through drawn as a ring. The digital floor fades in and the figure scans in. */
+  const X_END = 15, X_SW = 8.2, XBEAT = [0, 2.6, 5.4, X_SW, 12.6], XSIG = [[7.05, 0], [X_SW, Math.PI / 2], [12.5, 2.5 * Math.PI]];   // X_SW: cubes to dodecahedra, at a cell centre
+  const XT_V = Array.from({ length: 16 }, (_, n) => [0, 1, 2, 3].map(k => (n >> k & 1 ? .5 : -.5)));
+  const XT_E = [];
+  for (let a = 0; a < 16; a++) for (let k = 0; k < 4; k++) { const b = a ^ (1 << k); if (a < b) XT_E.push([a, b, k]); }
+  let X120 = null;
+  function x120() {                                                       // built the first time it is needed
+    if (X120) return X120;
+    const ph = (1 + Math.sqrt(5)) / 2, ip = 1 / ph, s5 = Math.sqrt(5), V = [], seen = new Set();
+    const EV = [[0, 1, 2, 3], [0, 2, 3, 1], [0, 3, 1, 2], [1, 0, 3, 2], [1, 2, 0, 3], [1, 3, 2, 0], [2, 0, 1, 3], [2, 1, 3, 0], [2, 3, 0, 1], [3, 0, 2, 1], [3, 1, 0, 2], [3, 2, 1, 0]];
+    const ALL = EV.concat(EV.map(e => [e[1], e[0], e[2], e[3]]));      // the odd permutations: an even one, then a swap
+    const put = v => { const k = v.map(x => Math.round(x * 1e4)).join(); if (!seen.has(k)) { seen.add(k); V.push(v.map(x => x / Math.sqrt(8))); } };
+    [[[2, 2, 0, 0], ALL], [[s5, 1, 1, 1], ALL], [[ph, ph, ph, ip * ip], ALL], [[ph * ph, ip, ip, ip], ALL], [[ph * ph, ip * ip, 1, 0], EV], [[s5, ip, ph, 0], EV], [[2, 1, ph, ip], EV]]
+      .forEach(([b, P]) => { for (let m = 0; m < 16; m++) { const s = b.map((x, i) => (m >> i & 1 ? -x : x)); P.forEach(e => put(e.map(i => s[i]))); } });
+    /* turned so that one cell is centred on -w and the line to its neighbour (a 600-cell edge, 36°) runs toward +z */
+    const nb = [1 / (2 * ph), .5, 0, -ph / 2], fb = unit([nb[0], nb[1], nb[2]]);
+    const e0 = Math.abs(fb[0]) < .9 ? [1, 0, 0] : [0, 1, 0], r0 = unit(sub(e0, mul(fb, dot3(e0, fb)))), r1 = cross(fb, r0);
+    const U = V.map(v => [dot3(r0, v), dot3(r1, v), dot3(fb, v), v[3]]), E = [];
+    for (let i = 0; i < U.length; i++) for (let j = i + 1; j < U.length; j++) { const a = U[i], b = U[j]; if (a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3] > .962) E.push([i, j]); }
+    const DOOR = [];                                                       // the pentagon between each cell on the path and the next
+    for (let k = 0; k < 10; k++) {
+      const s = (k + .5) * Math.PI / 5, c = [0, 0, Math.sin(s), -Math.cos(s)];
+      const five = U.map((v, i) => [v[0] * c[0] + v[1] * c[1] + v[2] * c[2] + v[3] * c[3], i]).sort((a, b) => b[0] - a[0]).slice(0, 5).map(x => x[1]);
+      DOOR.push({ s, e: E.filter(([i, j]) => five.includes(i) && five.includes(j)) });
+    }
+    return (X120 = { V: U, E, DOOR });
+  }
+  /* the camera rides along a great circle: the shape is turned back the other way in the plane of -w (where the camera is) and +z (where it looks) */
+  const xride = (p, s) => { const c = -p[3], f = p[2], cs = Math.cos(s), sn = Math.sin(s); return [p[0], p[1], -c * sn + f * cs, -(c * cs + f * sn)]; };
+  function hyperIntro(G, t) {
+    fadeWorld(G, t + 14, st(13.8, 14.8, t));
+    if (t >= X_END) return 1;
+    if (t > 1 && !X120) x120();                                           // build the 120-cell early, while the tesseract is still simple
+    const A = st(-.35, .05, t) * (t < .6 && (t * 20 | 0) % 3 === 0 ? .4 : 1), R0 = Math.min(G.S * .46, cw * .34);
+    const big = t >= X_SW, sig = qkey(XSIG, t), fly = eio(st(5.5, 7.05, t)), out = eio(st(12.6, 14.2, t)), kin = fly * (1 - out);
+    /* camera: an orbit, then into the centre of the inner cube looking along +z, then back out on the far side */
+    const L0 = 5.2, L1 = 6.5, F0 = L0 * R0 * .58, Fw = Math.max(cw, ch) * mix(.52, .36, st(8.4, 9.6, t)), F1 = L1 * R0 * 1.35;
+    const L = out > 0 ? Math.exp(mix(Math.log(.002), Math.log(L1), out)) : L0 * (1 - fly);
+    const F = out > 0 ? Math.exp(mix(Math.log(Fw), Math.log(F1), eio(st(12.6, 13.9, t)))) : Math.exp(mix(Math.log(F0), Math.log(Fw), fly));
+    /* inside, the camera looks a little off the way it flies: straight down the path every vertex of the 8-cell lines up with another */
+    const look = mix(1, .3, eio(st(8.4, 9.8, t))), yaw = mix(-.6 + .22 * t, .62 * look, fly) + .3 * out + .06 * Math.max(0, t - 13), pit = mix(.38, .42 * look, fly) + .1 * out;
+    const roll = 1.25 * eio(st(8, 12.5, t)) * (1 - .6 * out), cr = Math.cos(roll), sr = Math.sin(roll);
+    const px = mix(G.A[0], cw / 2, kin), py = mix(G.A[1], ch / 2, kin);
+    const D = big ? 1.3 : 2, K = big ? 1.3 - .9256 : 3;
+    const cam = q => { let P = [q[0] * K / (D - q[3]), q[1] * K / (D - q[3]), q[2] * K / (D - q[3])]; P = rx(ry(P, yaw), pit); return [P[0] * cr - P[1] * sr, P[0] * sr + P[1] * cr, P[2] + L]; };
+    const geo = q => Math.acos(cl(-q[3], -1, 1)) / Math.PI;               // distance from the camera's cell along S³, as a share of the way to the far side
+
+    if (!big) {
+      /* beats 1-3: the tesseract, built, turned, entered, then flown through */
+      const ext = [0, 1, 2, 3].map(k => eio(st(.25 + k * .5, .7 + k * .5, t)));
+      const xw = Math.PI * eio(st(2.7, 4.3, t)) + Math.PI * eio(st(4.3, 5.5, t)), yz = Math.PI * eio(st(4.3, 5.5, t));
+      const Q = XT_V.map(v => {
+        let p = [v[0] * ext[0], v[1] * ext[1], v[2] * ext[2], v[3] > 0 ? .5 : .5 - ext[3]];
+        p = r4(r4(p, 0, 3, xw), 1, 2, yz);
+        return xride(p, sig);
+      });
+      const P = Q.map(cam), fo = Q.map(q => mix(.92, Math.min(1, 1.5 * Math.pow(1 - geo(q), 1.1)), kin)), wd = Q.map(q => mix(1.6, 1.2 + 3.4 * Math.pow(1 - geo(q), 3), kin));
+      const AX = [C.R, C.Y, C.L, C.acc];
+      XT_E.forEach(([a, b, k]) => {
+        if (ext[k] <= 0 || [0, 1, 2, 3].some(j => j !== k && ext[j] <= 0 && (a >> j & 1))) return;   // only what has been built so far
+        const grow = ext[k] < 1;
+        xline(P[a], P[b], F, px, py, grow ? C.acc : AX[k], (fo[a] + fo[b]) / 2, grow ? 2 : (wd[a] + wd[b]) / 2);
+      });
+      xflush(A);
+      Q.forEach((q, i) => {                                               // the vertices, while it is small enough to read
+        if (kin > .6 || i & ~((ext[0] > 0 ? 1 : 0) | (ext[1] > 0 ? 2 : 0) | (ext[2] > 0 ? 4 : 0) | (ext[3] > 0 ? 8 : 0))) return;
+        const c = P[i]; if (c[2] < .1) return;
+        const x = px + F * c[0] / c[2], y = py - F * c[1] / c[2], r = 2.5;
+        g.globalAlpha = A * (1 - kin) * fo[i]; g.fillStyle = C.ink; g.fillRect(x - r, y - r, r * 2, r * 2);
+      });
+      if (t < 2.6 && G.B > 230) {                                          // the new axis, named at the copy that is moving out
+        const k = Math.min(3, Math.max(0, Math.floor((t - .25) / .5))), c = P[k === 3 ? 7 : 1 << k];
+        const on = st(0, .15, ext[k]) * (k === 3 ? 1 : 1 - st(.95 + k * .5, 1.15 + k * .5, t));
+        if (c[2] > .1 && on > 0) text(['X', 'Y', 'Z', 'W'][k], px + F * c[0] / c[2] + 10, py - F * c[1] / c[2] - 10, AX[k], A * on, 'left', 14);
+      }
+    } else {
+      /* beats 4-5: the 120-cell, flown round a great circle, then seen whole */
+      const X = x120(), s = sig - Math.PI / 2, xw = .22 * Math.max(0, t - 13.2);
+      const Q = X.V.map(v => { const p = xride(v, s); return xw ? r4(p, 0, 3, xw) : p; }), P = Q.map(cam);
+      const fo = Q.map(q => mix(.12 + .5 * (1 + q[3]) / 2, Math.pow(1 - geo(q), 1.5), kin)), wd = Q.map(q => mix(.8, .5 + 2.8 * Math.pow(1 - geo(q), 5), kin));
+      X.E.forEach(([a, b]) => xline(P[a], P[b], F, px, py, C.ink, (fo[a] + fo[b]) / 2, (wd[a] + wd[b]) / 2));
+      X.DOOR.forEach(d => {                                                // the ten doors on the path, brightest as the camera goes through
+        const near = Math.exp(-Math.pow(((s - d.s) % TAU + TAU + Math.PI) % TAU - Math.PI, 2) / .04);
+        d.e.forEach(([a, b]) => xline(P[a], P[b], F, px, py, C.acc, Math.min(1, .4 + .6 * near + .4 * out) * Math.max(fo[a], .6), mix(1.6, 1.8 + 3 * near, kin)));
+      });
+      xflush(A * (1 - st(13.9, 14.7, t)));
+    }
+
+    /* the switch from cubes to dodecahedra, in the middle of a cell */
+    if (t > X_SW - .15 && t < X_SW + .25) {
+      const u = (t - X_SW + .15) / .4, r = Math.max(cw, ch) * (.1 + eo(u) * .9);
+      g.globalAlpha = (1 - u) * .8; g.strokeStyle = C.acc; g.lineWidth = 2;
+      g.beginPath(); for (let k = 0; k <= 5; k++) { const a = -Math.PI / 2 + k * TAU / 5 + roll; g[k ? 'lineTo' : 'moveTo'](px + Math.cos(a) * r, py + Math.sin(a) * r); } g.stroke();
+    }
+    /* read-outs */
+    const ra = A * st(.4, .8, t) * (1 - st(13.6, 14, t));
+    if (t < 2.6) {
+      const n = Math.min(4, Math.max(0, Math.floor((t - .25) / .5) + (t > .25 ? 1 : 0))), rows = [['ONE MORE AXIS', C.ink]];
+      [['POINT', 1, 0], ['SEGMENT', 2, 1], ['SQUARE', 4, 4], ['CUBE', 8, 12], ['TESSERACT', 16, 32]].forEach(([nm, v, e], i) =>
+        rows.push([(nm + '          ').slice(0, 11) + 'V ' + String(v).padEnd(4) + 'E ' + e, i === n ? C.acc : C.ink2, i <= n ? 1 : .35]));
+      rows.push(['', C.ink], ['W: THE 4TH AXIS, AWAY FROM YOU', C.ink2, st(1.75, 2.1, t)]);
+      xread(G, R0, rows, ra);
+    } else if (t < 5.4) {
+      const xw = Math.PI * eio(st(2.7, 4.3, t)) + Math.PI * eio(st(4.3, 5.5, t)), yz = Math.PI * eio(st(4.3, 5.5, t)), c = Math.cos(xw), s = Math.sin(xw), c2 = Math.cos(yz), s2 = Math.sin(yz);
+      const a = st(2.6, 2.9, t) * (1 - st(5.1, 5.4, t));
+      if (G.B > 230 && a > 0) {
+        const sr2 = stage.getBoundingClientRect(), x = Math.max(24, sr2.left - cv.getBoundingClientRect().left + 22);
+        mhud(x, G.A[1] - R0 * .82, [[c, 0, 0, -s], [0, c2, -s2, 0], [0, s2, c2, 0], [s, 0, 0, c]], [C.R, C.Y, C.L, C.acc], ra * a, t < 4.3 ? 'R = XW(' + qdeg(xw).trim() + '°)' : 'R = XW · YZ',
+          t < 4.3 ? 'INNER AND OUTER CUBES SWAP' : 'TWO PLANES AT ONCE', 'ROTATE IN A PLANE, NOT ABOUT AN AXIS');
+      }
+    } else if (t < X_SW) {
+      xread(G, R0, [['INSIDE THE INNER CUBE', C.ink, st(6.4, 6.8, t)], ['', C.ink], ['FROM HERE THE 4D VIEW', C.ink2, st(6.8, 7.1, t)], ['IS THE VIEW INSIDE S³', C.ink2, st(6.8, 7.1, t)],
+        ['', C.ink], ['8 CUBES FILL IT', C.acc, st(7.2, 7.5, t)], ['3 ROUND EVERY EDGE', C.ink2, st(7.4, 7.7, t)]], ra * st(6.3, 6.7, t));
+    } else if (t < 12.6) {
+      const s = sig - Math.PI / 2, cell = Math.min(10, Math.floor((s / (Math.PI / 5)) + .5) % 10 + 1), home = st(12.1, 12.4, t);
+      xread(G, R0, [['120 DODECAHEDRA', C.ink], ['FILL THE 3-SPHERE', C.ink2], ['', C.ink], ['CELL ' + String(home > .5 ? 1 : cell).padStart(2, '0') + ' / 10 ON THIS CIRCLE', C.acc],
+        ['TRAVELLED ' + (s / TAU).toFixed(2) + ' × 2π', C.ink2], ['', C.ink], ['STRAIGHT ON LEADS HOME', C.ink, home]], ra * st(X_SW + .1, X_SW + .5, t));
+    } else xread(G, R0, [['120-CELL', C.ink], ['600 V · 1200 E', C.ink2], ['720 F · 120 C', C.ink2], ['', C.ink], ['BRIGHT: THE TEN DOORS FLOWN', C.acc]], A * st(13, 13.4, t) * (1 - st(13.9, 14.3, t)));
+
+    if (t > 13.9) for (let n = 0; n < 3; n++) {                            // a flash of corner marks on the figure, and the scan starts
+      const u = (t - 13.9 - n * .14) / .7; if (u < 0 || u >= 1) continue;
+      brackets(G.A, R0 * (.08 + eo(u) * 1.3), n === 1 ? C.ink : C.acc, Math.pow(1 - u, 1.5), 1.6);
+    }
+    tear(t - X_SW - .02 + 10.55); tear(t - 14.05 + 10.42);
+    return cl((t - 14.05) / .9);
+  }
+
+  /* ===== intro 7: hopf =====
+     After the torus gluing applets on Jonathan Rogness's "Visualization of 3D Mathematics" page, then the Hopf fibration.
+     1. A flat sheet, the (u, v) square, with arrows on the edges that get glued, and its diagonals u + v = const.
+     2. The two-stage gluing: the sheet rolls into a cylinder (v edges meet), then the cylinder bends round into a torus
+        (u edges meet). The torus it lands on is exactly the Clifford torus |z1| = |z2| in S³, seen in stereographic
+        projection, so the (u, v) grid is spaced the way that projection spaces it.
+     3. On it the diagonals are circles (Villarceau circles), every pair linked once. They are fibres of the Hopf map.
+     4. More tori grow out of it, |z1| = cos η for other η, each one made of its own fibres; with the core circle and the
+        z axis (a circle through infinity) that is the whole of S³ as circles, one for each point of the sphere S²
+        (colour = longitude on S²). Everything flows along its fibre. The camera climbs over it and lines up with the axis.
+     5. It dives down the axis, through the holes of every torus and through the core ring, which flies out past the
+        screen. The fibres fall away behind, the digital floor fades in and the figure scans in. */
+  const H_END = 13.4, HBEAT = [0, 2.2, 4.7, 7.2, 11.2], HR = Math.SQRT2, HS = Math.SQRT1_2;
+  const hDive = t => st(9.3, 11.55, t);
+  const hDc = t => mix(mix(11, 8.6, eio(st(2.4, 5, t))), 17, eio(st(7.2, 9.4, t))) - 23 * Math.pow(hDive(t), 1.6);
+  const H_PASS = (() => { let a = 9.3, b = 11.55; for (let n = 0; n < 40; n++) { const m = (a + b) / 2; if (hDc(m) > 0) a = m; else b = m; } return a; })();   // when the camera goes through the core ring
+  const HETA = [.2, .47, Math.PI / 4, 1.08, 1.36], HN = [10, 12, 12, 12, 14];
+  function hpsi(v) {                                                      // the tube angle of the point v on the Clifford torus
+    const b = Math.PI / 2 - v, d = 1 - HS * Math.sin(b);
+    let p = Math.atan2(HS * Math.cos(b) / d, HS / d - HR);
+    if (v > .5 && p < 0) p += TAU; if (v < -.5 && p > 0) p -= TAU;
+    return p;
+  }
+  function hsheet(u, v, ka, kb) {                                        // the sheet, rolled by ka and bent by kb
+    const h = mix(v, hpsi(v), ka);
+    let oR = 1, oZ = h;
+    if (ka > 1e-3) { const rr = 1 / ka, a = ka * h; oR = rr * Math.cos(a) - rr + 1; oZ = rr * Math.sin(a); }
+    let ax = HR, ay = HR * u, nx = 1, ny = 0;
+    if (kb > 1e-3) { const rb = HR / kb, th = kb * u; ax = HR - rb + rb * Math.cos(th); ay = rb * Math.sin(th); nx = Math.cos(th); ny = Math.sin(th); }
+    return [ax + oR * nx, ay + oR * ny, oZ];
+  }
+  function hpt(u, v, eta) {                                              // (cos η e^iu, sin η e^iβ) in S³, β = π/2 - v, projected from (0, 0, 0, 1)
+    const b = Math.PI / 2 - v, c = Math.cos(eta), s = Math.sin(eta), d = Math.max(1e-4, 1 - s * Math.sin(b));
+    return [c * Math.cos(u) / d, c * Math.sin(u) / d, s * Math.cos(b) / d];
+  }
+  const wrapA = a => ((a + Math.PI) % TAU + TAU) % TAU - Math.PI;
+  function hcol(lam, eta) {                                              // colour by the fibre's point on S²: hue = longitude, lightness = latitude
+    const dark = isDark(), l = (dark ? 64 : 44) + (dark ? 8 : -6) * Math.cos(2 * eta);
+    return 'hsl(' + ((lam / TAU * 360 + 205) % 360).toFixed(0) + ',' + (dark ? 78 : 70) + '%,' + l.toFixed(0) + '%)';
+  }
+  function hopfIntro(G, t) {
+    fadeWorld(G, t + 14, st(11.8, 12.9, t));
+    if (t >= H_END) return 1;
+    const A = st(-.35, .05, t) * (t < .6 && (t * 20 | 0) % 3 === 0 ? .4 : 1), R0 = Math.min(G.S * .46, cw * .34);
+    const ka = eio(st(2.35, 3.4, t)), kb = eio(st(3.55, 4.6, t)), grow = eio(st(7.2, 8.8, t)), flow = Math.max(0, t - 5.2) * .9;
+    const dive = hDive(t), passT = H_PASS;
+    /* camera: an orbit with z up, climbing until it looks straight down the z axis, then diving along it */
+    const tx = mix(mix(HR + 1, HR, ka), 0, kb);
+    const yaw = .5 + .07 * t + 1.6 * eio(st(9.3, 11.8, t)), pit = mix(mix(.2, .5, eio(st(2.4, 5, t))), Math.PI / 2, eio(st(7.6, 9.6, t)));
+    const Dc = hDc(t);
+    const dir = [Math.cos(pit) * Math.cos(yaw), Math.cos(pit) * Math.sin(yaw), Math.sin(pit)], up = [-Math.sin(pit) * Math.cos(yaw), -Math.sin(pit) * Math.sin(yaw), Math.cos(pit)];
+    const E = [tx + dir[0] * Dc + .05 * dive, dir[1] * Dc, dir[2] * Dc], f = mul(dir, -1), rt = cross(f, up);
+    const F0 = R0 * 2.25, Fw = Math.max(cw, ch) * .4, F = Math.exp(mix(Math.log(F0), Math.log(Fw), eio(st(9.6, 10.9, t))));
+    const kc = eio(st(9.4, 10.6, t)) * (1 - st(11.4, 12.4, t)), px = mix(G.A[0], cw / 2, kc), py = mix(G.A[1], ch / 2, kc);
+    const cam = p => { const d = sub(p, E); return [dot3(d, rt), dot3(d, up), dot3(d, f)]; };
+    const fog = z => (z < .05 ? 0 : st(.05, .5, z) / (1 + Math.pow(z / mix(34, 14, dive), 2))), wid = z => cl(F * .011 / Math.max(.05, z), .7, 3.6);
+    const scr = c => (c[2] > .05 ? [px + F * c[0] / c[2], py - F * c[1] / c[2]] : null);
+    const poly3 = (pts, col, al, wmul = 1) => {                           // a 3D polyline (null breaks it), fogged by depth
+      let pc = null;
+      pts.forEach(p => { const c = p ? cam(p) : null; if (c && pc) xline(pc, c, F, px, py, col, al * fog((pc[2] + c[2]) / 2), wid((pc[2] + c[2]) / 2) * wmul); pc = c; });
+    };
+    const fade = 1 - st(11.6, 12.4, t);
+
+    /* beats 1-3: the sheet, glued into the Clifford torus; its grid gives way to the fibres */
+    const sheetA = 1 - st(6.2, 7.2, t);
+    if (sheetA > 0) {
+      const NU = 16, NV = 12, SM = 48;
+      for (let i = 0; i <= NU; i++) {                                      // lines of constant u (they close up when the v edges meet)
+        const u = -Math.PI + i / NU * TAU, edge = i === 0 || i === NU, pts = [];
+        for (let k = 0; k <= SM; k++) pts.push(hsheet(u, -Math.PI + k / SM * TAU, ka, kb));
+        poly3(pts, edge ? (kb > .97 ? C.acc : C.ink) : C.ink2, sheetA * (edge ? .95 : .6) * st(.05 + i * .02, .5 + i * .02, t), edge ? 1.4 : .8);
+      }
+      for (let j = 0; j <= NV; j++) {                                      // lines of constant v
+        const v = -Math.PI + j / NV * TAU, edge = j === 0 || j === NV, pts = [];
+        for (let k = 0; k <= SM; k++) pts.push(hsheet(-Math.PI + k / SM * TAU, v, ka, kb));
+        poly3(pts, edge ? (ka > .97 ? C.acc : C.ink) : C.ink2, sheetA * (edge ? .95 : .6) * st(.2 + j * .02, .65 + j * .02, t), edge ? 1.4 : .8);
+      }
+    }
+    const chA = sheetA * st(.6, 1, t) * (1 - st(4.4, 4.8, t));
+    if (chA > 0) [[-Math.PI, 0, 0, 1, 1], [Math.PI, 0, 0, 1, 1], [0, -Math.PI, 1, 0, 2], [0, Math.PI, 1, 0, 2]].forEach(([u, v, du, dv, n]) => {   // the gluing arrows: → on the u edges, ⇉ on the v edges
+      for (let k = 0; k < n; k++) {
+        const o = (k - (n - 1) / 2) * .32, a = scr(cam(hsheet(u + du * o, v + dv * o, ka, kb))), b = scr(cam(hsheet(u + du * (o + .2), v + dv * (o + .2), ka, kb)));
+        if (!a || !b) continue;
+        const ang = Math.atan2(b[1] - a[1], b[0] - a[0]), h = 8;
+        g.globalAlpha = A * chA; g.strokeStyle = C.acc; g.lineWidth = 1.8; g.beginPath();
+        g.moveTo(b[0] - Math.cos(ang - .55) * h, b[1] - Math.sin(ang - .55) * h); g.lineTo(b[0], b[1]); g.lineTo(b[0] - Math.cos(ang + .55) * h, b[1] - Math.sin(ang + .55) * h); g.stroke();
+      }
+    });
+    /* the fibres: diagonals of the sheet, then circles on the tori */
+    const fibA = st(.9, 1.6, t) * fade, lit = st(4.8, 5.4, t);
+    if (fibA > 0) HETA.forEach((eta0, ti) => {
+      if (ti !== 2 && grow <= 0) return;
+      const eta = mix(Math.PI / 4, eta0, grow), n = HN[ti], ta = ti === 2 ? 1 : st(0, .5, grow - Math.abs(ti - 2) * .12);
+      for (let m = 0; m < n; m++) {
+        const lam = m / n * TAU + (ti & 1 ? Math.PI / n : 0), col = hcol(lam, eta), pts = [], N = 96;
+        let pu = null, pv = null;
+        for (let k = 0; k <= N; k++) {
+          const s = k / N * TAU, u = wrapA(lam + s), v = wrapA(-s);
+          if (kb < 1 && pu !== null && (Math.abs(u - pu) > 3 || Math.abs(v - pv) > 3)) pts.push(null);   // a jump across a seam that is not glued yet
+          pts.push(ti === 2 && grow <= 0 ? hsheet(u, v, ka, kb) : hpt(u, v, eta));
+          pu = u; pv = v;
+        }
+        const al = fibA * ta * mix(.4, 1, lit) * (ti === 2 && m === 0 ? 1 : 1);
+        poly3(pts, col, al, mix(.8, 1.25, lit));
+        if (lit > 0 && dive < .9) for (let b = 0; b < 3; b++) {           // beads: everything flows along its own fibre
+          const s = ((flow * .35 + b / 3 + m * .07) % 1) * TAU, u = wrapA(lam + s), v = wrapA(-s), c = scr(cam(ti === 2 && grow <= 0 ? hsheet(u, v, ka, kb) : hpt(u, v, eta)));
+          if (!c) continue;
+          const z = cam(hpt(u, v, eta))[2], r = cl(F * .03 / Math.max(.1, z), 1.5, 5);
+          g.globalAlpha = A * al * lit * fog(z); g.fillStyle = col; g.fillRect(c[0] - r, c[1] - r, r * 2, r * 2);
+        }
+      }
+    });
+    xflush(A);
+    /* the two fibres that are not on any torus: the core circle (η = 0) and the z axis (η = 90°), which runs through infinity */
+    const cAl = A * st(7.4, 8.2, t) * fade;
+    if (cAl > 0) {
+      const ring = [], axis = [];
+      for (let k = 0; k <= 120; k++) ring.push([Math.cos(k / 120 * TAU), Math.sin(k / 120 * TAU), 0]);
+      for (let k = -60; k <= 60; k++) axis.push([0, 0, Math.sign(k) * Math.pow(Math.abs(k) / 60, 2) * 60]);
+      poly3(ring, C.acc, 1, 1.6); poly3(axis, C.ink, .9, 1.2);
+      xflush(cAl);
+    }
+    /* the linking: two fibres picked out on the Clifford torus, and a mark where one goes through the other */
+    const lk = A * st(5.6, 6.0, t) * (1 - st(6.9, 7.3, t));
+    if (lk > 0) {
+      [0, Math.PI].forEach((lam, i) => { const pts = []; for (let k = 0; k <= 120; k++) { const s = k / 120 * TAU; pts.push(hpt(wrapA(lam + s), wrapA(-s), Math.PI / 4)); } poly3(pts, i ? C.ink : C.acc, 1, 2.4); });
+      xflush(lk);
+    }
+
+    /* through the core ring: its edge flies out past the screen */
+    if (t > passT - .05 && t < passT + .6) {
+      const u = (t - passT) / .55;
+      if (u > 0 && u < 1) {
+        const r = Math.max(cw, ch) * (.5 + eo(u) * .8);
+        g.globalAlpha = 1 - u; g.strokeStyle = C.acc; g.lineWidth = Math.max(1, 9 * (1 - u)); oval([px, py], r, r); g.stroke();
+        g.globalAlpha = (1 - u) * .6; g.lineWidth = 2; g.strokeStyle = C.glA; oval([px - 10 * (1 - u), py], r, r); g.stroke(); g.strokeStyle = C.glB; oval([px + 10 * (1 - u), py], r, r); g.stroke();
+      }
+    }
+
+    /* read-outs */
+    const ra = A * st(.4, .8, t) * (1 - st(9.6, 10, t));
+    if (t < 2.2) xread(G, R0, [['TORUS = A SQUARE', C.ink], ['WITH ITS EDGES GLUED', C.ink2], ['', C.ink], ['u ≡ u + 2π   (→)', C.ink2], ['v ≡ v + 2π   (⇉)', C.ink2], ['', C.ink], ['DIAGONALS  u + v = c', C.acc, st(1.2, 1.6, t)]], ra);
+    else if (t < 4.7) xread(G, R0, [['TWO-STAGE GLUING', C.ink], ['', C.ink], ['1  v EDGES: CYLINDER', ka > .97 ? C.acc : C.ink2, st(2.3, 2.6, t)], ['2  u EDGES: TORUS', kb > .97 ? C.acc : C.ink2, st(3.5, 3.8, t)]], ra);
+    else if (t < 7.2) xread(G, R0, [['THE DIAGONALS ARE CIRCLES', C.ink], ['VILLARCEAU CIRCLES', C.ink2], ['', C.ink], ['THIS TORUS: |z₁| = |z₂|', C.ink2], ['THE CLIFFORD TORUS IN S³', C.ink2], ['', C.ink], ['ANY TWO LINK ONCE', C.acc, st(5.6, 6, t)]], ra);
+    else {
+      xread(G, R0, [['HOPF FIBRATION', C.ink], ['S³ AS CIRCLES OVER S²', C.ink2], ['', C.ink], ['ONE CIRCLE PER POINT', C.ink2], ['NONE TOUCH, ALL LINK', C.acc], ['', C.ink], ['', C.ink], ['', C.ink], ['', C.ink], ['', C.ink]], ra * st(7.3, 7.7, t));
+      const ia = ra * st(7.6, 8.1, t);                                     // the base sphere, with one dot for each fibre drawn
+      if (ia > .01 && G.B > 230) {
+        const sr2 = stage.getBoundingClientRect(), r = 34, c = [Math.max(24, sr2.left - cv.getBoundingClientRect().left + 22) + r + 4, G.A[1] - R0 * .86 + 15 * 6 + r - 4], ct = Math.cos(.35), stl = Math.sin(.35);
+        g.globalAlpha = ia * .8; g.strokeStyle = C.ink2; g.lineWidth = 1; oval(c, r, r); g.stroke(); oval(c, r, r * stl); g.stroke();
+        HETA.forEach((eta0, ti) => {
+          if (ti !== 2 && grow <= 0) return;
+          const eta = mix(Math.PI / 4, eta0, grow), lat = Math.PI / 2 - 2 * eta;
+          for (let m = 0; m < HN[ti]; m++) {
+            const lam = m / HN[ti] * TAU + (ti & 1 ? Math.PI / HN[ti] : 0), sp = lam + t * .4, X = Math.cos(lat) * Math.cos(sp), Y = Math.sin(lat), Z = Math.cos(lat) * Math.sin(sp);
+            g.globalAlpha = ia * (Z * ct - Y * stl < 0 ? .35 : 1); g.fillStyle = hcol(lam, eta); g.fillRect(c[0] + X * r - 2, c[1] - (Y * ct + Z * stl) * r - 2, 4, 4);
+          }
+        });
+        text('S²', c[0] + r + 8, c[1] - r + 6, C.ink2, ia);
+      }
+    }
+
+    if (t > 11.5) for (let n = 0; n < 3; n++) {
+      const u = (t - 11.5 - n * .14) / .7; if (u < 0 || u >= 1) continue;
+      brackets(G.A, R0 * (.08 + eo(u) * 1.3), n === 1 ? C.ink : C.acc, Math.pow(1 - u, 1.5), 1.6);
+    }
+    tear(t - passT + 10.5);
+    return cl((t - 11.75) / .9);
+  }
+
   /* ----- placing, timing, drawing ----- */
-  const RUN = { origin: 1, vault: 1, bloom: 1, gimbal: 1, matrix: 1 }, LIST = (SITE.intros || ['origin']).filter(n => RUN[n]);
+  const RUN = { origin: 1, vault: 1, bloom: 1, gimbal: 1, matrix: 1, hyper: 1, hopf: 1 }, LIST = (SITE.intros || ['origin']).filter(n => RUN[n]);
   if (!LIST.length) LIST.push('origin');
   function pick() {                                                       // a random intro, never the one shown last time
     const prev = store.get('intro-last'), pool = LIST.length > 1 ? LIST.filter(n => n !== prev) : LIST, m = pool[Math.random() * pool.length | 0];
@@ -2774,7 +3116,7 @@ const lore = (() => {
     tear(t - 4.75 + 10.42); tear(t - 12.65 + 10.42);
     return cl((t - 12.6) / .9);
   }
-  const endT = () => (mode === 'vault' ? V_END : mode === 'bloom' ? B_END : mode === 'gimbal' ? Q_END : mode === 'matrix' ? M_END : END_T);
+  const endT = () => (mode === 'vault' ? V_END : mode === 'bloom' ? B_END : mode === 'gimbal' ? Q_END : mode === 'matrix' ? M_END : mode === 'hyper' ? X_END : mode === 'hopf' ? H_END : END_T);
   const clock_t = () => (mode === 'origin' ? story(clock) : clock);
   /* a layer above the page (under the header) for anything that should come in front of it; cleared each frame it was used */
   const fx = mk('canvas', 'lore-fx'), fg = fx.getContext('2d');
@@ -2800,7 +3142,7 @@ const lore = (() => {
     return { S, ox, oy, y0, cy: oy - .9436 * CP * S, th: fr / 240 * TAU - .55, B: S * 1.2, A: [ox, cl(seen, oy - 1.5 * CP * S, oy - .95 * CP * S)] };
   }
   function caption(t) {
-    const B = mode === 'vault' ? VBEAT : mode === 'bloom' ? BBEAT : mode === 'gimbal' ? QBEAT : mode === 'matrix' ? MBEAT : BEAT;
+    const B = mode === 'vault' ? VBEAT : mode === 'bloom' ? BBEAT : mode === 'gimbal' ? QBEAT : mode === 'matrix' ? MBEAT : mode === 'hyper' ? XBEAT : mode === 'hopf' ? HBEAT : BEAT;
     let i = 0; while (i < 4 && t >= B[i + 1]) i++;
     if (done) i = 5;
     if (i === beat) return;
@@ -2852,7 +3194,8 @@ const lore = (() => {
     const tt = done && mode !== 'origin' ? Math.max(t, endT()) : t;
     if (mode !== 'bloom' && glUsed && FG) { FG.clear(); glUsed = false; }
     const rev = mode === 'vault' ? (done ? (vault(G, tt), 1) : vault(G, tt)) : mode === 'bloom' ? (done ? (bloom(G, tt), 1) : bloom(G, tt))
-      : mode === 'gimbal' ? (done ? (gimbalIntro(G, tt), 1) : gimbalIntro(G, tt)) : mode === 'matrix' ? (done ? (matrixIntro(G, tt), 1) : matrixIntro(G, tt)) : origin(G, t);
+      : mode === 'gimbal' ? (done ? (gimbalIntro(G, tt), 1) : gimbalIntro(G, tt)) : mode === 'matrix' ? (done ? (matrixIntro(G, tt), 1) : matrixIntro(G, tt))
+      : mode === 'hyper' ? (done ? (hyperIntro(G, tt), 1) : hyperIntro(G, tt)) : mode === 'hopf' ? (done ? (hopfIntro(G, tt), 1) : hopfIntro(G, tt)) : origin(G, t);
     g.restore(); g.globalAlpha = 1;
     fig.style.opacity = figOp < 1 ? figOp.toFixed(3) : '';
     fig.style.clipPath = rev >= 1 ? '' : 'inset(0 0 ' + ((1 - rev) * 100).toFixed(2) + '% 0)';
