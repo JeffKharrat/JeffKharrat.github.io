@@ -3714,11 +3714,37 @@ const run = (() => {
       vtx(PT, [xs(z) + off * nf / nl, .02 + .9 * sm(ZSP - 10, ZSP, z), z - off * nf * tx / nl], [j, edge ? 1 : 0, 0], [edge ? U_ACC : j % 3 ? U_GLB : U_ACC, 0, 0], .9, edge ? .14 : .1, -1, 0, 1);
     }
   }
+  /* nothing that floats may sit between a parked camera and its building: a cone from roughly where the camera parks
+     (two distances, since that depends on the window) to the building's bounds */
+  const VIEW = STOP.map(S => { const dir = unit([S.s * .6, -.2, .78]), R = Math.max(S.ext[0], S.ext[1], S.ext[2]) * .62 + 1.5; return [16, 40].map(D => ({ E: sub(S.Tb, mul(dir, D)), dir, D, R })); }).flat();
+  const blocks = (p, front = 0) => VIEW.some(V => { const d = sub(p, V.E), a = dot(d, V.dir); if (a < 0 || a > V.D + 4 - front * V.R) return false; const r = Math.hypot(...sub(d, mul(V.dir, a))); return r < V.R * Math.min(1, a / V.D) + 1; });
+  /* data cables: three arc between each building and the next, high over the road (so from a parked camera they come down onto
+     the roof from above, never across the building), and one runs along the floor and over the road (kind 1: pulses run along them) */
+  for (let k = 0; k < N - 1; k++) {
+    const A0 = STOP[k], B0 = STOP[k + 1];
+    /* both ends on the roof, on its far (+z) half: the parked cameras come from -z */
+    const end = (S, dx, dz) => [S.Tb[0] - S.s * S.ext[0] * dx, S.Tb[1] + S.ext[1] * .5 + .2, S.Tb[2] + S.ext[2] * .3 + dz];
+    [[.3, 0, 13, U_ACC], [.1, .8, 15.5, U_GLB], [-.1, -.8, 18, U_INK]].forEach(([dx, dz, lift, c], j) => {
+      const a = end(A0, dx, dz), b = end(B0, dx, -dz), L = Math.hypot(...sub(b, a)) + lift * 2, n = Math.round(L / .3);
+      for (let i = 0; i <= n; i++) {
+        const u = i / n, k2 = Math.sin(u * Math.PI), p = add(mixV(a, b, u), [Math.sin(u * Math.PI * 2 + j) * .6, lift * Math.pow(k2, .7), 0]);
+        vtx(PT, p, [j + 3, 0, .55], [c, 0, 0], .95, .13, -1, 0, 1);
+      }
+      [a, b].forEach(q => { for (let m = 0; m < 10; m++) vtx(PT, add(q, [(m % 3 - 1) * .12, (m / 3 | 0) * .12 - .15, 0]), [0, 0, 0], [U_ACC, 0, 0], 1, .1, -1, 0, 0); });   // a socket at each end
+    });
+    const zm = (A0.z + B0.z) / 2, g0 = [A0.Tb[0] - A0.s * A0.ext[0] * .5, .05, A0.Tb[2] + 4], g1 = [B0.Tb[0] - B0.s * B0.ext[0] * .5, .05, B0.Tb[2] + 4], gm = [xs(zm), .05, zm];
+    for (let i = 0; i <= 260; i++) {                                         // the floor cable: a curve through the road's middle, with a low hump over it
+      const u = i / 260, p = add(add(mul(g0, (1 - u) * (1 - u)), mul(gm, 2 * u * (1 - u))), mul(g1, u * u)), over = Math.max(0, 1 - Math.abs(p[0] - xs(p[2])) / (ROAD + 1.4));
+      p[1] = .05 + 1.1 * Math.sin(over * Math.PI / 2);
+      vtx(PT, p, [6, 0, .5], [i % 4 ? U_GLB : U_ACC, 0, 0], blocks(p, 1) ? .25 : .95, .13, -1, 0, 1);   // dimmed where it runs in front of a building
+    }
+  }
   /* lines of pixels running in all directions (kind 2: position from time in the shader) */
   for (let i = 0; i < 70; i++) {
     const z = -10 + rnd() * (ZSP + 10), sd = rnd() < .5 ? -1 : 1, kd = rnd(), d = kd < .4 ? [0, -1, 0] : kd < .6 ? [0, 1, 0] : kd < .8 ? [0, 0, 1] : [sd, 0, 0];
     const o = [xs(z) + sd * (2.5 + rnd() * 28), rnd() * 14, z], n = 6 + (rnd() * 9 | 0), len = 10 + rnd() * 10, sp = 1.5 + rnd() * 4, ph = rnd() * 20, c = rnd() < .3 ? U_ACC : rnd() < .5 ? U_GLB : U_INK;
-    for (let m = 0; m < n; m++) vtx(PT, o, d, [c, 0, 0], 1 - m / n, .12, -1, sp, 2, m, len + ph * 1000);
+    let hit = false; for (let q = 0; q <= len + 3 && !hit; q += 1.5) hit = blocks(add(o, mul(d, q)));
+    if (!hit) for (let m = 0; m < n; m++) vtx(PT, o, d, [c, 0, 0], 1 - m / n, .12, -1, sp, 2, m, len + ph * 1000);
   }
   /* holographic props, from formulas: data pillars (square prisms of points with rings), and spinning rings (kind 4) */
   for (let z = -6; z < ZSP - 18; z += 9 + rnd() * 6) [-1, 1].forEach(s => {
@@ -3726,11 +3752,12 @@ const run = (() => {
     const cx = xs(z) + s * (9 + rnd() * 16), h = 3 + rnd() * 12, r = .6 + rnd() * 1.4, c = rnd() < .35 ? U_ACC : U_GLB;
     for (const [dx, dz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) for (let y = 0; y < h; y += .22) vtx(PT, [cx + dx * r, y, z + dz * r], [0, 0, 0], [c, 0, 0], .7, .08, -1, 0, 0);
     for (let y = 0; y <= h; y += 1.1) for (let q = 0; q < 4; q++) { const a = [[-1, -1], [1, -1], [1, 1], [-1, 1]][q], b = [[-1, -1], [1, -1], [1, 1], [-1, 1]][(q + 1) % 4]; for (let t = 0; t < 1; t += .1) vtx(PT, [cx + mix(a[0], b[0], t) * r, y, z + mix(a[1], b[1], t) * r], [0, 0, 0], [c, 0, 0], y === 0 ? .9 : .35, .07, -1, 0, 0); }
-    if (rnd() < .6) { const R = r * (1.8 + rnd()), yy = h + .8 + rnd() * 2, sp = (rnd() < .5 ? -1 : 1) * (.3 + rnd() * .6); for (let a = 0; a < TAU; a += .09) vtx(PT, [cx, yy, z], [Math.cos(a) * R, Math.sin(a * 6) * .08, Math.sin(a) * R], [U_ACC, 0, 0], .8, .09, -1, sp, 4); }
+    if (rnd() < .6) { const R = r * (1.8 + rnd()), yy = h + .8 + rnd() * 2, sp = (rnd() < .5 ? -1 : 1) * (.3 + rnd() * .6); if (!blocks([cx, yy, z]) && !blocks([cx + R, yy, z]) && !blocks([cx - R, yy, z])) for (let a = 0; a < TAU; a += .09) vtx(PT, [cx, yy, z], [Math.cos(a) * R, Math.sin(a * 6) * .08, Math.sin(a) * R], [U_ACC, 0, 0], .8, .09, -1, sp, 4); }
   });
   for (let i = 0; i < 14; i++) {                                            // big slow rings over the road
     const z = 10 + rnd() * (ZSP - 30), R = 3 + rnd() * 4, yy = 7 + rnd() * 6, sp = (rnd() < .5 ? -1 : 1) * (.08 + rnd() * .2), c = rnd() < .5 ? U_GLB : U_ACC;
-    for (let a = 0; a < TAU; a += .05) vtx(PT, [xs(z), yy, z], [Math.cos(a) * R, 0, Math.sin(a) * R], [c, 0, 0], (a * 7 | 0) % 3 ? .5 : .95, .08, -1, sp, 4);
+    let hit = false; for (let a = 0; a < TAU && !hit; a += .3) hit = blocks([xs(z) + Math.cos(a) * R, yy, z + Math.sin(a) * R]);
+    if (!hit) for (let a = 0; a < TAU; a += .05) vtx(PT, [xs(z), yy, z], [Math.cos(a) * R, 0, Math.sin(a) * R], [c, 0, 0], (a * 7 | 0) % 3 ? .5 : .95, .08, -1, sp, 4);
   }
   /* the core: a cloud of stars (kind 3 twinkles), a faint shell whose rim reads as a ring, and a small yellow companion */
   for (let i = 0; i < 2600; i++) {
@@ -3748,7 +3775,7 @@ const run = (() => {
   const CUBE_E = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]], CV = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]];
   for (let i = 0; i < 50; i++) {
     const z = -10 + rnd() * (ZSP - 6), sd = rnd() < .5 ? -1 : 1, c = [xs(z) + sd * (3 + rnd() * 22), 2.5 + rnd() * 13, z], h = .2 + rnd() * .55, ph = rnd() * 9, cc = rnd() < .3 ? U_ACC : rnd() < .4 ? U_GLB : U_INK;
-    CUBE_E.forEach(([a, b]) => { vtx(LN, c, mul(CV[a], h), [cc, 0, 0], .9, 0, -1, ph, 5); vtx(LN, c, mul(CV[b], h), [cc, 0, 0], .9, 0, -1, ph, 5); });
+    if (!blocks(c)) CUBE_E.forEach(([a, b]) => { vtx(LN, c, mul(CV[a], h), [cc, 0, 0], .9, 0, -1, ph, 5); vtx(LN, c, mul(CV[b], h), [cc, 0, 0], .9, 0, -1, ph, 5); });
   }
 
   /* ----- GL ----- */
@@ -3764,7 +3791,7 @@ const run = (() => {
     vec3 p = aPos; float kind = aMisc.w, a = aCol.a, id = dot(aPos, vec3(12.989, 78.233, 37.719)) + aX.x * 9.17 + aOff.x * 3.3;
     vec3 col = aCol.rgb;
     if (aCol.r < -.5) col = aCol.r < -3.5 ? uLine : aCol.r < -2.5 ? uInk : aCol.r < -1.5 ? uGlB : uAcc;
-    if (kind == 1.) { float fl = fract(aPos.z * .35 - uT * 2.2 + aOff.x * .37); a *= aOff.y > .5 ? 1. : .3 + .7 * pow(fl, 6.); }
+    if (kind == 1.) { float fl = fract(aPos.z * .35 - uT * 2.2 + aOff.x * .37), lo = max(.3, aOff.z); a *= aOff.y > .5 ? 1. : lo + (1. - lo) * pow(fl, 6.); }   // aOff.z: the dimmest a pulsing line gets
     else if (kind == 2.) { float len = mod(aX.y, 1000.), ph = floor(aX.y / 1000.); float hd = mod(uT * aMisc.z + ph, len + 6.) - 3., q = hd - aX.x * .45; if (q < 0. || q > len) a = 0.; p = aPos + aOff * q; if (aX.x < .5) col = uInk; }
     else if (kind == 3.) { a *= .55 + .45 * sin(uT * (1. + h1(id) * 3.) + id); }
     else if (kind == 4.) { float an = uT * aMisc.z, c = cos(an), s = sin(an); p = aPos + vec3(aOff.x * c - aOff.z * s, aOff.y, aOff.x * s + aOff.z * c); }
@@ -3809,7 +3836,7 @@ const run = (() => {
 
   /* ----- timeline: scroll units t (0 .. T). The camera runs along the road (u), and near each stop it blends to a parked view
      framing the building in two thirds of the screen. The road keys bracket each parked view, so the camera only moves forward. */
-  const TK = STOP.map((S, k) => 1.4 + k * 2.1), TSP = TK[N - 1] + 2.3, T = TSP + .25;
+  const TK = STOP.map((S, k) => 1.5 + k * 2.6), TSP = TK[N - 1] + 2.6, T = TSP + .25;
   const narrow = () => W < 760 || W < H;
   function parked(k) {
     const S = STOP[k], s = S.s, dir = unit([s * .6, -.2, .78]), nar = narrow(), F = H * .95;
@@ -3821,7 +3848,7 @@ const run = (() => {
   let UK = [];
   function keys() {
     UK = [[0, -6], [1, 4]];
-    STOP.forEach((S, k) => { const z = parked(k)[0][2]; UK.push([TK[k] - .5, z - 4], [TK[k] + .5, z + 3]); });
+    STOP.forEach((S, k) => { const z = parked(k)[0][2]; UK.push([TK[k] - .65, z - 4], [TK[k] + .65, z + 3]); });
     UK.push([TSP - .7, ZSP - 18], [TSP, ZSP - 9.5], [T, ZSP - 9]);
   }
   function ukey(t) {
@@ -3833,17 +3860,29 @@ const run = (() => {
     const h = K[i + 1][0] - K[i][0], u = (t - K[i][0]) / h, u2 = u * u, u3 = u2 * u;
     return (2 * u3 - 3 * u2 + 1) * K[i][1] + (u3 - 2 * u2 + u) * h * tg(i) + (3 * u2 - 2 * u3) * K[i + 1][1] + (u3 - u2) * h * tg(i + 1);
   }
-  const pull = (k, t) => sm(TK[k] - .8, TK[k] - .3, t) * (1 - sm(TK[k] + .3, TK[k] + .8, t));
+  /* how far the camera has turned to stop k: a long, gentle S (smootherstep) on each side, holding still around the stop */
+  const sm2 = (a, b, v) => { const t = cl((v - a) / (b - a)); return t * t * t * (t * (6 * t - 15) + 10); };
+  const pull = (k, t) => sm2(TK[k] - 1.15, TK[k] - .22, t) * (1 - sm2(TK[k] + .22, TK[k] + 1.15, t));
   const sparkW = t => sm(TSP - 1, TSP - .15, t);
   const CORE = add(SPARK, [0, 4, 0]);
-  function camAt(t) {
-    const u = ukey(t);
-    let E = [xs(u) - (xs(u + 12) - xs(u)) * .25, 2.6, u], Tg = [xs(u + 14), 1.1, u + 14];
-    STOP.forEach((S, k) => { const w = eio(pull(k, t)); if (w > 0) { const [Ep, Tp] = parked(k); E = mixV(E, Ep, w); Tg = mixV(Tg, Tp, w); } });
+  const roadCam = u => [[xs(u) - (xs(u + 12) - xs(u)) * .25, 2.6, u], [xs(u + 14), 1.1, u + 14]];   // riding the road at u: [eye, target]
+  function camAt(t, only) {                                                // [eye, target]; only: a function giving each stop's weight instead
+    let [E, Tg] = roadCam(ukey(t));
+    STOP.forEach((S, k) => { const w = only ? only(k) : pull(k, t); if (w > 0) { const [Ep, Tp] = parked(k); E = mixV(E, Ep, w); Tg = mixV(Tg, Tp, w); } });
     const sw = eio(sparkW(t)); if (sw > 0) { E = mixV(E, [CORE[0] - .6, CORE[1] - .4, ZSP - 9], sw); Tg = mixV(Tg, CORE, sw); }
     const o = 1 - eio(sm(0, 1.05, t));
     if (o > 0) { const mid = ZEND * .42; E = mixV(E, [xs(mid) + 52, 74, mid - 70], o); Tg = mixV(Tg, [xs(mid), 0, mid + 6], o); }
-    return look(E, Tg);
+    return [E, Tg];
+  }
+  /* a warp (a click on an entry or a tick): the camera leaves the view it is in, rides the road straight to the chosen stop
+     without turning to any building on the way, and turns to the chosen one only at the end */
+  let ride = null;
+  function rideCam(R, u) {
+    const e = sm2(0, 1, u), wa = 1 - sm2(0, .32, u), wb = sm2(.62, 1, u);
+    let [E, Tg] = roadCam(mix(ukey(R.a), ukey(R.b), e));
+    const [Ea, Ta] = camAt(R.a), [Eb, Tb2] = camAt(R.b);
+    E = mixV(mixV(E, Ea, wa), Eb, wb); Tg = mixV(mixV(Tg, Ta, wa), Tb2, wb);
+    return { E, Tg, panel: k => pull(k, R.a) * wa + pull(k, R.b) * wb };
   }
 
   /* ----- the overlays: the core's light (low resolution, like the scene) and the panels, frames and map (full resolution) ----- */
@@ -3904,7 +3943,7 @@ const run = (() => {
   }
 
   /* ----- scroll, warp, loop ----- */
-  let tNow = 0, raf = 0, last = 0, onScreen = false, warp = 0, vel = 0, active = -1;
+  let tNow = 0, raf = 0, last = 0, onScreen = false, warp = 0, vel = 0, active = -1, camE = null, camT = null;
   const span = () => sec.offsetHeight - box.offsetHeight;
   const tOf = () => { const r = sec.getBoundingClientRect(), top = hdr.getBoundingClientRect().bottom; return cl((top - r.top) / Math.max(1, span())) * T; };
   const hsh = (a, b) => { let h = (Math.imul(a | 0, 374761393) + Math.imul(b | 0, 668265263)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
@@ -3916,15 +3955,23 @@ const run = (() => {
     gl.viewport(0, 0, glc.width, glc.height);
     const pw = narrow() ? Math.round(W * .88) : Math.round(cl(W * .29, 300, 470));
     panels.forEach((el, k) => { el.style.width = pw + 'px'; tfCache[k] = ''; });
-    keys(); kick();
+    keys(); camE = null; kick();
   }
   const v3 = c => rgb(c).map(v => v / 255);
   function frame(now) {
     raf = 0;
     const dt = Math.min(.05, Math.max(0, (now - last) / 1000)); last = now;
-    const goal = tOf(), prev = tNow; tNow = still.matches ? goal : tNow + (goal - tNow) * Math.min(1, dt * 5.5);
+    const goal = tOf(), prev = tNow; tNow = still.matches ? goal : tNow + (goal - tNow) * (1 - Math.exp(-dt * 3.6));
     vel = mix(vel, Math.abs(tNow - prev) / Math.max(.001, dt), .2);
-    cam = camAt(tNow);
+    /* where the camera wants to be, then a soft follow (a little lag, so changes of direction never snap) */
+    let want, panelW = k => pull(k, tNow);
+    if (ride) {
+      const u = cl((now - ride.t0) / ride.dur), rc = rideCam(ride, u); want = [rc.E, rc.Tg]; panelW = rc.panel;
+      if (u >= 1) { ride = null; tNow = goal; }
+    } else want = camAt(tNow);
+    const kf = still.matches || !camE ? 1 : 1 - Math.exp(-dt * 6);
+    camE = camE ? mixV(camE, want[0], kf) : want[0]; camT = camT ? mixV(camT, want[1], kf) : want[1];
+    cam = look(camE, camT);
     const time = still.matches ? 0 : now / 1000, dark = rgb(C.ground)[0] < 128, G = v3(C.ground);
     /* the scene */
     gl.clearColor(G[0], G[1], G[2], 1); gl.clear(gl.COLOR_BUFFER_BIT);
@@ -3943,8 +3990,8 @@ const run = (() => {
     /* the panels and the HUD */
     x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
     let best = -1, bw = 0;
-    STOP.forEach((S, k) => { const a = pull(k, tNow); glass(k, sm(.05, .6, a), time); if (a > bw) { bw = a; best = k; } });
-    const near = sparkW(tNow) > .5 ? N : bw > .5 ? best : -1;
+    STOP.forEach((S, k) => { const a = panelW(k); glass(k, sm(.05, .6, a), time); if (a > bw) { bw = a; best = k; } });
+    const near = (ride ? ride.b >= T - .01 && warp < .5 && sparkW(ride.b) > .5 : sparkW(tNow) > .5) ? N : bw > .5 ? best : -1;
     if (near !== active) {
       active = near;
       ticks.forEach((b, i) => { if (i === active) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
@@ -3966,16 +4013,20 @@ const run = (() => {
   }
   function kick() { if (!raf && onScreen) { last = performance.now(); raf = requestAnimationFrame(frame); } }
   function warpTo(k) {
-    const goal = sec.getBoundingClientRect().top + scrollY - hdr.getBoundingClientRect().bottom + ((k >= N ? T : TK[k]) / T) * span(), from = scrollY;
+    const tb = k >= N ? T : TK[k], goal = sec.getBoundingClientRect().top + scrollY - hdr.getBoundingClientRect().bottom + (tb / T) * span(), from = scrollY;
     if (still.matches) { scrollTo({ top: goal, behavior: 'instant' }); return; }
-    const t0 = performance.now(), dur = Math.min(1900, 700 + Math.abs(goal - from) / 6);
+    const t0 = performance.now(), dur = Math.min(4200, 1500 + Math.abs(tb - tNow) * 260), R = { a: tNow, b: tb, t0, dur };
+    ride = R;
     const step = now => {
-      const u = cl((now - t0) / dur); scrollTo({ top: mix(from, goal, eio(u)), behavior: 'instant' });
-      warp = Math.sin(u * Math.PI); kick();
+      if (ride !== R) { warp = 0; return; }                                 // cancelled: the camera's soft follow takes it from here
+      const u = cl((now - t0) / dur); scrollTo({ top: mix(from, goal, sm2(0, 1, u)), behavior: 'instant' });
+      warp = Math.sin(u * Math.PI) * .7; kick();
       if (u < 1) requestAnimationFrame(step); else { warp = 0; if (panels[k]) panels[k].focus({ preventScroll: true }); }
     };
     requestAnimationFrame(step);
   }
+  const cancelRide = () => { if (ride) { ride = null; kick(); } };   // the reader scrolls during a warp: the soft follow hands back to the scroll
+  ['wheel', 'touchstart', 'keydown'].forEach(ev => addEventListener(ev, e => { if (ev !== 'keydown' || ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) cancelRide(); }, { passive: true }));
   $$('[data-run]').forEach(el => {
     const go = () => warpTo(+el.dataset.run);
     el.addEventListener('click', go);
