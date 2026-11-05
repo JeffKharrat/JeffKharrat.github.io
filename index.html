@@ -412,6 +412,14 @@ a.gtile:hover b{text-decoration:underline;text-decoration-color:var(--accent);te
 .run-p .run-r{color:var(--accent)}
 .run-p .run-g{font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
 .run-sp{position:absolute;left:0;top:0;opacity:0;pointer-events:none;white-space:nowrap;color:var(--ink);letter-spacing:.08em}
+/* the spark is a button: a ring shows on hover or focus; clicking it plays the LED sequence over the stage */
+.run-spb{position:absolute;left:0;top:0;width:8rem;height:8rem;margin:-4rem 0 0 -4rem;padding:0;border:0;border-radius:50%;background:none;cursor:pointer;color:var(--ink)}
+.run-spb::after{content:"";position:absolute;inset:1.4rem;border-radius:50%;border:1px solid currentColor;opacity:0;transform:scale(.75);transition:opacity .2s,transform .2s}
+.run-spb:hover::after,.run-spb:focus-visible::after{opacity:.7;transform:scale(1)}
+.run-spb:focus-visible{outline:0}
+.run-x,.run-led{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:pointer}
+.run--x .run-hud,.run--x .run-tl,.run--x .run-sp,.run--x .run-spb,.run--x .run-p{visibility:hidden!important}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
 .run-hud{position:absolute;left:var(--pad);top:1rem;display:grid;gap:.15rem;pointer-events:none}
 .run-hud b{font-weight:500}
 .run-tl{position:absolute;left:var(--pad);right:calc(var(--pad) + 9.5rem);bottom:1rem;display:flex;flex-wrap:wrap;gap:.4rem}
@@ -699,6 +707,7 @@ body[data-view="page"] .lore--bg{display:none}
         <article class="run-p" tabindex="-1"><p class="label">2022.01 – 2022.06 · 04</p><h3 class="disp">Mathematic Studio</h3><p class="run-r label" data-i18n="ab.gen">3D generalist</p><p data-i18n="run.b1"></p><p class="run-g">Maya · Unreal Engine</p></article>
         <article class="run-p" tabindex="-1"><p class="label">2020.09 – 2025.06 · 05</p><h3 class="disp" data-i18n="ab.isart">Isart Digital, Paris</h3><p class="run-r label" data-i18n="ab.ms2">Master's, 3D cinema</p><p data-i18n="run.b0"></p><p class="run-g">Maya · Creature rig · Joint-based muscles · Team pipeline</p></article>
           <p class="run-sp label" id="run-sp" data-i18n="run.sp">Frame 0</p>
+          <button type="button" class="run-spb" id="run-spb" hidden><span class="vh" data-i18n="run.spb">Enter the spark</span></button>
           <div class="run-hud"><span class="label"><span data-i18n="run.k">The path</span> <span id="run-n">—</span></span><b id="run-t" data-i18n="run.hint">Scroll to follow the path</b></div>
           <nav class="run-tl" id="run-tl" aria-label="Path stops"><button type="button" data-run="0">2025 TUT</button><button type="button" data-run="1">2023 Miraculous</button><button type="button" data-run="2">2023 Zag</button><button type="button" data-run="3">2022 Mathematic</button><button type="button" data-run="4">2020 Isart</button><button type="button" data-run="5">✦</button></nav>
         </div>
@@ -858,7 +867,7 @@ const T = {
     'ab.cv': 'CV, PDF', 'ab.exp': 'Experience', 'ab.edu': 'Education', 'ab.soft': 'Software', 'ab.lang': 'Languages', 'ab.also': 'Outside work',
     'ab.gen': '3D generalist', 'ab.tut': 'Tokyo University of Technology, School of Media Science', 'ab.rs': 'Research student',
     'ab.isart': 'Isart Digital, Paris', 'ab.ms': "Master's, 3D cinema. RNCP level 7: expert in digital design, CGI animation and VFX",
-    'run.k': 'The path', 'run.hint': 'Scroll to follow the path', 'run.sp': 'Frame 0', 'ab.ms2': "Master's, 3D cinema · animation and rigging", 'run.rs': 'Research student, Kawashima Lab', 'ab.tut2': 'Tokyo University of Technology',
+    'run.k': 'The path', 'run.hint': 'Scroll to follow the path', 'run.sp': 'Frame 0', 'run.spb': 'Enter the spark', 'ab.ms2': "Master's, 3D cinema · animation and rigging", 'run.rs': 'Research student, Kawashima Lab', 'ab.tut2': 'Tokyo University of Technology',
     'run.b0': "Five years in Paris, specialising in animation and rigging. Master's degree, RNCP level 7 (five years of higher education). Graduation project in a team of eight, ending in a short trailer: I built the team's animation and rigging pipeline and rigged the creature, with a joint-based muscle system.",
     'run.b1': 'Internship during my years at Isart. Modelling and layout in Maya for the Killer Klowns from Outer Space game trailer, rendered in Unreal Engine.',
     'run.b2': 'Internship in Paris, at the studio that became Miraculous Corp while I was there. Modelling, rigging, layout and lookdev in Maya, Unreal Engine and Photoshop. My first look at how a real-time engine fits into a professional animation pipeline, and the start of the two-year work-study that followed.',
@@ -908,7 +917,7 @@ const T = {
     'ab.cv': '履歴書（PDF）', 'ab.exp': '職歴', 'ab.edu': '学歴', 'ab.soft': '使用ソフト', 'ab.lang': '言語', 'ab.also': '趣味',
     'ab.gen': '3Dジェネラリスト', 'ab.tut': '東京工科大学 メディア学部', 'ab.rs': '研究生',
     'ab.isart': 'Isart Digital Paris', 'ab.ms': '3Dシネマ専攻 修士課程。RNCPレベル7：デジタルデザイン、CGIアニメーション、VFXのエキスパート',
-    'run.k': '軌跡', 'run.hint': 'スクロールで軌跡をたどる', 'run.sp': 'フレーム0', 'ab.ms2': '3Dシネマ専攻 修士課程（アニメーション・リギング）', 'run.rs': '研究生（川島研究室）', 'ab.tut2': '東京工科大学',
+    'run.k': '軌跡', 'run.hint': 'スクロールで軌跡をたどる', 'run.sp': 'フレーム0', 'run.spb': '光の中へ', 'ab.ms2': '3Dシネマ専攻 修士課程（アニメーション・リギング）', 'run.rs': '研究生（川島研究室）', 'ab.tut2': '東京工科大学',
     'run.b0': 'パリで5年間、アニメーションとリギングを専攻。修士号（RNCPレベル7：フランス国家資格で、5年制の高等教育に相当）を取得。卒業制作は8人チームで短いトレーラーを完成させ、チームのアニメーション・リギングパイプラインを構築し、ジョイントベースのマッスルシステムを備えたクリーチャーリグを担当しました。',
     'run.b1': 'Isart在学中のインターンシップ。Unreal Engineでレンダリングされた『Killer Klowns from Outer Space』ゲームトレーラーで、Mayaによるモデリングとレイアウトを担当しました。',
     'run.b2': 'パリでのインターンシップ。在籍中にこのスタジオがMiraculous Corpへと移行しました。Maya、Unreal Engine、Photoshopでモデリング、リギング、レイアウト、ルックデヴを担当。リアルタイムエンジンがプロのアニメーションパイプラインにどう組み込まれるのかを初めて学んだ場であり、その後2年間のアルタナンスにつながりました。',
@@ -3885,8 +3894,9 @@ const run = (() => {
   }
 
   /* ----- the overlays: the core's light (low resolution, like the scene) and the panels, frames and map (full resolution) ----- */
+  let sparkP = null;                                                        // the spark on screen: [x, y, how visible]
   function coreLight(t, time) {
-    fx.setTransform(RS, 0, 0, RS, 0, 0); fx.clearRect(0, 0, W, H);
+    fx.setTransform(RS, 0, 0, RS, 0, 0); fx.clearRect(0, 0, W, H); sparkP = null;
     const p = pj(CORE); if (!p) return;
     const A0 = (1 - sm(110, 220, p[2])) * (.25 + .75 * sparkW(t)), dark = rgb(C.ground)[0] < 128, pu = still.matches ? .5 : (Math.sin(time * 1.7) + 1) / 2;
     if (A0 <= .01) return;
@@ -3905,6 +3915,7 @@ const run = (() => {
     fx.globalCompositeOperation = 'source-over'; fx.globalAlpha = 1;
     const cap = $('#run-sp'), sw = sparkW(t);
     cap.style.opacity = (sw * A0).toFixed(3); cap.style.transform = 'translate(' + Math.round(p[0]) + 'px,' + Math.round(p[1] + 120 * Math.min(1, s2) + 18) + 'px) translateX(-50%)';
+    sparkP = [p[0], p[1], sw * A0];
   }
   const tfCache = [];
   function glass(k, a, time) {
@@ -3954,9 +3965,218 @@ const run = (() => {
     gl.viewport(0, 0, glc.width, glc.height);
     const pw = narrow() ? Math.round(W * .88) : Math.round(cl(W * .29, 300, 470));
     panels.forEach((el, k) => { el.style.width = pw + 'px'; tfCache[k] = ''; });
-    keys(); camE = null; kick();
+    keys(); camE = null; if (seq) endSpark(); kick();
   }
   const v3 = c => rgb(c).map(v => v / 255);
+  /* ----- the spark: clicking it shears and warps everything on screen into the light, breaks it into blocks that give way to
+     an LED panel, plays the カラット mark there (dot by dot in, dot by dot out), then throws you back to the spark as you left it.
+     The scene is read back the same frame it is drawn (the WebGL canvas, the glow and HUD layers, and the HUD text redrawn),
+     so the transition starts from exactly what was on screen. Click, Escape or scrolling skips to the way back. ----- */
+  function makeLED(cv) {
+    const LW = 1600, LH = 900, GREEN = '#3DF27A', YEL = '#F4E42C', HOT = '#FFFBD0', dur = 7.4;
+    const seg = (t, a, b2) => cl((t - a) / (b2 - a)), eo = v => 1 - Math.pow(1 - cl(v), 3);
+    const bk = v => { v = cl(v); return 1 + 2.9 * Math.pow(v - 1, 3) + 1.9 * Math.pow(v - 1, 2); };
+    const g = cv.getContext('2d'), buf = document.createElement('canvas'), small = document.createElement('canvas'), lay = document.createElement('canvas');
+    const b = buf.getContext('2d', { willReadFrequently: true }), smc = small.getContext('2d'), L = lay.getContext('2d');
+    smc.imageSmoothingQuality = 'high';
+    let COLS = 0, ROWS = 0, P = 0, mask = null, unlit = null, vig = null, noise = null, fs = 1, ox = 0, oy = 0;
+    const TRI = [[100, 22, 141, 94, 59, 94], [56, 102, 97, 174, 15, 174], [144, 102, 185, 174, 103, 174]];
+    const BANDS = [[-20, 50], [50, 72], [72, 128], [128, 142], [142, 220]], GOAL = [0, 14, -6, 22, 0], CUTS = [50, 72, 128, 142];
+    const KB = [[300, 446], [446, 470], [470, 600]];
+    function fit() {                                                         // one LED about every 5 CSS px; the 1600 x 900 scene fits inside
+      const w = box.clientWidth || 800, h = box.clientHeight || 450, d = Math.min(2, devicePixelRatio || 1);
+      const cols = Math.round(cl(w / 5, 120, 260)), pc = w / cols, rows = Math.max(40, Math.round(h / pc)), p = Math.max(2, Math.min(6, Math.round(pc * d)));
+      if (cols === COLS && rows === ROWS && p === P) return;
+      COLS = cols; ROWS = rows; P = p;
+      buf.width = COLS; buf.height = ROWS; small.width = Math.max(8, Math.round(COLS / 5)); small.height = Math.max(5, Math.round(ROWS / 5));
+      cv.width = lay.width = COLS * p; cv.height = lay.height = ROWS * p;
+      const dots = (fill, r, a) => {
+        const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height;
+        const x2 = c.getContext('2d'); x2.fillStyle = fill;
+        for (let j = 0; j < ROWS; j++) for (let i = 0; i < COLS; i++) { x2.globalAlpha = a(i, j); x2.beginPath(); x2.arc((i + .5) * p, (j + .5) * p, r * p, 0, TAU); x2.fill(); }
+        return c;
+      };
+      mask = dots('#ffffff', .42, (i, j) => .78 + .22 * hsh(i * 31 + 5, j * 7 + 3));   // each LED a little brighter or dimmer, like a real panel
+      unlit = dots('#16231B', .4, (i, j) => .7 + .3 * hsh(i * 3 + 1, j * 17 + 9));
+      vig = g.createRadialGradient(cv.width / 2, cv.height / 2, Math.min(cv.width, cv.height) * .45, cv.width / 2, cv.height / 2, Math.max(cv.width, cv.height) * .62);
+      vig.addColorStop(0, 'rgba(0,0,0,0)'); vig.addColorStop(1, 'rgba(0,0,0,.6)');
+      noise = new Float32Array(COLS * ROWS); for (let i = 0; i < noise.length; i++) noise[i] = hsh(i, 91);
+      fs = Math.min(COLS / LW, ROWS / LH) * .94; ox = (COLS - LW * fs) / 2; oy = (ROWS - LH * fs) / 2;
+    }
+    function scene(t) {
+      b.setTransform(1, 0, 0, 1, 0, 0); b.globalCompositeOperation = 'source-over'; b.globalAlpha = 1;
+      b.clearRect(0, 0, COLS, ROWS);                                        // transparent where no LED is lit, so the scan only brightens lit ones
+      b.setTransform(fs, 0, 0, fs, ox, oy);
+      const kick = bk(seg(t, 1.75, 2.15)), lit = t > 1.75, jit = t > 2.15 && t < 2.5, f = (t * 30) | 0;
+      b.save(); b.translate(300, 133); b.scale(2.6, 2.6);
+      const ring = eio(seg(t, .55, 1.35));                                  // the ring round the three scales, drawn round from the top
+      if (ring > 0) { b.strokeStyle = GREEN; b.lineWidth = 11; b.beginPath(); b.arc(100, 122, 110, -Math.PI / 2, -Math.PI / 2 + TAU * ring); b.stroke(); }
+      BANDS.forEach(([y0, y1], i) => {                                      // the three scales, in five bands
+        b.save(); b.beginPath(); b.rect(-30, y0, 280, y1 - y0); b.clip();
+        b.translate(GOAL[i] * kick + (jit ? (hsh(f * 5 + i, 12) - .5) * 12 : 0), 0);
+        b.fillStyle = GOAL[i] > 0 && lit ? YEL : GREEN; b.beginPath();
+        TRI.forEach(q => { b.moveTo(q[0], q[1]); b.lineTo(q[2], q[3]); b.lineTo(q[4], q[5]); b.closePath(); });
+        b.fill(); b.restore();
+      });
+      b.strokeStyle = HOT; b.lineWidth = 2.6;
+      CUTS.forEach((y, i) => {                                              // the cut lines sweep across, then fade
+        const u = eio(seg(t, 1.25 + i * .08, 1.6 + i * .08)), fade = 1 - seg(t, 1.8, 2.3);
+        if (u <= 0 || fade <= 0) return;
+        b.globalAlpha = fade; b.beginPath(); b.moveTo(-20, y); b.lineTo(-20 + 240 * u, y); b.stroke();
+      });
+      b.globalAlpha = 1; b.restore();
+      b.font = "160px 'Dela Gothic One', 'Noto Sans JP', sans-serif"; b.textAlign = 'center'; b.textBaseline = 'alphabetic';
+      KB.forEach(([y0, y1], i) => {                                         // the name rises band by band; the middle band kicks out yellow
+        const u = eo(seg(t, 2.35 + i * .12, 2.9 + i * .12)); if (u <= 0) return;
+        b.save(); b.beginPath(); b.rect(900, y0, 700, y1 - y0); b.clip();
+        b.translate(i === 1 ? 22 * bk(seg(t, 3.1, 3.45)) : 0, (1 - u) * 200);
+        b.fillStyle = i === 1 && t > 3.1 ? YEL : GREEN; b.fillText('カラット', 1230, 520); b.restore();
+      });
+      const n = Math.floor(seg(t, 3.4, 4.0) * 9), code = 'HJ-03 / D'.slice(0, n);   // the code types in, with a block cursor
+      b.font = '500 92px ' + MONO; b.textAlign = 'left'; b.fillStyle = GREEN; b.fillText(code, 90, 850);
+      if (t > 3.4 && t < dur - 1 && ((t * 3) | 0) % 2) { b.fillStyle = YEL; b.fillRect(90 + b.measureText(code).width + 12, 774, 46, 86); }
+      const wipe = eio(seg(t, 3.8, 4.3));
+      if (wipe > 0) {
+        b.save(); b.beginPath(); b.rect(1520 - 600 * wipe, 730, 600 * wipe, 160); b.clip();
+        b.font = "92px 'Dela Gothic One', 'Noto Sans JP', sans-serif"; b.textAlign = 'right'; b.fillStyle = YEL; b.fillText('執権機構', 1520, 850); b.restore();
+      }
+      b.setTransform(1, 0, 0, 1, 0, 0);
+      if (t > 2.1 && t < 2.42) {                                            // glitch: a few rows torn sideways at the kick
+        const f2 = (t * 24) | 0;
+        for (let k = 0; k < 4; k++) { const y = hsh(f2 * 3 + k, 13) * ROWS | 0, h = 1 + (hsh(f2 * 7 + k, 14) * 5 | 0), dx = ((hsh(f2 * 11 + k, 15) - .5) * 16) | 0; b.drawImage(buf, 0, y, COLS, h, dx, y, COLS, h); }
+      }
+      if (t > 4.3 && t < dur - 1.1) {                                       // hold: a bright scan rolls down over the lit LEDs
+        const y = ((t - 4.3) * .45 % 1) * (ROWS + 10) - 5;
+        b.globalCompositeOperation = 'source-atop';
+        b.fillStyle = 'rgba(255,255,240,.5)'; b.fillRect(0, y, COLS, 2); b.fillStyle = 'rgba(255,255,240,.18)'; b.fillRect(0, y - 4, COLS, 4);
+        b.globalCompositeOperation = 'source-over';
+      }
+      const rin = seg(t, 0, .95), rout = seg(t, dur - 1.05, dur - .1);       // in: LEDs come on in a random order, flashing as they light; out: the same
+      if (rin < 1 || rout > 0) {
+        const im = b.getImageData(0, 0, COLS, ROWS), px = im.data;
+        for (let i = 0; i < noise.length; i++) {
+          if (!px[i * 4 + 3]) continue;
+          const v = noise[i];
+          if (v > rin || v < rout) px[i * 4 + 3] = 0;
+          else if ((rin < 1 && v > rin - .05) || (rout > 0 && v < rout + .05)) { px[i * 4] = 255; px[i * 4 + 1] = 251; px[i * 4 + 2] = 208; }
+        }
+        b.putImageData(im, 0, 0);
+      }
+    }
+    function show() {
+      const Wc = cv.width, Hc = cv.height;
+      g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.fillStyle = '#040605'; g.fillRect(0, 0, Wc, Hc);
+      g.drawImage(unlit, 0, 0);
+      L.globalCompositeOperation = 'source-over'; L.clearRect(0, 0, Wc, Hc); L.imageSmoothingEnabled = false; L.drawImage(buf, 0, 0, Wc, Hc);
+      L.globalCompositeOperation = 'destination-in'; L.drawImage(mask, 0, 0);
+      g.globalCompositeOperation = 'lighter'; g.drawImage(lay, 0, 0);
+      smc.clearRect(0, 0, small.width, small.height); smc.drawImage(buf, 0, 0, small.width, small.height);
+      g.imageSmoothingEnabled = true; g.globalAlpha = .55; g.drawImage(small, 0, 0, Wc, Hc); g.globalAlpha = .22; g.drawImage(buf, 0, 0, Wc, Hc);
+      g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.fillStyle = vig; g.fillRect(0, 0, Wc, Hc);
+    }
+    return { dur, rest: 5.2, draw(t) { fit(); scene(t); show(); } };
+  }
+  const spb = $('#run-spb'), xc = mk('canvas', 'run-x'), ledc = mk('canvas', 'run-led'), xg = xc.getContext('2d');
+  const snap = document.createElement('canvas'), sg = snap.getContext('2d'), tmp = document.createElement('canvas'), tg = tmp.getContext('2d');
+  const mos = document.createElement('canvas'), mg = mos.getContext('2d');
+  [ledc, xc].forEach(c => { c.hidden = true; c.setAttribute('aria-hidden', 'true'); box.append(c); });
+  const LEDP = makeLED(ledc), SA = .95, SB = .4, SD = .45, SE = .8;          // shear out, break into blocks, (the mark), blocks back, shear back
+  let seq = null;
+  const backE = v => { v = cl(v); return 1 + 2.4 * Math.pow(v - 1, 3) + 1.4 * Math.pow(v - 1, 2); };   // overshoots a little: the throw back
+  function startSpark() {
+    if (seq || !sparkP) return;
+    seq = { sx: sparkP[0], sy: sparkP[1], snap: false, t0: 0, kb: document.activeElement === spb };
+    if (document.fonts && document.fonts.load) document.fonts.load("160px 'Dela Gothic One'", 'カラット執権機構').catch(() => {});
+    kick();
+  }
+  function skipSpark() {                                                     // straight to the way back
+    if (!seq || !seq.snap || still.matches) { if (seq && still.matches) seq.t0 = Math.min(seq.t0, performance.now() - 3300); return; }
+    const tD = SA + SB + LEDP.dur, e = (performance.now() - seq.t0) / 1000;
+    if (e < tD) seq.t0 = performance.now() - tD * 1000;
+  }
+  function endSpark() {
+    if (!seq) return;
+    const kb = seq.kb; seq = null;
+    box.classList.remove('run--x'); xc.hidden = ledc.hidden = true; ledc.style.opacity = '';
+    if (kb) ticks[N] && ticks[N].focus({ preventScroll: true });
+  }
+  function takeSnap() {
+    const Wd = Math.max(1, Math.round(W * dpr)), Hd = Math.max(1, Math.round(H * dpr));
+    [snap, tmp, xc].forEach(c => { c.width = Wd; c.height = Hd; });
+    sg.setTransform(1, 0, 0, 1, 0, 0); sg.globalAlpha = 1; sg.fillStyle = C.ground; sg.fillRect(0, 0, Wd, Hd);
+    sg.imageSmoothingEnabled = false; sg.drawImage(glc, 0, 0, Wd, Hd); sg.drawImage(fxc, 0, 0, Wd, Hd);
+    sg.imageSmoothingEnabled = true; sg.drawImage(uic, 0, 0, Wd, Hd);
+    sg.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const br = box.getBoundingClientRect();
+    $$('.run-hud .label, #run-t, #run-tl button, #run-sp', box).forEach(el => {   // the HUD text, redrawn where it sits
+      const r = el.getBoundingClientRect(), cs = getComputedStyle(el), op = el.style.opacity === '' ? 1 : +el.style.opacity;
+      if (!r.width || cs.visibility === 'hidden' || op < .02) return;
+      const x0 = r.left - br.left, y0 = r.top - br.top, mid = el.tagName === 'BUTTON' || el.id === 'run-sp';
+      sg.globalAlpha = op;
+      if (el.tagName === 'BUTTON') { sg.fillStyle = cs.backgroundColor; sg.fillRect(x0, y0, r.width, r.height); sg.strokeStyle = cs.borderTopColor; sg.lineWidth = 1; sg.strokeRect(x0 + .5, y0 + .5, r.width - 1, r.height - 1); }
+      sg.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; sg.fillStyle = cs.color; sg.textBaseline = 'middle'; sg.textAlign = mid ? 'center' : 'left';
+      if ('letterSpacing' in sg) sg.letterSpacing = cs.letterSpacing === 'normal' ? '0px' : cs.letterSpacing;
+      let txt = el.textContent.replace(/\s+/g, ' ').trim(); if (cs.textTransform === 'uppercase') txt = txt.toUpperCase();
+      sg.fillText(txt, mid ? x0 + r.width / 2 : x0 + parseFloat(cs.paddingLeft || 0), y0 + r.height / 2);
+    });
+    if ('letterSpacing' in sg) sg.letterSpacing = '0px';
+    sg.globalAlpha = 1;
+  }
+  function sheared(a, now) {                                                 // the snapshot cut into bands, sheared, stretched from the spark and squeezed onto its line
+    const Wd = tmp.width, Hd = tmp.height, k = Wd / W, sx = seq.sx * k, sy = seq.sy * k, q = Math.min(1, a * a), f = (now / 50) | 0;
+    tg.setTransform(1, 0, 0, 1, 0, 0); tg.globalAlpha = 1; tg.fillStyle = C.ground; tg.fillRect(0, 0, Wd, Hd); tg.imageSmoothingEnabled = true;
+    const sq = 1 - .93 * q, sc = 1 + 3.2 * q;
+    for (let y = 0, i = 0; y < Hd; i++) {
+      const h = Math.max(2, (6 + hsh(i, 17) * 40) * k), ny = sy + (y - sy) * sq, nh = Math.max(1, h * sq);
+      const jit = (hsh(i, f) - .5) * Wd * .3 * q * (hsh(i, 5) < .5 ? 1 : .3), dx = (y + h / 2 - sy) * 1.1 * a + jit, x0 = sx - sx * sc + dx;
+      tg.globalAlpha = 1; tg.drawImage(snap, 0, y, Wd, h, x0, ny, Wd * sc, nh);
+      if (Math.abs(a) > .08) { tg.globalAlpha = .28 * Math.min(1, Math.abs(a) * 2); tg.drawImage(snap, 0, y, Wd, h, x0 + 14 * k * a, ny, Wd * sc, nh); }
+      y += h;
+    }
+    tg.globalAlpha = 1;
+    if (a > 0) {                                                              // and the light swallows it
+      const R = (60 + Math.pow(a, 3) * Math.max(W, H) * 1.1) * k, gr = tg.createRadialGradient(sx, sy, 0, sx, sy, R);
+      gr.addColorStop(0, 'rgba(255,255,250,' + Math.min(1, a * 1.3).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(255,255,250,0)');
+      tg.fillStyle = gr; tg.fillRect(0, 0, Wd, Hd);
+    }
+    return tmp;
+  }
+  const blockOf = a => (Math.abs(a) > .5 ? Math.round((1 + 44 * Math.pow((Math.abs(a) - .5) / .5, 1.5)) * dpr) : 1);
+  function present(src, bs, holes) {                                         // onto the overlay in blocks of bs device px; holes: share of blocks cleared to show the LED panel
+    const Wd = xc.width, Hd = xc.height;
+    xg.setTransform(1, 0, 0, 1, 0, 0); xg.globalAlpha = 1; xg.clearRect(0, 0, Wd, Hd);
+    if (bs <= 1) { xg.imageSmoothingEnabled = true; xg.drawImage(src, 0, 0); return; }
+    const mw = Math.ceil(Wd / bs), mh = Math.ceil(Hd / bs);
+    if (mos.width !== mw || mos.height !== mh) { mos.width = mw; mos.height = mh; }
+    mg.imageSmoothingEnabled = true; mg.drawImage(src, 0, 0, mw, mh);
+    xg.imageSmoothingEnabled = false; xg.drawImage(mos, 0, 0, mw, mh, 0, 0, mw * bs, mh * bs);
+    if (holes > 0) for (let j = 0; j < mh; j++) for (let i = 0; i < mw; i++) if (hsh(i * 7 + 3, j * 13 + 1) < holes) xg.clearRect(i * bs, j * bs, bs, bs);
+  }
+  function sparkFrame(now) {
+    if (!seq.snap) {                                                          // the first frame: read back what is on screen, then cover it
+      takeSnap(); seq.snap = true; seq.t0 = now;
+      box.classList.add('run--x'); xc.hidden = false;
+    }
+    if (current !== 'about' || !onScreen) { endSpark(); return; }
+    const e = (now - seq.t0) / 1000;
+    if (still.matches) {                                                      // reduced motion: the finished mark fades in, holds and fades out
+      const tot = 3.6; if (e >= tot) { endSpark(); return; }
+      xg.clearRect(0, 0, xc.width, xc.height); ledc.hidden = false; ledc.style.opacity = String(cl(Math.min(e / .3, (tot - e) / .3))); LEDP.draw(LEDP.rest); return;
+    }
+    const tB = SA, tC = tB + SB, tD = tC + LEDP.dur, tE = tD + SD, tEnd = tE + SE;
+    if (e >= tEnd) { endSpark(); return; }
+    const led = e >= tB && e < tE; if (ledc.hidden === led) ledc.hidden = !led;
+    if (e < tB) { const a = eio(e / tB); present(sheared(a, now), blockOf(a), 0); }
+    else if (e < tC) { LEDP.draw(0); present(sheared(1, now), blockOf(1), sm(0, 1, (e - tB) / SB)); }
+    else if (e < tD) { if (!seq.clear) { xg.clearRect(0, 0, xc.width, xc.height); seq.clear = true; } LEDP.draw(e - tC); }
+    else if (e < tE) { LEDP.draw(LEDP.dur); present(sheared(.85, now), blockOf(.85), 1 - sm(0, 1, (e - tD) / SD)); }
+    else { const a = .85 * (1 - backE((e - tE) / SE)); present(sheared(a, now), blockOf(a), 0); }
+  }
+  spb.addEventListener('click', startSpark);
+  [xc, ledc].forEach(c => c.addEventListener('click', skipSpark));
+  addEventListener('keydown', e => { if (seq && e.key === 'Escape') skipSpark(); });
+  ['wheel', 'touchmove'].forEach(ev => addEventListener(ev, () => { if (seq) skipSpark(); }, { passive: true }));
+
   function frame(now) {
     raf = 0;
     const dt = Math.min(.05, Math.max(0, (now - last) / 1000)); last = now;
@@ -3986,6 +4206,9 @@ const run = (() => {
     bind(BL); gl.drawArrays(gl.LINES, 0, BL.n);
     bind(BP); gl.drawArrays(gl.POINTS, 0, BP.n);
     coreLight(tNow, time);
+    const spOn = !!sparkP && sparkP[2] > .55 && !seq;                          // the spark's button follows it while it is in view
+    if (spb.hidden === spOn) spb.hidden = !spOn;
+    if (spOn) spb.style.transform = 'translate(' + Math.round(sparkP[0]) + 'px,' + Math.round(sparkP[1]) + 'px)';
     /* the panels and the HUD */
     x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
     let best = -1, bw = 0;
@@ -4008,7 +4231,9 @@ const run = (() => {
         x.beginPath(); x.moveTo(W / 2 + Math.cos(an) * r0, H * .52 + Math.sin(an) * r0); x.lineTo(W / 2 + Math.cos(an) * (r0 + len), H * .52 + Math.sin(an) * (r0 + len)); x.stroke();
       }
     }
+    if (seq) sparkFrame(now);
     if (onScreen && current === 'about' && !document.hidden) raf = requestAnimationFrame(frame);
+    else if (seq) endSpark();
   }
   function kick() { if (!raf && onScreen) { last = performance.now(); raf = requestAnimationFrame(frame); } }
   function warpTo(k) {
