@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-accent="lime">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flower Wave Lab</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+1+Code:wght@300..700&family=Tektur:wdth,wght@75..100,400..900&display=swap">
+<style>
+/* The site's tokens, copied from index.html so this page reads like the site. */
+:root{
+  --ground:#E3E5EA; --panel:#F0F1F4; --ink:#14161C; --ink-2:#555B69; --line:#A9AEBA; --tile:#0F1116; --on-tile:#EEF0F4;
+  --gl-a:#FF2E4D; --gl-b:#12C8F0;
+  --acc-l:#2433FF; --acc-d:#4A5BFF; --accent:var(--acc-l);
+  --display:'Tektur','M PLUS 1 Code',ui-monospace,Menlo,Consolas,monospace;
+  --mono:'M PLUS 1 Code',ui-monospace,Menlo,Consolas,monospace;
+  --pad:clamp(1rem,2vw,2.25rem); --chamfer:10px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#0E1014; --panel:#161920; --ink:#E9EBF0; --ink-2:#9AA1B0; --line:#343945; --tile:#050608; --accent:var(--acc-d); color-scheme:dark}}
+:root[data-theme="dark"]{--ground:#0E1014; --panel:#161920; --ink:#E9EBF0; --ink-2:#9AA1B0; --line:#343945; --tile:#050608; --accent:var(--acc-d); color-scheme:dark}
+:root[data-accent="lime"]{--acc-l:#B4F000;--acc-d:#B4F000}
+:root[data-accent="red"]{--acc-l:#D52E16;--acc-d:#FF5A3D}
+:root[data-accent="yellow"]{--acc-l:#FFC400;--acc-d:#FFC400}
+
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font:15px/1.6 var(--mono);-webkit-font-smoothing:antialiased}
+h1,h2,p{margin:0}
+button,input{font:inherit;color:inherit}
+.label{font-size:.8125rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.disp{font-family:var(--display);font-weight:800;text-transform:uppercase;line-height:.92}
+.frame{max-width:1440px;margin-inline:auto;padding-inline:clamp(16px,4vw,64px)}
+.grid{border-inline:1px solid var(--line);background-image:linear-gradient(to right,var(--line) 1px,transparent 1px);background-size:25% 100%}
+.row{border-bottom:1px solid var(--line)}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:1rem 1.5rem;padding:1.25rem var(--pad)}
+header h1{font-size:clamp(2rem,5vw,4rem);margin-right:auto}
+.ctl{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem}
+.seg{display:flex;border:1px solid var(--line)}
+.seg button{min-height:2.5rem;padding:0 .8rem;background:var(--ground);border:0;cursor:pointer;font-size:.8125rem;letter-spacing:.06em;text-transform:uppercase}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--ground)}
+label.sl{display:flex;align-items:center;gap:.6rem;font-size:.8125rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+input[type=range]{accent-color:var(--accent);width:9rem}
+.hero{display:grid;grid-template-columns:minmax(0,1fr);min-height:70vh}
+.hero-txt{padding:var(--pad);display:grid;gap:1rem;align-content:start}
+.hero-txt p{max-width:34ch}
+.hero flower-wave{height:min(70vh,46rem)}
+@media (min-width:64rem){.hero{grid-template-columns:1fr 2fr 1fr}.hero-txt{grid-column:1}.hero flower-wave{grid-column:2}}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (min-width:64rem){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.cell{display:grid;gap:.7rem;padding:var(--pad);align-content:start}
+.tile{position:relative;aspect-ratio:1;background:var(--tile);color:var(--on-tile);--ink:var(--on-tile)}
+.tile flower-wave{position:absolute;inset:8%}
+code{font-size:.8125rem;color:var(--ink-2);overflow-wrap:anywhere}
+.inline{display:flex;align-items:center;gap:.6rem;padding:var(--pad)}
+.inline flower-wave{width:2.75rem;height:2.75rem}
+</style>
+<script src="../js/flower-wave.js" defer></script>
+</head>
+<body>
+<div class="frame"><div class="grid">
+  <header class="row">
+    <h1 class="disp">Flower wave</h1>
+    <div class="ctl">
+      <div class="seg" role="group" aria-label="Theme">
+        <button type="button" data-theme-set="dark" aria-pressed="true">Dark</button>
+        <button type="button" data-theme-set="light" aria-pressed="false">Light</button>
+      </div>
+      <div class="seg" role="group" aria-label="Accent">
+        <button type="button" data-accent-set="lime" aria-pressed="true">Lime</button>
+        <button type="button" data-accent-set="" aria-pressed="false">Blue</button>
+        <button type="button" data-accent-set="red" aria-pressed="false">Red</button>
+        <button type="button" data-accent-set="yellow" aria-pressed="false">Yellow</button>
+      </div>
+      <label class="sl">Glitch <input type="range" id="gl" min="0" max="1" step=".01" value=".22"></label>
+    </div>
+  </header>
+
+  <section class="row hero">
+    <div class="hero-txt">
+      <p class="label">01 / Hero</p>
+      <p>The waving loop from the Maya rig, drawn as outlines: silhouettes in ink, eyes, mouth and creases in the accent colour. Hover it for a glitch burst.</p>
+      <code>&lt;flower-wave src="media/flower/flower-wave.json"&gt;&lt;/flower-wave&gt;</code>
+    </div>
+    <flower-wave id="hero" src="../media/flower/flower-wave.json"></flower-wave>
+  </section>
+
+  <section class="row tiles">
+    <div class="cell"><div class="tile"><flower-wave src="../media/flower/flower-wave.json"></flower-wave></div><p class="label">02 / In a tile</p><code>default</code></div>
+    <div class="cell"><div class="tile"><flower-wave src="../media/flower/flower-wave.json" mode="accent" glitch="0"></flower-wave></div><p class="label">03 / One colour</p><code>mode="accent" glitch="0"</code></div>
+    <div class="cell"><div class="tile"><flower-wave src="../media/flower/flower-wave.json" glitch=".7" line="2"></flower-wave></div><p class="label">04 / Heavy glitch</p><code>glitch=".7" line="2"</code></div>
+    <div class="cell"><div class="tile"><flower-wave src="../media/flower/flower-wave.json" frame="9" glitch="0"></flower-wave></div><p class="label">05 / Still frame</p><code>frame="9" glitch="0"</code></div>
+  </section>
+
+  <section class="row inline">
+    <flower-wave src="../media/flower/flower-wave.json" line="1" glitch=".1" speed=".8"></flower-wave>
+    <p><span class="label">06 / Icon size</span> next to a line of text, e.g. a contact button or a loading state.</p>
+  </section>
+</div></div>
+<script>
+const root = document.documentElement;
+document.querySelectorAll('[data-theme-set]').forEach(b => b.addEventListener('click', () => {
+  root.dataset.theme = b.dataset.themeSet;
+  document.querySelectorAll('[data-theme-set]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+}));
+document.querySelectorAll('[data-accent-set]').forEach(b => b.addEventListener('click', () => {
+  if (b.dataset.accentSet) root.dataset.accent = b.dataset.accentSet; else delete root.dataset.accent;
+  document.querySelectorAll('[data-accent-set]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+}));
+document.getElementById('gl').addEventListener('input', e => document.getElementById('hero').setAttribute('glitch', e.target.value));
+</script>
+</body>
+</html>
