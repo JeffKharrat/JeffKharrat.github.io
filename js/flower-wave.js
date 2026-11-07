@@ -93,7 +93,8 @@ class FlowerWave extends HTMLElement {
     } });
     add(d.frames[f].i, false); add(d.frames[f].a, true);
     this._px = document.createElement('canvas'); this._px.setAttribute('aria-hidden', 'true');
-    this._px.style.cssText = `position:absolute;left:${-ML * 100}%;right:${-MR * 100}%;top:${-MT * 100}%;bottom:${-MB * 100}%;pointer-events:none`;
+    /* a canvas does not stretch between left/right like a div: it keeps its own pixel size, so width and height are given */
+    this._px.style.cssText = `position:absolute;left:${-ML * 100}%;top:${-MT * 100}%;width:${(1 + ML + MR) * 100}%;height:${(1 + MT + MB) * 100}%;max-width:none;pointer-events:none`;
     this.append(this._px);
     this._sh = { t0: performance.now(), f, P };
     this._burst = Math.max(this._burst, .6); this._wake();
