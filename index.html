@@ -8,15 +8,15 @@
 <meta property="og:title" content="Jeff Kharrat Portfolio">
 <meta property="og:description" content="Character rigging and technical animation, Maya and Unreal Engine 5.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://jeffkharrat.github.io/">
-<meta property="og:image" content="https://jeffkharrat.github.io/og-image.jpg">
+<meta property="og:url" content="https://crapyshit.github.io/">
+<meta property="og:image" content="https://crapyshit.github.io/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Jeff Kharrat, character rigging and technical animation">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="favicon.ico?v=3" sizes="32x32">
-<link rel="icon" href="favicon.svg?v=3" type="image/svg+xml">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=3">
+<link rel="icon" href="favicon.ico?v=4" sizes="32x32">
+<link rel="icon" href="favicon.svg?v=4" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">
 <style>[hidden]{display:none!important}img{max-width:100%}</style>
 </head>
 <body>
@@ -317,7 +317,7 @@ dialog::backdrop{background:color-mix(in srgb,var(--tile) 62%,transparent)}
 .wipe{position:fixed;inset:0;z-index:100;display:grid;place-items:center}
 .wipe canvas{position:absolute;inset:0;width:100%;height:100%}
 .wipe-c{position:relative;display:grid;justify-items:center;gap:clamp(.9rem,2.2vw,1.8rem)}
-.wipe-m{width:clamp(3.5rem,8vw,6rem);height:auto;fill:var(--ground)}
+.wipe-m{width:clamp(4.5rem,11vw,8.5rem);height:auto;fill:var(--ground)}
 /* Long project titles wrap onto balanced, centred lines with a margin on both sides. */
 .wipe p{position:relative;max-width:min(88vw,16ch);margin:0 auto;font-size:clamp(1.9rem,5.6vw,5rem);line-height:1;text-align:center;text-wrap:balance;color:var(--ground)}
 
@@ -449,23 +449,25 @@ li.soft{justify-content:center}
 :root[data-theme="dark"] .soft-ic--l{display:none}
 :root[data-theme="dark"] .soft-ic--d{display:inline}
 
-/* ---------- the カラット mark ----------
-   Header mark: three scales in a ring, cut into bands; the two slipped bands flicker on hover.
+/* ---------- the Yeff sigil ----------
+   Header mark: the eye is two halves, so the slip between them can flicker on hover.
    --tet is the stepped-block pattern that fills empty media slots, used as a mask so it takes the theme's line colour.
    The credits plate is an LED panel: every dot is one dash of a dashed line, lit in the bright variant of the current accent. */
 :root{--slot-a:20%;--tet:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 6'%3E%3Cpath d='M1 0h2v1h-2zM0 1h2v1h-2zM4 3h2v1h-2zM3 4h2v1h-2z'/%3E%3C/svg%3E")}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--slot-a:38%}}
 :root[data-theme="dark"]{--slot-a:38%}
-.logo:hover .slip-a,.logo:focus-visible .slip-a{animation:slip-a .46s steps(1,end) 1}
-.logo:hover .slip-b,.logo:focus-visible .slip-b{animation:slip-b .46s steps(1,end) 1}
-@keyframes slip-a{0%,44%{transform:translateX(-1.7px)}22%{transform:translateX(1.2px)}66%{transform:translateX(-.6px)}100%{transform:translateX(0)}}
-@keyframes slip-b{0%,44%{transform:translateX(-2.7px)}22%{transform:translateX(1.6px)}66%{transform:translateX(-1px)}100%{transform:translateX(0)}}
+.logo .eye-t{transform:translateX(1px)}
+.logo .eye-b{transform:translateX(-1px)}
+.logo:hover .eye-t,.logo:focus-visible .eye-t{animation:eye-t .46s steps(1,end) 1}
+.logo:hover .eye-b,.logo:focus-visible .eye-b{animation:eye-b .46s steps(1,end) 1}
+@keyframes eye-t{0%,44%{transform:translateX(0)}22%{transform:translateX(2px)}66%{transform:translateX(1px)}}
+@keyframes eye-b{0%,44%{transform:translateX(0)}22%{transform:translateX(-2px)}66%{transform:translateX(-1px)}}
 .plate{display:block;width:min(100%,20rem);background:var(--tile)}
 .plate svg{display:block;width:100%;height:auto;fill:none;stroke-width:.76;stroke-dasharray:.76 .24}
 .led-off{stroke:color-mix(in srgb,var(--on-tile) 9%,transparent)}
 .led-on{stroke:color-mix(in srgb,var(--acc-d) 84%,#fff);filter:drop-shadow(0 0 .3px var(--acc-d)) drop-shadow(0 0 1.5px color-mix(in srgb,var(--acc-d) 50%,transparent))}
 @media (prefers-reduced-motion:reduce){
-  .logo:hover .slip-a,.logo:hover .slip-b,.logo:focus-visible .slip-a,.logo:focus-visible .slip-b{animation:none}
+  .logo:hover .eye-t,.logo:hover .eye-b,.logo:focus-visible .eye-t,.logo:focus-visible .eye-b{animation:none}
 }
 
 /* ---------- origin sequence ----------
@@ -493,9 +495,8 @@ body[data-view="page"] .lore--bg{display:none}
     <a class="logo" href="#home" data-route="home" aria-label="Jeff Kharrat, home">
       <svg viewBox="0 0 40 40" aria-hidden="true">
         <path d="M9 1h30v30l-8 8H1V9z" style="fill:var(--accent)"/>
-        <g style="fill:var(--on-accent)">
-          <circle cx="20" cy="20" r="13.6" fill="none" style="stroke:var(--on-accent)" stroke-width="2"/>
-          <path d="M20 7.64L21.97 11.1L18.03 11.1ZM22.78 13.82L24.33 16.54L14.19 16.54L15.74 13.82ZM13.82 17.53L15.65 20.74L11.99 20.74ZM24.7 17.53L26.53 20.74L22.87 20.74ZM17.38 22.47L19.63 26.43L9.49 26.43L11.74 22.47ZM28.26 22.47L30.51 26.43L20.37 26.43L22.62 22.47Z"/><path class="slip-a" d="M23.7 11.1L25.25 13.82L18.21 13.82L19.76 11.1Z"/><path class="slip-b" d="M19.11 20.74L20.1 22.47L14.46 22.47L15.45 20.74ZM29.99 20.74L30.98 22.47L25.34 22.47L26.33 20.74Z"/>
+        <g transform="translate(6 13) scale(1.75)" style="fill:var(--on-accent)">
+          <path class="eye-t" d="M0 4A10 10 0 0 1 16 4V4.05H10V2H6V4.05H0z"/><path class="eye-b" d="M16 4A10 10 0 0 1 0 4V3.95H6V6H10V3.95H16z"/>
         </g>
       </svg>
       <span class="logo-t"><span class="logo-n">Jeff Kharrat</span><span class="logo-r" data-i18n="logo.role">rigging / tech anim</span></span>
@@ -752,7 +753,7 @@ body[data-view="page"] .lore--bg{display:none}
 
 <div class="wipe" id="wipe" hidden aria-hidden="true"><canvas></canvas>
   <div class="wipe-c" id="wipe-c">
-    <svg class="wipe-m" viewBox="0 0 32 32" shape-rendering="crispEdges"><path d="M11 1h10v1h-10zM9 2h14v1h-14zM7 3h6v1h-6zM19 3h6v1h-6zM6 4h4v1h-4zM15 4h2v1h-2zM22 4h4v1h-4zM5 5h4v1h-4zM15 5h2v1h-2zM23 5h4v1h-4zM4 6h3v1h-3zM14 6h4v1h-4zM25 6h3v1h-3zM3 7h3v1h-3zM14 7h4v1h-4zM26 7h3v1h-3zM3 8h3v1h-3zM14 8h6v1h-6zM26 8h3v1h-3zM2 9h3v1h-3zM14 9h6v1h-6zM27 9h3v1h-3zM2 10h2v1h-2zM12 10h8v1h-8zM28 10h2v1h-2zM1 11h3v1h-3zM12 11h8v1h-8zM28 11h3v1h-3zM1 12h3v1h-3zM11 12h10v1h-10zM28 12h3v1h-3zM1 13h2v1h-2zM29 13h2v1h-2zM1 14h2v1h-2zM10 14h2v1h-2zM20 14h2v1h-2zM29 14h2v1h-2zM1 15h2v1h-2zM10 15h2v1h-2zM20 15h2v1h-2zM29 15h2v1h-2zM1 16h2v1h-2zM9 16h4v1h-4zM19 16h4v1h-4zM29 16h2v1h-2zM1 17h2v1h-2zM11 17h4v1h-4zM21 17h4v1h-4zM29 17h2v1h-2zM1 18h2v1h-2zM10 18h6v1h-6zM20 18h6v1h-6zM29 18h2v1h-2zM1 19h3v1h-3zM8 19h6v1h-6zM18 19h6v1h-6zM28 19h3v1h-3zM1 20h3v1h-3zM7 20h8v1h-8zM17 20h8v1h-8zM28 20h3v1h-3zM2 21h2v1h-2zM7 21h8v1h-8zM17 21h8v1h-8zM28 21h2v1h-2zM2 22h3v1h-3zM6 22h20v1h-20zM27 22h3v1h-3zM3 23h3v1h-3zM26 23h3v1h-3zM3 24h3v1h-3zM26 24h3v1h-3zM4 25h3v1h-3zM25 25h3v1h-3zM5 26h4v1h-4zM23 26h4v1h-4zM6 27h4v1h-4zM22 27h4v1h-4zM7 28h6v1h-6zM19 28h6v1h-6zM9 29h14v1h-14zM11 30h10v1h-10z"/></svg>
+    <svg class="wipe-m" viewBox="0 0 18 8"><path fill-rule="evenodd" d="M0 4H2V3H3V2H5V1H7V0H13V1H15V2H17V3H18V4H16V5H15V6H13V7H11V8H5V7H3V6H1V5H0ZM6 4V6H10V4H12V2H8V4Z"/></svg>
     <p class="disp" id="wipe-t"></p>
   </div>
 </div>
@@ -768,7 +769,7 @@ body[data-view="page"] .lore--bg{display:none}
 const SITE = {
   email: 'jeanfkh@gmail.com',
   links: [['LinkedIn', 'https://www.linkedin.com/in/jean-fran%C3%A7ois-kharrat/'], ['ArtStation', 'https://www.artstation.com/jeanfkh'],
-    ['YouTube', 'https://youtube.com/@jfk4852'], ['GitHub', 'https://github.com/JeffKharrat']],
+    ['YouTube', 'https://youtube.com/@jfk4852'], ['GitHub', 'https://github.com/CrapyShit']],
   media: {   // stage layers: one clip, or { dark, light } to follow the theme; empty layers reuse the shaded clip
     shaded: { dark: 'media/stage/oni_dark_final.webm', light: 'media/stage/oni_light_final.webm' },
     wire: { dark: 'media/stage/oni_dark_wire.webm', light: 'media/stage/oni_light_wire.webm' },
@@ -3675,11 +3676,11 @@ const run = (() => {
       for (let i = 0; i < n; i++) { x.save(); x.translate((i + .5) * 100 / n, 50); x.scale(100 / n / (String(d.s).length * 22), 1.4); x.fillText(d.s, 0, 0); x.restore(); }
     } else if (d.t === 'logo') {
       x.scale(100 / 40, 100 / 40); x.fillStyle = C.acc; x.fill(LOGO_SQ);
-      x.fillStyle = C.ground; x.fill(LOGO_MARK, 'evenodd');
+      x.translate(6, 13); x.scale(1.75, 1.75); x.fillStyle = C.ground; x.fill(LOGO_EYE_T); x.fill(LOGO_EYE_B);
     }
     x.restore();
   }
-  const LOGO_SQ = new Path2D('M9 1h30v30l-8 8H1V9z'), LOGO_MARK = new Path2D('M34.6 20A14.6 14.6 0 1 1 5.4 20A14.6 14.6 0 1 1 34.6 20ZM32.6 20A12.6 12.6 0 1 0 7.4 20A12.6 12.6 0 1 0 32.6 20ZM20 7.64L21.97 11.1L18.03 11.1ZM22.78 13.82L24.33 16.54L14.19 16.54L15.74 13.82ZM13.82 17.53L15.65 20.74L11.99 20.74ZM24.7 17.53L26.53 20.74L22.87 20.74ZM17.38 22.47L19.63 26.43L9.49 26.43L11.74 22.47ZM28.26 22.47L30.51 26.43L20.37 26.43L22.62 22.47ZM23.7 11.1L25.25 13.82L18.21 13.82L19.76 11.1ZM19.11 20.74L20.1 22.47L14.46 22.47L15.45 20.74ZM29.99 20.74L30.98 22.47L25.34 22.47L26.33 20.74Z');   // the カラット mark: ring and three slipped scales
+  const LOGO_SQ = new Path2D('M9 1h30v30l-8 8H1V9z'), LOGO_EYE_T = new Path2D('M0 4A10 10 0 0 1 16 4V4.05H10V2H6V4.05H0z'), LOGO_EYE_B = new Path2D('M16 4A10 10 0 0 1 0 4V3.95H6V6H10V3.95H16z');
   /* ----- vertex data: pos(3) off(3) col(4) misc(4: size, building, speed/phase, kind) extra(2) ----- */
   const STRIDE = 16, PT = [], LN = [];
   const U_ACC = -1, U_GLB = -2, U_INK = -3, U_LINE = -4;
