@@ -27,7 +27,7 @@
    while the side columns hold the text. Left-aligned throughout. */
 :root{
   --ground:#E3E5EA; --panel:#F0F1F4; --ink:#14161C; --ink-2:#555B69; --line:#A9AEBA;
-  --tile:#0F1116; --on-tile:#EEF0F4; --ghost:#D2D5DD;
+  --tile:#0F1116; --on-tile:#EEF0F4; --ghost:#D2D5DD; --key:#E8EAEE;
   --fig-lit:#F8F9FB; --fig-shade:#B2B8C5;
   --ctl-l:#2457FF; --ctl-r:#DC3A2B; --ctl-c:#B98A00; --ax-y:#1C9A55;
   --gl-a:#FF2E4D; --gl-b:#12C8F0;
@@ -43,7 +43,7 @@
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
     --ground:#0E1014; --panel:#161920; --ink:#E9EBF0; --ink-2:#9AA1B0; --line:#343945;
-    --tile:#050608; --on-tile:#EEF0F4; --ghost:#1D2029;
+    --tile:#050608; --on-tile:#EEF0F4; --ghost:#1D2029; --key:#121419;
     --fig-lit:#D6DAE4; --fig-shade:#5A6172;
     --ctl-l:#5C84FF; --ctl-r:#FF5E4F; --ctl-c:#FFD23F; --ax-y:#3DD68C;
     --accent:var(--acc-d); --on-accent:var(--on-acc-d); color-scheme:dark;
@@ -51,7 +51,7 @@
 }
 :root[data-theme="dark"]{
   --ground:#0E1014; --panel:#161920; --ink:#E9EBF0; --ink-2:#9AA1B0; --line:#343945;
-  --tile:#050608; --on-tile:#EEF0F4; --ghost:#1D2029;
+  --tile:#050608; --on-tile:#EEF0F4; --ghost:#1D2029; --key:#121419;
   --fig-lit:#D6DAE4; --fig-shade:#5A6172;
   --ctl-l:#5C84FF; --ctl-r:#FF5E4F; --ctl-c:#FFD23F; --ax-y:#3DD68C;
   --accent:var(--acc-d); --on-accent:var(--on-acc-d); color-scheme:dark;
@@ -133,24 +133,22 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
   border:1px solid var(--line);border-top:0}
 .hdr[data-menu] .nav a{padding:.35rem var(--pad);border-top:1px solid var(--line)}
 @media (max-width:26rem){.logo-t{display:none}}
-.nav .n{margin-left:auto;padding-left:.8rem;font-size:.6875rem;letter-spacing:.06em;color:var(--ink-2)}
 @media (min-width:64rem){
   /* Main nav: three chamfered keys spread across the free middle of the header.
      The 1px chamfered outline is the key's own fill (clip-path) with a ground-coloured
      inset on ::after; hover inverts it, the current page lights the outline and square. */
   .nav{display:flex;flex:1 1 auto;justify-content:center;gap:clamp(.5rem,1.2vw,1.25rem);margin-inline:clamp(.75rem,3vw,3.5rem);min-width:0}
   .nav a{--c:8px;position:relative;z-index:0;flex:1 1 0;max-width:14rem;min-height:3rem;padding:0 clamp(.7rem,1vw,1.1rem);
-    font-size:.9375rem;letter-spacing:.08em;text-transform:uppercase;background:var(--line);
+    justify-content:center;font-size:.9375rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:var(--line);
     clip-path:polygon(var(--c) 0,100% 0,100% calc(100% - var(--c)),calc(100% - var(--c)) 100%,0 100%,0 var(--c));
     transition:background-color .12s,color .12s}
-  .nav a::after{content:"";position:absolute;inset:1px;z-index:-1;background:var(--ground);
+  .nav a::after{content:"";position:absolute;inset:1px;z-index:-1;background:var(--key);
     clip-path:polygon(calc(var(--c) - .5px) 0,100% 0,100% calc(100% - var(--c) + .5px),calc(100% - var(--c) + .5px) 100%,0 100%,0 calc(var(--c) - .5px));
     transition:background-color .12s}
   .nav a::before{flex:none;opacity:1;background:transparent;box-shadow:inset 0 0 0 1px var(--ink-2);margin-right:.65rem}
   .nav a:hover,.nav a:focus-visible{background:var(--ink);color:var(--ground);outline:0}
   .nav a:hover::after,.nav a:focus-visible::after{background:var(--ink)}
   .nav a:hover::before,.nav a:focus-visible::before,.nav a[aria-current="page"]::before{background:var(--accent);box-shadow:none}
-  .nav a:hover .n,.nav a:focus-visible .n{color:var(--ground);opacity:.7}
   .nav a[aria-current="page"]{background:var(--accent)}
   .nav a:active{transform:translateY(1px)}
   .menu-btn{display:none}
@@ -520,9 +518,9 @@ body[data-view="page"] .lore--bg{display:none}
       <span class="logo-t"><span class="logo-n">Jeff Kharrat</span><span class="logo-r" data-i18n="logo.role">rigging / tech anim</span></span>
     </a>
     <nav class="nav" id="nav" aria-label="Main">
-      <a href="#work" data-route="work" data-glitch><span class="t" data-i18n="nav.work">Work</span><span class="n" aria-hidden="true">01</span></a>
-      <a href="#reel" data-open="dlg-reel" data-glitch><span class="t" data-i18n="nav.reel">Reel</span><span class="n" aria-hidden="true">02</span></a>
-      <a href="#about" data-route="about" data-glitch><span class="t" data-i18n="nav.about">About</span><span class="n" aria-hidden="true">03</span></a>
+      <a href="#work" data-route="work" data-glitch><span class="t" data-i18n="nav.work">Work</span></a>
+      <a href="#reel" data-open="dlg-reel" data-glitch><span class="t" data-i18n="nav.reel">Reel</span></a>
+      <a href="#about" data-route="about" data-glitch><span class="t" data-i18n="nav.about">About</span></a>
     </nav>
     <div class="lang" role="group" aria-label="Language">
       <button type="button" data-lang="en" aria-pressed="true">EN</button>
