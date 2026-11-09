@@ -393,6 +393,7 @@ a.gtile:hover b{text-decoration:underline;text-decoration-color:var(--accent);te
 .shot{display:grid;gap:.5rem}
 .shot .fill{aspect-ratio:auto;object-fit:contain}
 .shot video.fill{aspect-ratio:16/9}   /* reserve the frame before the clip loads */
+.shot .fill--yt{aspect-ratio:16/9;height:auto}
 @media (min-width:64rem){
   .proj{grid-template-columns:repeat(4,minmax(0,1fr))}
   .proj-info{grid-column:4;grid-row:1;border-bottom:0;background:none}
@@ -805,7 +806,8 @@ const SITE = {
 };
 
 /* One entry per project, newest first. The first two also show on the home page.
-   cat: one of CATS below.   thumb and media src: an image, or an .mp4 / .webm clip. */
+   cat: one of CATS below, or a list of them to show the project in several sections.
+   thumb and media src: an image, an .mp4 / .webm clip, or (media only) a YouTube link. */
 /* Work page sections, in filter order. A section with no projects yet shows empty slots. */
 const CATS = ['rigs', 'animation', 'research', 'tools'];
 
@@ -830,6 +832,17 @@ const ALL_PROJECTS = [
     media: [
       { label: { en: 'Rig reel', ja: 'リグリール' }, src: 'media/proto/proto-reel.mp4' },
       { label: { en: 'Shaded loop (home page)', ja: 'シェーディングループ（ホーム）' }, src: SITE.media.shaded }] },
+  { id: 'amari', cat: ['rigs', 'animation'], year: '2025', thumb: 'media/amari/thumb.jpg',
+    title: { en: 'Amari', ja: 'Amari' },
+    kind: { en: 'ISART Digital graduation film', ja: 'ISART Digital 卒業制作短編映画' },
+    role: { en: 'Rigging, animation', ja: 'リギング、アニメーション' },
+    software: ['Maya'],
+    summary: { en: 'Short film made by a team of ISART Digital students, class of 2025. To finish her late grandfather\'s research, Amari sets out across a mysterious, fantastical Ireland. I worked on the rigging and animation.',
+      ja: 'ISART Digital 2025年卒業生のチームによる短編映画。亡き祖父の研究を完成させるため、アマリは幻想的なアイルランドを旅する。リギングとアニメーションを担当。' },
+    media: [
+      { label: { en: 'Full film', ja: '本編' }, src: 'https://youtu.be/TVTv4xNDYnM' },
+      { label: { en: 'Teaser', ja: 'ティザー' }, src: 'https://youtu.be/5g1-04Qwb4Q' },
+      { label: { en: 'Rig showcase', ja: 'リグ紹介' }, src: 'media/amari/amari-rig-showcase.mp4' }] },
   { id: 'creature-rig', cat: 'rigs', year: '2024.12.01', time: { en: '~1 month', ja: '約1か月' }, thumb: 'media/creature-rig/thumb.jpg',
     title: { en: 'Creature Rigging Master Project', ja: 'クリーチャーリギング 修士制作' },
     kind: { en: "Master's project", ja: '修士制作' },
@@ -1130,6 +1143,7 @@ const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls)
 const L = o => (o && (o[lang] ?? o.en)) ?? '';
 /* Only projects with a thumbnail or at least one clip are shown; the rest wait as drafts. */
 const PROJECTS = ALL_PROJECTS.filter(p => p.thumb || p.media.some(m => m.src));
+const inCat = (p, c) => [].concat(p.cat).includes(c);   // cat is one section or a list of them
 const projOf = name => (name.startsWith('p-') ? PROJECTS.find(p => p.id === name.slice(2)) : null);
 const known = name => name === 'home' || name === 'work' || name === 'about' || !!projOf(name);   // Tools and Skill tree return when they have content
 let filter = 'all';
@@ -1137,6 +1151,14 @@ let filter = 'all';
 /* A media frame: the file if there is one, otherwise a patterned slot that says what goes there. */
 function frame(src, shape, quiet, alt) {
   if (!src) { const d = mk('div', 'slot slot--' + shape); d.append(mk('span', 'slot-t', { sq: '1:1', wide: '16:9', clip: '16:10' }[shape] + ' [' + tr('slot.todo') + ']')); return d; }
+  const yt = typeof src === 'string' && src.match(/(?:youtu\.be\/|[?&]v=|\/embed\/|\/shorts\/)([\w-]{11})/);
+  if (yt) {                                                               // YouTube link: an embedded player, loaded when scrolled near
+    const f = mk('iframe', 'fill fill--wide fill--yt');
+    f.src = 'https://www.youtube-nocookie.com/embed/' + yt[1] + '?rel=0&modestbranding=1';
+    f.title = alt || 'YouTube'; f.loading = 'lazy'; f.allowFullscreen = true;
+    f.allow = 'encrypted-media; picture-in-picture; fullscreen';
+    return f;
+  }
   const themed = typeof src === 'object';                                  // { dark, light }: follows the theme, like the home stage
   const video = /\.(mp4|webm|mov)$/i.test(themed ? src.dark || src.light : src), n = mk(video ? 'video' : 'img', 'fill fill--' + shape);
   n.src = srcFor(src);
@@ -1154,7 +1176,7 @@ function renderLatest() {
   });
 }
 function renderResearch() {
-  const p = PROJECTS.find(q => q.cat === 'research'), w = $('#rwin');
+  const p = PROJECTS.find(q => inCat(q, 'research')), w = $('#rwin');
   if (!w) return;
   w.hidden = !p; if (!p) return;
   $('#rwin-t').textContent = L(p.title);
@@ -1163,12 +1185,12 @@ function renderResearch() {
 function renderWork() {
   const chips = $('#chips'), ul = $('#tiles');
   chips.textContent = ''; ul.textContent = '';
-  ['all', ...CATS.filter(c => PROJECTS.some(p => p.cat === c))].forEach(c => {
+  ['all', ...CATS.filter(c => PROJECTS.some(p => inCat(p, c)))].forEach(c => {
     const b = mk('button', 'chip', tr(c === 'all' ? 'wk.all' : 'cat.' + c));
     b.type = 'button'; b.dataset.cat = c; b.setAttribute('aria-pressed', String(c === filter));
     chips.append(b);
   });
-  const list = PROJECTS.filter(p => filter === 'all' || p.cat === filter);
+  const list = PROJECTS.filter(p => filter === 'all' || inCat(p, filter));
   list.forEach(p => {
     const li = mk('li'), a = link(mk('a', 'gtile'), 'p-' + p.id), cap = mk('span', 'gcap');
     cap.append(mk('b', '', L(p.title)), mk('span', 'label', [L(p.kind), p.year, L(p.time)].filter(Boolean).join(', ')));
