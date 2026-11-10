@@ -10,5 +10,6 @@ Suggested names:
 | `hero_*.mp4` (HEVC with alpha) | Safari versions of the four loops |
 | `creature-rig/thumb.jpg`, `creature-rig/turntable.mp4`, ... | One folder per project |
 | `cv-ja.pdf`, `cv-en.pdf` | CV downloads on the About page |
+| `logos/path-tut.png`, `path-mc.png`, `path-zag.png`, `path-mth.png`, `path-isd.png` | The logos on the About path's rooftop signs: transparent background, light ink instead of black (black reads as empty in the hologram). Swap a file to change a logo; it is fitted into its sign's box (`SIGN` in `index.html`) |
 
 Keep each loop around 1 to 2 MB. GitHub refuses files over 100 MB; host the reel on Vimeo or YouTube.
