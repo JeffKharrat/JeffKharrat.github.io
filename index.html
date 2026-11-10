@@ -3692,10 +3692,10 @@ const run = (() => {
     b.parts.forEach(p => p.F.forEach(f => f.pts.forEach(q => { lo = lo.map((v, i) => Math.min(v, q[i])); hi = hi.map((v, i) => Math.max(v, q[i])); })));
     STOP[k].Tb = mul(add(lo, hi), .5); STOP[k].ext = sub(hi, lo);
   });
-  /* ----- the rooftop signs: each building flies its studio's or school's logo on a hologram plate above the roof, cast up from
-     a small emitter and turned toward where the camera parks. The frame is built here; the logo is sampled from
+  /* ----- the rooftop logos: each building has its studio's or school's logo floating above the roof, turned toward where the
+     camera parks, with no frame. Its place is set here; the logo is sampled from
      media/logos/path-<id>.png into pixels once the image loads (see "the logos" under GL), so it scans, flickers and glitches
-     with its building. w by h: the box the logo is fitted into (scene units, proportions kept); col: the frame's colour. ----- */
+     with its building. w by h: the box the logo is fitted into (scene units, proportions kept). ----- */
   const SIGN = { tut: { w: 8.4, h: 2.9, col: PAL.lime }, mc: { w: 9.6, h: 2.8, col: PAL.orange }, zag: { w: 8.6, h: 3.7, col: PAL.blue },
     mth: { w: 4.2, h: 4.5, col: PAL.blue }, isd: { w: 8.8, h: 2.65, col: PAL.orange } };
   STOP.forEach((S, k) => {
@@ -3705,9 +3705,7 @@ const run = (() => {
     B.parts.forEach(p => p.F.forEach(f => f.pts.forEach(q => { if (Math.hypot(q[0] - S.Tb[0], q[2] - S.Tb[2]) < 1.8) top = Math.max(top, q[1]); })));
     top = top || S.roof;
     const f = unit([S.s * .6, 0, .78]), rt = unit(cross([0, 1, 0], f)), c = [S.Tb[0], S.roof + 1.3 + g.h / 2, S.Tb[2]];
-    S.sign = { c, rt, w: g.w, h: g.h, col: g.col, top };
-    setFrame(0, 0, 1);
-    B.parts.push(tank([c[0], top - .1, c[2]], 'y', .45, .55, PAL.black, false, 14), torus([c[0], top + .38, c[2]], .66, .07, g.col, 20));   // the emitter
+    S.sign = { c, rt, w: g.w, h: g.h };
     const lo = [...S.Tb.map((v, i) => v - S.ext[i] / 2)], hi = [...S.Tb.map((v, i) => v + S.ext[i] / 2)];
     [-1, 1].forEach(u => [-1, 1].forEach(v => { const p = add(c, add(mul(rt, u * g.w * .56), [0, v * g.h * .6, 0])); p.forEach((q, i) => { lo[i] = Math.min(lo[i], q); hi[i] = Math.max(hi[i], q); }); }));
     S.Fb = mul(add(lo, hi), .5); S.Fe = sub(hi, lo);                      // what the parked camera frames: the building and its sign
@@ -3806,16 +3804,6 @@ const run = (() => {
     }
   }
   BLD.forEach((b, k) => b.parts.forEach(p => { p.F.forEach(F => sampleFace(F, k)); p.L.forEach(l => { const a = l.pts[0], c2 = l.pts[1], m = Math.max(1, Math.hypot(...sub(c2, a)) / .15 | 0); for (let i = 0; i <= m; i++) vtx(PT, add(a, mul(sub(c2, a), i / m)), [0, 0, 0], [.75, .78, .85], .6, .06, k, 0, 0); }); }));
-  /* the signs' frames: corner brackets in the building's colour, a rail under the plate, and faint beams from the emitter */
-  STOP.forEach((S, k) => {
-    const G = S.sign; if (!G) return;
-    const c = C255(G.col), at = (u, v) => add(G.c, add(mul(G.rt, u * G.w / 2), [0, v * G.h / 2, 0])), seg = (a, b, cc, al, sz, step = .07) => { const m = Math.max(1, Math.hypot(...sub(b, a)) / step | 0); for (let i = 0; i <= m; i++) vtx(PT, add(a, mul(sub(b, a), i / m)), [0, 0, 0], cc, al, sz, k, 0, 0); };
-    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([u, v]) => { const p = at(u * 1.1, v * 1.18); seg(p, add(p, mul(G.rt, -u * Math.min(1.1, G.w * .14))), c, 1, .08); seg(p, add(p, [0, -v * Math.min(.9, G.h * .2), 0]), c, 1, .08); });
-    seg(at(-1.1, -1.32), at(1.1, -1.32), c, .9, .07, .1);
-    for (let i = 0; i < 9; i++) seg(at(-1.1 + i * .275, -1.32), at(-1.1 + i * .275, -1.4), c, .9, .06);   // ticks on the rail
-    const em = [G.c[0], G.top + .45, G.c[2]];
-    [[-1, -1.32], [1, -1.32], [-.35, -1.32], [.35, -1.32]].forEach(([u, v]) => seg(em, at(u * 1.1, v), c, .22, .05, .22));
-  });
   /* the road: lanes of points, pulsing in the shader (kind 1), narrowing and rising into the core */
   for (let j = 0; j < 9; j++) {
     const off = (j / 8 - .5) * 2 * ROAD, edge = j === 0 || j === 8;
@@ -3985,7 +3973,7 @@ const run = (() => {
   });
   for (let i = 0; i < 600; i++) { const a = i / 200 * TAU; vtx(YO, [0, 0, 0], [Math.cos(a) * .9, Math.sin(a) * .9, ((i / 200 | 0) - 1) * .035], [.05, .03, .05], .95, .05, -1, 0, 7, rnd(), 0); }   // the groove
   const BY = buf(YO); YO.length = 0;
-  const YST = 640, TD = new Float32Array(YST * STRIDE), BT = { b: gl.createBuffer(), n: YST };
+  const YST = 1400, TD = new Float32Array(YST * STRIDE), BT = { b: gl.createBuffer(), n: YST };
   gl.bindBuffer(gl.ARRAY_BUFFER, BT.b); gl.bufferData(gl.ARRAY_BUFFER, TD.byteLength, gl.DYNAMIC_DRAW);
   /* ----- camera (also projected in JS for the panels, the overlay and the mini-map) ----- */
   let W = 0, H = 0, dpr = 1, RS = .6, cam = null;
@@ -4013,19 +4001,32 @@ const run = (() => {
   /* where the yoyo and its string sit, set from the Miraculous parked view so the composition holds on any window. Each key is an
      offset from the building on screen (in screen heights) and a depth (times the building's depth). YPOS: the yoyo;
      YROPE: the string from the yoyo outward, up the left side, over the roof and down behind the building (an open Catmull-Rom). */
-  const YPOS = [-.25, .07, .36], YROPE = [[-.25, .07, .36], [-.33, -.07, .52], [-.31, -.24, .78], [-.13, -.36, 1], [.12, -.35, 1.2], [.3, -.2, 1.38], [.37, -.02, 1.55]];
+  const YPOS = [-.25, .07, .36], YROPE = [[-.25, .07, .36], [-.43, .03, .4], [-.52, -.05, .45], [-.54, -.12, .5], [-.51, -.18, .56], [-.44, -.225, .64],
+    [-.33, -.25, .73], [-.19, -.24, .82], [-.07, -.21, .9], [.04, -.14, .98]];   // the string: out to the left, up, over and into the roof behind the logo
   let YP = [0, 0, 0], YR = [], YS = 1, YAX = null;
   function yoPath() {
     const S = STOP[MCI]; if (!S) return;
     const [E, Tg] = parked(MCI), f = unit(sub(Tg, E)), r = unit(cross([0, 1, 0], f)), u = cross(f, r), F = H * .95, cx = W / 2, cy = H * .52;
     const d = sub(S.Tb, E), dz = dot(d, f), bx = cx + F * dot(d, r) / dz, by = cy - F * dot(d, u) / dz, sh = narrow() ? Math.min(H, W * 1.3) : H;
     const at = ([sx, sy, kz]) => { const z = dz * kz, X = bx + sx * sh - cx, Y = cy - (by + sy * sh), p = add(E, add(mul(f, z), add(mul(r, X * z / F), mul(u, Y * z / F)))); p[1] = Math.max(.7, p[1]); return p; };
-    YP = at(YPOS); YR = YROPE.map(at); YAX = { r, u };
+    YP = at(YPOS); YAX = { r, u };
+    /* the string, smoothed: a centripetal Catmull-Rom through the keys (no kinks or overshoot at uneven spacing), sampled densely,
+       then resampled so the pixels sit evenly on screen (spacing measured as length over depth), so it reads as one clean line */
+    const K = YROPE.map(at), D = [];
+    const P = [add(K[0], sub(K[0], K[1])), ...K, add(K[K.length - 1], sub(K[K.length - 1], K[K.length - 2]))];
+    for (let i = 1; i < P.length - 2; i++) {
+      const p0 = P[i - 1], p1 = P[i], p2 = P[i + 1], p3 = P[i + 2], tj = (a, b) => Math.pow(Math.max(1e-6, Math.hypot(...sub(b, a))), .5);
+      const t1 = tj(p0, p1), t2 = t1 + tj(p1, p2), t3 = t2 + tj(p2, p3);
+      for (let q = 0; q < 60; q++) {
+        const t = t1 + (t2 - t1) * q / 60, L = (a, b, ta, tb) => add(mul(a, (tb - t) / (tb - ta)), mul(b, (t - ta) / (tb - ta)));
+        const A1 = L(p0, p1, 0, t1), A2 = L(p1, p2, t1, t2), A3 = L(p2, p3, t2, t3), B1 = L(A1, A2, 0, t2), B2 = L(A2, A3, t1, t3);
+        D.push(L(B1, B2, t1, t2));
+      }
+    }
+    D.push(K[K.length - 1]);
+    const acc = [0]; for (let i = 1; i < D.length; i++) acc.push(acc[i - 1] + Math.hypot(...sub(D[i], D[i - 1])) / Math.max(1, dot(sub(D[i], E), f)));
+    YR = Array.from({ length: YST }, (_, n) => { const v = acc[acc.length - 1] * n / (YST - 1); let i = 1; while (i < acc.length - 1 && acc[i] < v) i++; const k2 = (v - acc[i - 1]) / Math.max(1e-9, acc[i] - acc[i - 1]); return add(D[i - 1], mul(sub(D[i], D[i - 1]), cl(k2))); });
     YS = .105 * sh * dz * YPOS[2] / F;                                      // its radius: about a tenth of the screen's height
-  }
-  function ropeAt(g) {                                                      // g in 0..1 along the string, from the yoyo
-    const n = YR.length - 1, x = cl(g) * n, i = Math.min(n - 1, Math.floor(x)), u = x - i, P0 = YR[Math.max(0, i - 1)], P1 = YR[i], P2 = YR[i + 1], P3 = YR[Math.min(n, i + 2)];
-    return [0, 1, 2].map(j => .5 * (2 * P1[j] + (P2[j] - P0[j]) * u + (2 * P0[j] - 5 * P1[j] + 4 * P2[j] - P3[j]) * u * u + (3 * P1[j] - P0[j] - 3 * P2[j] + P3[j]) * u * u * u));
   }
   function ukey(t) {
     const K = UK, n = K.length - 1;
@@ -4128,7 +4129,7 @@ const run = (() => {
     const r = box.getBoundingClientRect(); ptr = [cl((e.clientX - r.left) / Math.max(1, r.width) * 2 - 1, -1, 1), cl((e.clientY - r.top) / Math.max(1, r.height) * 2 - 1, -1, 1)];
   }, { passive: true });
   function drawYoyo(time) {
-    if (!YAX) return;
+    if (!YAX || !YR.length) return;
     const t = time, eye = cam.E, { r, u } = YAX;
     /* the float: a slow bob and drift, a slight rocking of the face; the string's near end moves with it, its far end stays put */
     const bob = add(mul(u, YS * (.11 * Math.sin(t * 1.05) + .03 * Math.sin(t * 2.3))), mul(r, YS * .05 * Math.sin(t * .7 + 1)));
@@ -4139,7 +4140,7 @@ const run = (() => {
     const hid = p => { if (!yc) return 1; const q = pj(p); return q && q[2] > yc[2] - YS && Math.hypot(q[0] - yc[0], q[1] - yc[1]) < yr ? 0 : 1; };
     let o = 0;
     for (let i = 0; i < YST; i++) {                                         // the string: dense near the screen, thinning into the distance
-      const g = Math.pow(i / (YST - 1), 1.7), w = Math.pow(1 - g, 2), p = add(ropeAt(g), add(mul(bob, w), mul(r, YS * .06 * Math.sin(t * .9 + g * 5) * g * (1 - g))));
+      const g = i / (YST - 1), w = Math.pow(1 - g, 2), p = add(YR[i], add(mul(bob, w), mul(r, YS * .05 * Math.sin(t * .9 + g * 4) * g * (1 - g))));   // the near end floats with the yoyo, the far end stays put
       TD.set([p[0], p[1], p[2], 0, 0, 0, .95, .93, .9, ca * (.95 - .55 * g) * hid(p), YS * .085, -1, 0, 0, i * .37, 0], o); o += STRIDE;
     }
     bind(BT); gl.bufferSubData(gl.ARRAY_BUFFER, 0, TD); gl.drawArrays(gl.POINTS, 0, BT.n);
@@ -4365,6 +4366,7 @@ const run = (() => {
     else if (e < tE) { LEDP.draw(LEDP.dur); present(sheared(.85, now), blockOf(.85), 1 - sm(0, 1, (e - tD) / SD)); }
     else { const a = .85 * (1 - backE((e - tE) / SE)); present(sheared(a, now), blockOf(a), 0); }
   }
+  const SPARK_CLICK = false;                                                // clicking the spark (the LED sequence) is off for now; true brings it back
   spb.addEventListener('click', startSpark);
   [xc, ledc].forEach(c => c.addEventListener('click', skipSpark));
   addEventListener('keydown', e => { if (seq && e.key === 'Escape') skipSpark(); });
@@ -4405,7 +4407,7 @@ const run = (() => {
     if (BG) { bind(BG); gl.drawArrays(gl.POINTS, 0, BG.n); }
     if (MCI >= 0) drawYoyo(time);
     coreLight(tNow, time);
-    const spOn = !!sparkP && sparkP[2] > .55 && !seq;                          // the spark's button follows it while it is in view
+    const spOn = SPARK_CLICK && !!sparkP && sparkP[2] > .55 && !seq;           // the spark's button follows it while it is in view
     if (spb.hidden === spOn) spb.hidden = !spOn;
     if (spOn) spb.style.transform = 'translate(' + Math.round(sparkP[0]) + 'px,' + Math.round(sparkP[1]) + 'px)';
     /* the panels and the HUD */
