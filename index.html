@@ -398,6 +398,11 @@ a.gtile:hover b{text-decoration:underline;text-decoration-color:var(--accent);te
   .proj{grid-template-columns:repeat(4,minmax(0,1fr))}
   .proj-info{grid-column:4;grid-row:1;border-bottom:0;background:none}
   .proj-media{grid-column:1/4;grid-row:1}
+  /* Long project texts: the pinned info column scrolls on its own instead of waiting for the end of the page */
+  .proj-info .pin{max-height:calc(100vh - var(--hdr) - 4rem);max-height:calc(100svh - var(--hdr) - 4rem);overflow-y:auto;
+    padding-right:.6rem;margin-right:-.6rem;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+  .proj-info .pin::-webkit-scrollbar{width:6px}
+  .proj-info .pin::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
 }
 
 /* ---------- about ---------- */
