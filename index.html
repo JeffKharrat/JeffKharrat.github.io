@@ -3988,10 +3988,10 @@ const run = (() => {
   function glass(k, a, time) {
     const S = STOP[k], el = panels[k];
     if (a <= .01) { if (tfCache[k] !== 'h') { el.style.opacity = '0'; el.style.visibility = 'hidden'; tfCache[k] = 'h'; } return; }
-    const ew = el.offsetWidth, eh = el.offsetHeight, nar = narrow(), side = -S.s, Dp = 6, kk = Dp / cam.F, bob = still.matches ? 0 : Math.sin(time * 1.1 + k) * 5;
+    const ew = el.offsetWidth, eh = el.offsetHeight, nar = narrow(), side = -S.s, Dp = 6, kk = Dp / cam.F, bob = still.matches ? 0 : Math.sin(time * .8 + k) * 2.5;   // a light float, not a sway
     let sx2, sy2, th;
     if (nar) { sx2 = W / 2; sy2 = H - eh / 2 - 58 + (1 - a) * 60; th = 0; }
-    else { sx2 = (side < 0 ? W * .045 + ew / 2 : W - W * .045 - ew / 2) + side * (1 - a) * W * .2; sy2 = H * .48 + bob; th = side * -.24 + (still.matches ? 0 : Math.sin(time * .7 + k) * .03); }
+    else { sx2 = (side < 0 ? W * .045 + ew / 2 : W - W * .045 - ew / 2) + side * (1 - a) * W * .2; sy2 = H * .48 + bob; th = side * -.24 + (still.matches ? 0 : Math.sin(time * .5 + k) * .012); }
     const Cw = add(add(add(cam.E, mul(cam.f, Dp)), mul(cam.r, (sx2 - cam.cx) * kk)), mul(cam.u, -(sy2 - cam.cy) * kk));
     const rp = add(mul(cam.r, Math.cos(th)), mul(cam.f, Math.sin(th))), hw = mul(rp, ew * kk / 2), hh = mul(cam.u, eh * kk / 2);
     const P = [add(sub(Cw, hw), hh), add(add(Cw, hw), hh), sub(add(Cw, hw), hh), sub(sub(Cw, hw), hh)].map(pj);
@@ -4005,7 +4005,7 @@ const run = (() => {
     const dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3, dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3, den = dx1 * dy2 - dx2 * dy1;
     const g2 = (dx3 * dy2 - dx2 * dy3) / den, h = (dx1 * dy3 - dx3 * dy1) / den;
     const Aq = x1 - x0 + g2 * x1, Bq = x3 - x0 + h * x3, Dq = y1 - y0 + g2 * y1, Eq = y3 - y0 + h * y3;
-    const tf = 'matrix3d(' + [Aq / ew, Dq / ew, 0, g2 / ew, Bq / eh, Eq / eh, 0, h / eh, 0, 0, 1, 0, x0, y0, 0, 1].map(v => +v.toFixed(4)).join(',') + ')';
+    const tf = 'matrix3d(' + [Aq / ew, Dq / ew, 0, g2 / ew, Bq / eh, Eq / eh, 0, h / eh, 0, 0, 1, 0, x0, y0, 0, 1].map(v => +v.toPrecision(7)).join(',') + ')';   // significant digits, not decimals: the perspective terms are ~3e-4, and 4 decimals threw away most of them
     if (tf !== tfCache[k]) { el.style.transform = tf; el.style.opacity = a.toFixed(2); el.style.visibility = 'visible'; tfCache[k] = tf; }
   }
   function minimap(t) {
