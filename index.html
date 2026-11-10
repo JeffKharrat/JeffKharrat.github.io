@@ -436,6 +436,8 @@ a.gtile:hover b{text-decoration:underline;text-decoration-color:var(--accent);te
   text-shadow:0 0 6px var(--ground),0 0 2px var(--ground)}
 .run-p h3{font-size:2.1rem;line-height:.95}
 .run-p .run-r{color:var(--accent)}
+.run-p h3 a{color:inherit;text-decoration:none;cursor:pointer;transition:color .15s}
+.run-p h3 a:hover,.run-p h3 a:focus-visible{color:var(--accent);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:.12em}
 .run-p .run-g{font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
 .run-sp{position:absolute;left:0;top:0;opacity:0;pointer-events:none;white-space:nowrap;color:var(--ink);letter-spacing:.08em}
 /* the spark is a button: a ring shows on hover or focus; clicking it plays the LED sequence over the stage */
@@ -728,11 +730,11 @@ body[data-view="page"] .lore--bg{display:none}
       <section class="run" id="run" aria-labelledby="run-t">
         <div class="run-st" id="run-st">
           <canvas id="run-cv" aria-hidden="true"></canvas>
-        <article class="run-p" tabindex="-1"><p class="label">2025.10 – · 01</p><h3 class="disp" data-i18n="ab.tut2">Tokyo University of Technology</h3><p class="run-r label" data-i18n="run.rs">Research student, Kawashima Lab</p><p data-i18n="run.b4"></p><p class="run-g">Maya · Python · FBX · Unreal Engine 5.6 · Control Rig</p></article>
-        <article class="run-p" tabindex="-1"><p class="label">2023.09 – 2025.07 · 02</p><h3 class="disp">Miraculous Corp</h3><p class="run-r label" data-i18n="ab.gen">3D generalist</p><p data-i18n="run.b3"></p><p class="run-g">Maya 2024 · Unreal Engine 5.4 · Matrix rigging</p></article>
-        <article class="run-p" tabindex="-1"><p class="label">2023.01 – 2023.06 · 03</p><h3 class="disp">Zag Studios</h3><p class="run-r label" data-i18n="ab.gen">3D generalist</p><p data-i18n="run.b2"></p><p class="run-g">Maya · Unreal Engine · Photoshop</p></article>
-        <article class="run-p" tabindex="-1"><p class="label">2022.01 – 2022.06 · 04</p><h3 class="disp">Mathematic Studio</h3><p class="run-r label" data-i18n="ab.gen">3D generalist</p><p data-i18n="run.b1"></p><p class="run-g">Maya · Unreal Engine</p></article>
-        <article class="run-p" tabindex="-1"><p class="label">2020.09 – 2025.06 · 05</p><h3 class="disp" data-i18n="ab.isart">Isart Digital, Paris</h3><p class="run-r label" data-i18n="ab.ms2">Master's, 3D cinema</p><p data-i18n="run.b0"></p><p class="run-g">Maya · Creature rig · Joint-based muscles · Team pipeline</p></article>
+        <article class="run-p" tabindex="-1"><p class="label">2025.10 – · 01</p><h3 class="disp"><a href="https://www.teu.ac.jp/" target="_blank" rel="noopener" data-i18n="ab.tut2">Tokyo University of Technology</a></h3><p class="run-r label" data-i18n="run.rs">Research student, Kawashima Lab</p><p data-i18n="run.b4"></p><p class="run-g">Maya · Python · FBX · Unreal Engine 5.6 · Control Rig</p></article>
+        <article class="run-p" tabindex="-1"><p class="label">2023.09 – 2025.07 · 02</p><h3 class="disp"><a href="https://miraculous.com/" target="_blank" rel="noopener">Miraculous Corp</a></h3><p class="run-r label" data-i18n="ab.gen">3D generalist</p><p data-i18n="run.b3"></p><p class="run-g">Maya 2024 · Unreal Engine 5.4 · Matrix rigging</p></article>
+        <article class="run-p" tabindex="-1"><p class="label">2023.01 – 2023.06 · 03</p><h3 class="disp"><a href="https://www.linkedin.com/company/zagstudios/home/" target="_blank" rel="noopener">Zag Studios</a></h3><p class="run-r label" data-i18n="ab.gen">3D generalist</p><p data-i18n="run.b2"></p><p class="run-g">Maya · Unreal Engine · Photoshop</p></article>
+        <article class="run-p" tabindex="-1"><p class="label">2022.01 – 2022.06 · 04</p><h3 class="disp"><a href="https://mathematic.tv/" target="_blank" rel="noopener">Mathematic Studio</a></h3><p class="run-r label" data-i18n="ab.gen">3D generalist</p><p data-i18n="run.b1"></p><p class="run-g">Maya · Unreal Engine</p></article>
+        <article class="run-p" tabindex="-1"><p class="label">2020.09 – 2025.06 · 05</p><h3 class="disp"><a href="https://www.isart.com/" target="_blank" rel="noopener" data-i18n="ab.isart">Isart Digital, Paris</a></h3><p class="run-r label" data-i18n="ab.ms2">Master's, 3D cinema</p><p data-i18n="run.b0"></p><p class="run-g">Maya · Creature rig · Joint-based muscles · Team pipeline</p></article>
           <p class="run-sp label" id="run-sp" data-i18n="run.sp">Frame 0</p>
           <button type="button" class="run-spb" id="run-spb" hidden><span class="vh" data-i18n="run.spb">Enter the spark</span></button>
           <div class="run-hud"><span class="label"><span data-i18n="run.k">The path</span> <span id="run-n">—</span></span><b id="run-t" data-i18n="run.hint">Scroll to follow the path</b></div>
