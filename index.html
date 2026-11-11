@@ -2905,82 +2905,112 @@ const lore = (() => {
   if (RUN[QS.get('intro')]) mode = QS.get('intro');
   let cw = 0, ch = 0, cd = 1, clock = -.35, last = 0, rafL = 0, done = false, beat = -1, lastY = -1, odd = false;
   /* ===== intro 3: bloom =====
-     The flower heads (js/flower-gl.js, WebGL, drawn on their own canvas above this one) rain down, stall and all turn
-     to look at you, then drop away. One head rezzes in, faces front and rushes the camera with its smile lined up
-     on the stage; the mouth becomes a window onto the digital floor, we go through it, the mouth's outline flies out
-     past the screen and the figure scans in. Falls back to the other intros when WebGL2 or the model is missing. */
-  const B_END = 9.9, BBEAT = [0, 1.2, 3.6, 4.9, 7.6], B_THRU = 7.58, B_CAMZ = 14, B_TAN = Math.tan(16 * Math.PI / 180), B_HS = 1.3;
+     The flower heads (js/flower-gl.js, WebGL, outlines only, on their own canvas next to this one) rain through a real
+     volume seen by one camera (38 degree lens) that drifts sideways and dollies in, so the layers slide over each other.
+     Every head falls at about the same speed in the world: the far ones (40 units out) are small, thin, faint and slow
+     on screen, the near ones large, thick and fast. The page is a pane of glass B_UI units from the lens: line fragments
+     nearer than that are drawn on the layer in front of the UI (a second WebGL pass, split at the plane per fragment,
+     copied onto the front canvas), the rest behind it, so a head can be half through the page.
+       0    Signal  one head blinks in and hangs there, then the far field rezzes in mid-air
+       1.2  Rain    the rain comes nearer layer by layer; three heads fall past in front of the UI (1.45 to 3.55)
+       3.6  Notice  time stalls, the camera arcs round, every head turns to look at the lens and follows it
+       4.9  Chosen  the rain drops away (three streaks in front, 5.25 to 5.9); one head rezzes in, leans back, then lunges
+                    at the lens with its smile lined up on the stage and comes through the page (7.1 on)
+       7.7  online  we go through the mouth onto the digital floor, its outline flies out past the screen in front of the
+                    UI and the figure scans in.
+     Falls back to the other intros when WebGL2 or the model is missing. */
+  const B_END = 10, BBEAT = [0, 1.2, 3.6, 4.9, 7.7], B_THRU = 7.7, B_RUSH = 6.25, B_CAMZ = 14, B_FOV = 38, B_TAN = Math.tan(B_FOV * Math.PI / 360), B_HS = 1.3, B_UI = 9, B_DT = .02;
   const gcv = mk('canvas', 'lore'), FGL = window.FlowerGL;
   gcv.setAttribute('aria-hidden', 'true');
   let FG = FGL ? undefined : null, fgSince = performance.now(), glUsed = false;
   if (FGL && (SITE.intros || []).includes('bloom')) FGL.create(gcv, 'media/flower/flower-head.bin').then(r => { FG = r; if (!r) dropBloom(); });
   else FG = null;
-  const B = { drops: [], last: -1, hull: null, hullC: null };
+  const B = { heads: [], T: null, S: null, hull: null, hullC: null, hullW: 1, w: 0, cam: { x: 0, y: 0, z: B_CAMZ, at: [0, 0, -6], fov: B_FOV }, items: [], near: [] };
+  const bHash = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+  /* the rain's own clock: it hangs at first, 1 while it falls, almost 0 in the stall, then it lets go */
+  const bSpd = t => (t < 3.6 ? mix(.1, 1, st(.85, 1.5, t)) : t < 5 ? mix(1, .035, st(3.6, 4.15, t)) : mix(.035, 5, st(5, 5.8, t)));
+  const bSpin = t => 1 - st(3.6, 4.1, t) + st(5, 5.4, t);
+  const bTab = (A, t) => { const x = cl(t / B_DT, 0, A.length - 1.001), i = x | 0; return A[i] + (A[i + 1] - A[i]) * (x - i); };
   function bloomReset() {
-    const R = Math.random;
-    B.drops = Array.from({ length: 20 }, (_, i) => ({
-      ts: .25 + 3.1 * Math.pow(i / 20, .75) + R() * .15, fx: R() * 2 - 1, z: -9 + R() * 11, s: .8 + R() * .4, y: null, v: .9 + R() * .5,
-      q: FGL.qax([R() - .5, R() - .5, (R() - .5) * .3], (R() - .5) * 2.4), w: [R() - .5, R() - .5, R() - .5], ws: .3 + R() * .7,
-      face: FGL.qax([R() - .5, R() - .5, 0], R() * .35), g: 0, snap: 0, jit: 0, a: 1, mid: i < 7 ? .85 - R() * 1.1 : null }));
-    B.drops[0].ts = .15; B.drops[0].mid = .35; B.drops[0].fx = .25;   // the first one blinks in on its own
-    B.last = -1; B.hull = null;
+    let sd = 20261; const R = () => { sd = sd + 0x6D2B79F5 | 0; let x = Math.imul(sd ^ sd >>> 15, 1 | sd); x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x; return ((x ^ x >>> 14) >>> 0) / 4294967296; };
+    const n = Math.ceil((B_END + 1) / B_DT) + 2; B.T = new Float32Array(n); B.S = new Float32Array(n);   // fall and tumble, integrated once
+    for (let i = 1; i < n; i++) { const tm = (i - .5) * B_DT; B.T[i] = B.T[i - 1] + bSpd(tm) * B_DT; B.S[i] = B.S[i - 1] + bSpin(tm) * B_DT; }
+    /* d: distance from the resting lens; y0: it rezzes in mid-air and will hang at this height (in half-heights) in the stall, null: it falls in from the top */
+    const H = [], add = (d, ts, fx, y0, o) => H.push(Object.assign({ d, ts, fx, y0, s: .66 + R() * .26, v: 4.6 + R() * 1.1, wrap: 1,
+      q: FGL.qax([R() - .5, R() - .5, (R() - .5) * .4], (R() - .5) * 5), w: [R() - .5, R() - .5, (R() - .5) * .6], ws: .7 + R() * 1.1,
+      face: FGL.qax([R() - .5, R() - .5, R() - .5], R() * .3) }, o));
+    add(13, .15, .22, .3, { s: .9, wrap: 0 });                                          // the first one blinks in on its own
+    for (let i = 0; i < 30; i++) { const u = (i + R()) / 30; add(40 - 21 * u, .4 + 1.3 * Math.pow(u, .8) + R() * .1, R() * 2 - 1, R() * 1.8 - .9); }   // far field, farthest first
+    for (let i = 0; i < 7; i++) add(10.5 + 8 * R(), .9 + .9 * R(), R() * 2 - 1, R() * 1.7 - .85);                       // middle, rezzing in
+    for (let i = 0; i < 8; i++) { const u = (i + R()) / 8; add(18.5 - 9 * u, 1.05 + 1.6 * u, R() * 2 - 1, null); }   // middle, falling in, nearer and nearer
+    [[1.45, 7.7, .66], [1.8, 6.5, -.6], [2.15, 7.2, .08]].forEach(([ts, d, fx]) => add(d, ts, fx, null, { v: 5.6, s: .74, wrap: 0 }));   // the three that pass in front of the page
+    [[5.25, 7.4, -.42], [5.4, 6.4, .55], [5.55, 7.9, .1]].forEach(([ts, d, fx]) => add(d, ts, fx, null, { v: 5.4, s: .74, wrap: 0 }));   // streaks in front as the rain lets go
+    B.heads = H; B.hull = null;
   }
-  const bHalf = z => (B_CAMZ - z) * B_TAN;
-  function bProj(p, asp) { const d = Math.max(.05, B_CAMZ - p[2]); return [(p[0] / (d * B_TAN * asp) * .5 + .5) * cw, (.5 - p[1] / (d * B_TAN) * .5) * ch, d]; }
+  function bCam(t) {                                                     // the lens: drifts and dollies in, arcs round during the stall, back to rest for the lunge
+    const c = B.cam, back = 1 - st(5, 6.2, t);
+    c.x = (mix(-1.3, -.45, st(0, 3.6, t)) + 1.85 * st(3.5, 5, t)) * back; c.y = (mix(.7, .15, st(0, 3.6, t)) - .55 * st(3.5, 5, t)) * back;
+    c.z = B_CAMZ + 2.2 * (1 - st(0, 3.8, t)); c.at[0] = c.x * .3; c.at[1] = c.y * .3;
+    return c;
+  }
+  function bProj(p, asp) { const d = Math.max(.05, B_CAMZ - p[2]); return [(p[0] / (d * B_TAN * asp) * .5 + .5) * cw, (.5 - p[1] / (d * B_TAN) * .5) * ch, d]; }   // the lens at rest
   function hull(pts) {                                                   // convex hull, monotone chain
     const P = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), x = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
     P.forEach(p => { while (lo.length > 1 && x(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); });
     P.slice().reverse().forEach(p => { while (up.length > 1 && x(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); });
     return lo.slice(0, -1).concat(up.slice(0, -1));
   }
-  function bloom(G, t, dry) {
+  function bHero(G, t, asp, fit) {                                       // the chosen head's pose at t
+    const u = cl((t - B_RUSH) / (B_THRU - B_RUSH)), ez = u * u * .8 + u * .2, s = B_HS * fit, off = .315 * s;
+    const zm = mix(mix(-5.5, -3, eo((t - 4.9) / 1.1)) - 1.5 * st(5.75, B_RUSH + .1, t), B_CAMZ - .45 - off, ez) + off;
+    const calm = 1 - st(B_RUSH - .3, B_RUSH + .7, t), turn = Math.PI * (1 - eo((t - 4.9) / .7));
+    const q = FGL.qmul(FGL.qax([0, 1, 0], turn + .32 * Math.sin(t * 2.2) * calm), FGL.qax([1, 0, 0], (.18 * Math.sin(t * 1.7 + 1) - .22 * st(5.75, B_RUSH, t)) * calm));
+    const tx = mix(G.A[0], G.ox, st(5.2, 6.8, t)), ty = mix(G.A[1], G.oy - 1.25 * CP * G.S, st(5.2, 6.8, t));
+    const d = B_CAMZ - zm, aim = [(tx / cw * 2 - 1) * d * B_TAN * asp, (1 - ty / ch * 2) * d * B_TAN, zm];
+    const mo = FGL.qrot(q, FG.mouth.centre.map(x => x * s));
+    return { p: [aim[0] - mo[0], aim[1] - mo[1], aim[2] - mo[2]], q, s, d, c: [tx, ty] };
+  }
+  const bMouth = (h, asp) => hull(FG.mouth.pts.map(m => { const w = FGL.qrot(h.q, m.map(x => x * h.s)); return bProj([h.p[0] + w[0], h.p[1] + w[1], h.p[2] + w[2]], asp); }));
+  function bloom(G, t) {
     if (!FG) return 1;
-    if (!B.drops.length || t < B.last - .01) bloomReset();
-    if (!dry) {                                                            // a jump ahead (a frozen ?at= view) replays the rain up to it
-      let x = B.last < 0 ? 0 : B.last;
-      if (t - x > .06) { if (B.last < 0) B.last = 0; for (x += .05; x < t; x += .05) bloom(G, x, true); }
-    }
-    const dt = B.last < 0 ? 0 : cl(t - B.last, 0, .05); B.last = t;
+    if (!B.heads.length) bloomReset();
+    if (B.w !== cw * 9973 + ch) { B.w = cw * 9973 + ch; B.hull = null; }      // the lip is measured again after a resize
     const asp = cw / Math.max(1, ch), fit = Math.min(1, Math.max(.45, asp / 1.4)), R = FG.radius;
     const floorY = reveal.getBoundingClientRect().bottom - cv.getBoundingClientRect().top;
-    const items = [];
+    const cam = bCam(t), items = B.items, near = B.near; items.length = 0; near.length = 0;
+    let fw = [cam.at[0] - cam.x, cam.at[1] - cam.y, cam.at[2] - cam.z]; const fl = Math.hypot(fw[0], fw[1], fw[2]); fw = fw.map(x => x / fl);
+    const put = it => { it.vd = (it.p[0] - cam.x) * fw[0] + (it.p[1] - cam.y) * fw[1] + (it.p[2] - cam.z) * fw[2]; items.push(it); if (it.vd - R * it.s * 1.1 < B_UI) near.push(it); };
 
-    /* the rain: falls, stalls at 3.6 while every head turns to you, drops away fast from 5 */
-    const spd = t < 3.6 ? 1 : t < 5 ? mix(1, .04, st(3.6, 4.2, t)) : mix(.04, 4, st(5, 5.7, t));
-    const look = st(3.6, 4.3, t) * (1 - st(5, 5.5, t)), spin = 1 - st(3.6, 4.1, t) + st(5, 5.4, t), fade = 1 - st(5.4, 6.3, t);
-    if (fade > 0) B.drops.forEach((d, i) => {
-      const hh = bHalf(d.z), r = R * d.s * fit * 1.1;
-      if (t < d.ts) { d.y = null; return; }
-      if (d.y == null) d.y = d.mid == null ? hh + r : d.mid * hh;           // a few rez in mid-air, the rest fall in from the top
-      d.y -= d.v * 2.2 * spd * dt;
-      if (d.y < -hh - r && t < 3.3) { d.y = hh + r; d.fx = Math.random() * 2 - 1; }
-      d.q = FGL.qmul(d.q, FGL.qax(d.w, d.ws * spin * dt));
-      const age = t - d.ts, rez = age < .3;
-      if (d.g <= 0 && Math.random() < dt * .4) d.g = .1 + Math.random() * .3;
-      if (d.g > 0 || rez) { d.g -= dt; d.snap = ((t * 18 | 0) + i) % 3 ? 6 + Math.random() * 10 : 0; d.jit = Math.random() < .3 ? (Math.random() - .5) * 50 : 0; d.a = Math.random() < .3 ? .25 : 1; }
-      else { d.snap = 0; d.jit = 0; d.a = 1; }
-      items.push({ p: [d.fx * hh * asp, d.y, d.z], q: FGL.slerp(d.q, d.face, look), s: d.s * fit, snap: d.snap, jit: d.jit, alpha: d.a * fade });
+    /* the rain: every position is a function of t (no state), so any moment can be shown on its own */
+    const look = st(3.6, 4.3, t) * (1 - st(5, 5.5, t)), fade = 1 - st(5.5, 6.4, t), Tt = bTab(B.T, t), St = bTab(B.S, t), fr = t * 18 | 0;
+    if (fade > 0) B.heads.forEach((d, i) => {
+      if (t < d.ts) return;
+      const s = d.s * fit, r = R * s, hh = d.d * B_TAN, top = hh * 1.14 + r + .7, L = 2 * top, F = d.v * (Tt - bTab(B.T, d.ts));
+      /* a: how far down its lane it starts. Those that rez in mid-air start where they must to be at height y0 when the rain
+         stalls, so the stalled volume is evenly filled; those that leave before then come round again, in another lane */
+      const Fs = d.v * (bTab(B.T, 3.6) - bTab(B.T, d.ts)), a = d.y0 == null ? 0 : d.wrap ? (((top - d.y0 * hh - Fs) % L) + L) % L : top - d.y0 * hh;
+      const n = d.wrap ? Math.floor((Math.min(F, Fs) + a) / L) : 0, y = top - (F + a - n * L);
+      if (y < -top) return;
+      const fx = n ? bHash(i * 7.3, n) * 2 - 1 : d.fx, p = [fx * hh * asp * 1.04, y, B_CAMZ - d.d];
+      let q = FGL.qmul(d.q, FGL.qax(d.w, d.ws * St));
+      if (look > 0) {                                                      // turn to the lens, wherever it is
+        const v = [cam.x - p[0], cam.y - p[1], cam.z - p[2]], l = Math.hypot(v[0], v[1], v[2]);
+        q = FGL.slerp(q, FGL.qmul(FGL.qmul(FGL.qax([0, 1, 0], Math.atan2(v[0], v[2])), FGL.qax([1, 0, 0], -Math.asin(v[1] / l))), d.face), look);
+      }
+      const rez = t - d.ts < .32 && d.y0 != null, gl = rez || bHash(i + .5, Math.floor(t / .28 + i * .37)) < .09;
+      let snap = 0, jit = 0, al = 1;
+      if (gl) { snap = (fr + i) % 3 ? 5 + bHash(i, fr) * 10 : 0; jit = bHash(i + 3, fr) < .3 ? (bHash(i + 5, fr) - .5) * 50 : 0; al = bHash(i + 9, fr) < .3 ? .25 : 1; }
+      put({ p, q, s, snap, jit, alpha: al * fade });
     });
 
-    /* the chosen one: rezzes in turning to face front, drifts, then rushes the camera with the mouth on the stage */
-    let thru = t >= B_THRU, mouthHull = null;
+    /* the chosen one: rezzes in turning to face front, drifts, leans back, then lunges at the lens with the mouth on the stage */
+    let thru = t >= B_THRU, mouthHull = null, mouthD = 99;
     if (t >= 4.9 && !thru) {
-      const u = cl((t - 6) / (B_THRU - 6)), ez = u * u * u * .85 + u * .15, s = B_HS * fit, mz0 = -3 + .315 * s;
-      const zm = t < 6 ? mix(-5, -3, eo((t - 4.9) / 1.1)) + .315 * s : mix(mz0, B_CAMZ - .45, ez);
-      const calm = 1 - st(6, 7.2, t), turn = Math.PI * (1 - eo((t - 4.9) / .7));
-      const q = FGL.qmul(FGL.qax([0, 1, 0], turn + .32 * Math.sin(t * 2.2) * calm), FGL.qax([1, 0, 0], .18 * Math.sin(t * 1.7 + 1) * calm));
-      const tx = mix(G.A[0], G.ox, st(5.2, 6.8, t)), ty = mix(G.A[1], G.oy - 1.25 * CP * G.S, st(5.2, 6.8, t));
-      const d = B_CAMZ - zm, aim = [(tx / cw * 2 - 1) * d * B_TAN * asp, (1 - ty / ch * 2) * d * B_TAN, zm];
-      const mo = FGL.qrot(q, FG.mouth.centre.map(x => x * s)), p = [aim[0] - mo[0], aim[1] - mo[1], aim[2] - mo[2]];
-      const rez = t < 5.45, fl = rez && (t * 20 | 0) % 3 === 0;
-      items.push({ p, q, s, snap: rez ? 14 * (1 - st(4.9, 5.45, t)) : 0, alpha: fl ? .3 : 1 });
-      if (t > 6.3) {                                                         // the mouth, on screen, for the window
-        mouthHull = hull(FG.mouth.pts.map(m => { const w = FGL.qrot(q, m.map(x => x * s)); return bProj([p[0] + w[0], p[1] + w[1], p[2] + w[2]], asp); }));
-        B.hull = mouthHull; B.hullC = [tx, ty];
-      }
+      const h = bHero(G, t, asp, fit), rez = t < 5.45, fl = rez && (t * 20 | 0) % 3 === 0;
+      put({ p: h.p, q: h.q, s: h.s, snap: rez ? 14 * (1 - st(4.9, 5.45, t)) : 0, alpha: fl ? .3 : 1 });
+      if (t > B_RUSH + .25) { mouthHull = bMouth(h, asp); mouthD = h.d; }     // the mouth, on screen, for the window
     }
 
-    if (dry) return 0;
     /* the 2D side: the digital floor seen through the mouth, then all around once we are through */
     if (mouthHull && mouthHull.length > 2) {
       g.save(); poly(mouthHull); g.clip();
@@ -2992,27 +3022,43 @@ const lore = (() => {
         poly(mouthHull.map(p => [mc[0] + (p[0] - mc[0]) * k, mc[1] + (p[1] - mc[1]) * k])); g.stroke();
       }
       g.restore();
-      g.globalAlpha = st(7.0, 7.5, t); g.strokeStyle = C.acc; g.lineWidth = 2; poly(mouthHull); g.stroke();
+      const rim = () => { g.globalAlpha = st(B_THRU - .6, B_THRU - .15, t); g.strokeStyle = C.acc; g.lineWidth = 2; poly(mouthHull); g.stroke(); };
+      if (mouthD > B_UI || !front(rim)) rim();                               // the lip comes through the page with the head
     }
     if (thru) {
-      world(G, t + 14, st(8.3, 9.8, t));
-      const u = (t - B_THRU) / .6;
-      if (B.hull && u < 1) {                                                 // the mouth's edge, flying out past the screen
-        const xs = B.hull.map(p => p[0]), bw = Math.max(1, Math.max(...xs) - Math.min(...xs)), k = cw * .75 / bw * (1 + eo(u) * 2.2), c = B.hullC, sc = pts => pts.map(p => [c[0] + (p[0] - c[0]) * k, c[1] + (p[1] - c[1]) * k]), o = 10 * (1 - u);
-        g.globalAlpha = (1 - u) * .65; g.lineWidth = 2;
-        g.strokeStyle = C.glA; poly(sc(B.hull).map(p => [p[0] - o, p[1]])); g.stroke();
-        g.strokeStyle = C.glB; poly(sc(B.hull).map(p => [p[0] + o, p[1]])); g.stroke();
-        g.globalAlpha = 1 - u; g.strokeStyle = C.acc; g.lineWidth = Math.max(1, 8 * (1 - u)); poly(sc(B.hull)); g.stroke();
+      world(G, t + 14, st(8.4, 9.9, t));
+      const u = (t - B_THRU) / .7;
+      if (u < 1) {                                                           // the lip and two echoes of it fly out past the lens: in front of the page
+        if (!B.hull) { const h = bHero(G, B_THRU - .3, asp, fit); B.hull = bMouth(h, asp); B.hullC = h.c; B.hullW = Math.max(1, Math.max(...B.hull.map(p => p[0])) - Math.min(...B.hull.map(p => p[0]))); }
+        const ring = () => {
+          const c = B.hullC;
+          for (let n = 0; n < 3; n++) {
+            const v = u * 1.25 - n * .14; if (v <= 0 || v >= 1) continue;
+            const k = cw * .2 / B.hullW / (1 - .93 * v), al = st(0, .12, v) * (1 - st(.75, 1, v)) * (n ? .7 : 1), pts = B.hull.map(p => [c[0] + (p[0] - c[0]) * k, c[1] + (p[1] - c[1]) * k]), o = 3 + 9 * v;   // 1 / distance: it speeds up as it nears
+            g.globalAlpha = al * .6; g.lineWidth = 1.5;
+            g.strokeStyle = C.glA; poly(pts.map(p => [p[0] - o, p[1]])); g.stroke();
+            g.strokeStyle = C.glB; poly(pts.map(p => [p[0] + o, p[1]])); g.stroke();
+            g.globalAlpha = al; g.strokeStyle = n ? C.ink : C.acc; g.lineWidth = Math.min(5, 1 + k * B.hullW / cw * 1.6); poly(pts); g.stroke();
+          }
+        };
+        if (!front(ring)) ring();
       }
       tear(t - B_THRU + 10.42);
     }
 
-    const burst = .9 * st(4.25, 4.35, t) * (1 - st(4.45, 4.8, t)) + .35 * st(1.55, 1.6, t) * (1 - st(1.6, 1.8, t)) + .35 * st(2.7, 2.75, t) * (1 - st(2.75, 2.95, t)) + .55 * st(7.1, 7.55, t);
-    const col = { ink: FGL.rgb(C.ink), acc: FGL.rgb(C.acc), glA: FGL.rgb(C.glA), glB: FGL.rgb(C.glB) };
-    if (items.length) { FG.frame({ items, w: cw, h: ch, dpr: Math.min(1.5, cd), cam: { z: B_CAMZ }, colours: col, mode: 2, line: 1.4,
-      amb: still.matches ? 0 : .22, burst: still.matches ? 0 : Math.min(1, burst), time: t, clipBottom: floorY }); glUsed = true; }
+    /* the heads: the part nearer than the page first, copied onto the front layer, then everything behind it */
+    const burst = .9 * st(4.25, 4.35, t) * (1 - st(4.45, 4.8, t)) + .35 * st(1.55, 1.6, t) * (1 - st(1.6, 1.8, t)) + .35 * st(2.7, 2.75, t) * (1 - st(2.75, 2.95, t)) + .55 * st(B_THRU - .5, B_THRU - .05, t);
+    if (items.length) {
+      const o = { items, w: cw, h: ch, dpr: Math.min(1.5, cd), cam, colours: { ink: FGL.rgb(C.ink), acc: FGL.rgb(C.acc), glA: FGL.rgb(C.glA), glB: FGL.rgb(C.glB) }, mode: 2, line: mix(.95, 1.4, cl((fit - .45) / .55)),
+        ref: 13, fade: [11, 27, .3], amb: still.matches ? 0 : .22, burst: still.matches ? 0 : Math.min(1, burst), time: t, clipBottom: floorY, slab: null, halo: null };
+      if (near.length && front(() => {
+        o.items = near; o.slab = [0, B_UI]; o.halo = FGL.rgb(C.ground); FG.frame(o);
+        g.globalAlpha = 1; g.drawImage(gcv, 0, 0, cw, ch);
+      })) o.slab = [B_UI, 1e9];
+      o.items = items; o.halo = null; FG.frame(o); glUsed = true;
+    }
     else if (glUsed) { FG.clear(); glUsed = false; }
-    return thru ? cl((t - 7.9) / .9) : 0;
+    return thru ? cl((t - 8) / .9) : 0;
   }
   function dropBloom() {                                                 // no WebGL2 or no model: this intro leaves the list
     const i = LIST.indexOf('bloom'); if (i >= 0 && LIST.length > 1) LIST.splice(i, 1);
