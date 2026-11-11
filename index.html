@@ -312,7 +312,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .foot .push{margin-left:auto}
 @media (min-width:64rem){
   .credits{grid-template-columns:repeat(4,minmax(0,1fr))}
-  .c-roll{grid-column:1/3}
+  .c-site{grid-column:1/3}
+  .c-find{grid-column:3/-1}
   .credits > .c-site,.credits > .c-find{background:none}
   .c-find{text-align:right}
   .c-find .links{justify-items:end}
@@ -641,13 +642,6 @@ body[data-view="page"] .lore--bg{display:none}
       </div>
       <footer class="credits" id="credits">
         <div class="sign"><p class="disp" aria-hidden="true" data-i18n="sign">Jeff Kharrat</p><flower-wave src="media/flower/flower-wave.json" shatter aria-hidden="true"></flower-wave></div>
-        <section class="c-roll" aria-labelledby="cr-h">
-          <h2 class="label" id="cr-h" data-i18n="cr.title" style="margin-bottom:1.2rem">Credits</h2>
-          <dl class="roll">
-            <div><dt data-i18n="cr.r1">Rigging and tools</dt><dd>Jeff Kharrat</dd></div>
-            <div><dt data-i18n="cr.r2">Software</dt><dd data-soft="Autodesk Maya, Unreal Engine 5, Python">Autodesk Maya, Unreal Engine 5, Python</dd></div>
-          </dl>
-        </section>
         <nav class="c-site" aria-labelledby="st-h">
           <h2 class="label" id="st-h" data-i18n="ft.site" style="margin-bottom:.8rem">Site</h2>
           <ul class="links">
@@ -937,8 +931,7 @@ const T = {
     'run.b3': 'Work-study alongside my master\'s, on Miraculous season 6. As a generalist I moved between departments, wherever a production phase needed hands. Modelled about a dozen sets and many props, and rigged a dozen props. Took my sets from Maya into Unreal, laid them out and optimised them for the other departments. R&D on cube-mapped apartment interiors for background buildings. Trained on the studio\'s matrix-based auto-rig and helped the five-person rigging team when I could. Animation reached Unreal as Alembic caches; that workflow problem is where my research started.',
     'run.b4': 'Research on a rigging pipeline between Maya and Unreal Engine 5.6. Rigs and animation still cross from one to the other as baked caches or manual rebuilds, and production needs a better bridge. I design the pipeline and the rig logic: the Maya rig\'s setup travels inside the FBX as metadata and is rebuilt in Unreal as a Control Rig.',
     'ab.fr': 'French, native', 'ab.en': 'English, professional (TOEIC 885)', 'ab.ja': 'Japanese, intermediate (around JLPT N3–N2)', 'ab.kendo': 'Kendo, bonsai, nature walks, Japanese history',
-    'cr.title': 'Credits', 'cr.r1': 'Rigging and tools', 'cr.r2': 'Software', 'cr.r3': 'Character',
-    'ft.site': 'Site', 'ft.find': 'Find me', 'ft.theme': 'Light / dark', 'ft.top': 'Back to top',
+        'ft.site': 'Site', 'ft.find': 'Find me', 'ft.theme': 'Light / dark', 'ft.top': 'Back to top',
     'ct.title': 'Contact', 'ct.email': 'Email', 'ct.copy': 'Copy', 'ct.copied': 'Copied', 'ct.links': 'Elsewhere',
     'ct.where': 'Based in', 'ct.loc': 'Hachioji, Tokyo (JST, UTC+9)', 'ct.avail': 'Availability', 'ct.close': 'Close', 'ct.todo': 'add link',
     'rl.title': 'Reel', 'rl.slot': 'Reel slot: 16:9, H.264 MP4',
@@ -987,8 +980,7 @@ const T = {
     'run.b3': '修士課程と並行したアルタナンス（企業での実務と学業を両立するフランスの制度）で、『ミラキュラス』シーズン6に参加。ジェネラリストとして、制作の時期に応じて人手が必要な部署を行き来しました。背景セット約12点と多数のプロップをモデリングし、プロップ約12点をリギング。自分のセットをMayaからUnrealへ書き出してレイアウトし、他部署が使えるよう最適化しました。背景ビルの室内をキューブマップで表現するR&Dにも参加。社内のマトリクスベースのオートリグを学び、5人のリギングチームを可能な範囲でサポート。アニメーションはAlembicキャッシュでUnrealへ渡していましたが、この工程の課題が現在の研究の出発点です。',
     'run.b4': 'MayaとUnreal Engine 5.6をつなぐリギングパイプラインを研究中。制作現場では、リグやアニメーションをベイクしたキャッシュや手作業の再構築で受け渡すことが多く、より良い橋渡しが求められています。パイプラインとリグのロジックを設計し、Mayaリグの構成をメタデータとしてFBXに格納、Unreal側でControl Rigとして再構築する仕組みを開発しています。',
     'ab.fr': 'フランス語（ネイティブ）', 'ab.en': '英語（ビジネスレベル、TOEIC 885点）', 'ab.ja': '日本語（中級、JLPT N3〜N2程度）', 'ab.kendo': '剣道、盆栽、自然散策、日本史',
-    'cr.title': 'クレジット', 'cr.r1': 'リギング・ツール', 'cr.r2': 'ソフトウェア', 'cr.r3': 'キャラクター',
-    'ft.site': 'サイト', 'ft.find': 'リンク', 'ft.theme': 'ライト / ダーク', 'ft.top': 'ページ上部へ',
+        'ft.site': 'サイト', 'ft.find': 'リンク', 'ft.theme': 'ライト / ダーク', 'ft.top': 'ページ上部へ',
     'ct.title': '連絡先', 'ct.email': 'メール', 'ct.copy': 'コピー', 'ct.copied': 'コピーしました', 'ct.links': 'その他のリンク',
     'ct.where': '拠点', 'ct.loc': '東京都八王子市（JST, UTC+9）', 'ct.avail': '稼働状況', 'ct.close': '閉じる', 'ct.todo': 'リンク未設定',
     'rl.title': 'デモリール', 'rl.slot': 'リール枠：16:9、H.264 MP4',
