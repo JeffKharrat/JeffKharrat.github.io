@@ -5,8 +5,14 @@
    (a depth-only fill pass first), then a glitch pass (torn rows, block shifts, red/cyan split).
 
    FlowerGL.create(canvas, url) -> Promise of a renderer, or null when WebGL2 or the model is unavailable.
-   renderer.frame({ items, w, h, dpr, cam, colours, mode, line, amb, burst, time, clipBottom })
-     items: [{ p:[x,y,z], q:[x,y,z,w], s, snap, alpha, jit }], world units; the camera sits at (0,0,cam.z) looking down -z.
+   renderer.frame({ items, w, h, dpr, cam, colours, mode, line, amb, burst, time, clipBottom, slab, halo, fade, ref })
+     items: [{ p:[x,y,z], q:[x,y,z,w], s, snap, alpha, jit }], world units; the camera sits at (cam.x||0, cam.y||0, cam.z) and looks
+     down -z, or at cam.at = [x,y,z] when given (cam.fov in degrees, 32 by default).
+     slab: [near, far] keeps only the line fragments whose depth from the camera is in that range, so one frame can be drawn as
+       two layers split at a plane (the home intro puts the near layer in front of the page); hidden lines stay hidden in both.
+     halo: [r,g,b] puts a soft rim of that colour round every line (so a front layer visibly covers what it crosses).
+     fade: [start, range, floor] dims lines with distance; ref: a distance at which lines have their nominal width, thicker
+       nearer and thinner farther (0: the same width everywhere).
    renderer.project(p) -> [x, y] in CSS pixels for a world point (after frame() set the size).
    renderer.mouth: model-space points around the mouth and their centre, for aiming and for the mouth window. */
 (function () {
@@ -45,14 +51,14 @@ precision mediump float; out vec4 o; void main() { o = vec4(0); }`;
 /* every edge as a screen-space quad; kind (aK.z): 0 plain, 1 crease, 2 intersection, 3 intersection on the face (eyes) */
 const LINE_VS = `#version 300 es
 in vec3 aA; in vec3 aB; in vec3 aN1; in vec3 aN2; in vec4 aK;` + INST + `
-uniform float uW, uMode, uEps, uPx; uniform vec3 uInk, uAcc; uniform vec3 uMat[6];
-out vec4 vC;
+uniform float uW, uMode, uEps, uPx, uRef; uniform vec3 uInk, uAcc, uFade; uniform vec3 uMat[6];
+out vec4 vC; out float vD;
 void main() {
   vec3 wa = world(aA), wb = world(aB);
   vec3 n1 = qrot(iRot, aN1), n2 = qrot(iRot, aN2), v = uCam - (wa + wb) * .5;
   bool always = aK.z > 1.5, face = aK.z > 2.5;
   bool f1 = dot(n1, v) > 0.0, f2 = dot(n2, v) > 0.0, sil = !always && f1 != f2, cr = !always && aK.z > .5 && (f1 || f2);
-  if (!(sil || cr || always)) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); vC = vec4(0); return; }
+  if (!(sil || cr || always)) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); vC = vec4(0); vD = 0.0; return; }
   /* lift the line off its surface by a fixed distance toward the camera, in world units, so it wins against its own
      faces but not against anything really in front of it, whatever the camera's near plane */
   /* the lift grows with the size of a pixel at that distance, so far flowers behave like near ones */
@@ -63,28 +69,30 @@ void main() {
   float l = length(d); d = l > 1e-4 ? d / l : vec2(1, 0);
   vec2 nr = vec2(-d.y, d.x);
   vec4 c = mix(ca, cb, aK.x);
-  vec2 s = mix(sa, sb, aK.x) + nr * aK.y * uW * .5 + d * (aK.x * 2.0 - 1.0) * uW * .5;
-  gl_Position = vec4(s / (uRes * .5) * c.w, c.z, c.w);
+  float w = uRef > 0.0 ? uW * clamp(uRef / max(c.w, .01), .55, 2.4) : uW;   // perspective line weight
+  vec2 s = mix(sa, sb, aK.x) + nr * aK.y * w * .5 + d * (aK.x * 2.0 - 1.0) * w * .5;
+  gl_Position = vec4(s / (uRes * .5) * c.w, c.z, c.w); vD = c.w;
   int m = int(aK.w + .5);
   vec3 col = uMode < .5 ? uInk : uMode < 1.5 ? uAcc : uMode < 2.5 ? ((cr && !sil) || face ? uAcc : uInk) : uMat[m];
-  float far = clamp((uCam.z - 15.0 - iPos.z) / 9.0, 0.0, 1.0);
-  float a = iFx.z * mix(1.0, .38, far);
+  float far = clamp((length(uCam - iPos) - uFade.x) / uFade.y, 0.0, 1.0);
+  float a = iFx.z * mix(1.0, uFade.z, far);
   vC = vec4(col * a, a);
 }`;
 const LINE_FS = `#version 300 es
-precision mediump float; in vec4 vC; out vec4 o; void main() { o = vC; }`;
+precision highp float; in vec4 vC; in float vD; uniform vec2 uSlab; out vec4 o;
+void main() { if (vD < uSlab.x || vD >= uSlab.y) discard; o = vC; }`;
 /* uG: the constant glitch (0 none, 1 heavy), uB: a burst on top (0..1) */
 const POST_VS = `#version 300 es
 in vec2 aQ; out vec2 vU; void main() { vU = aQ * .5 + .5; gl_Position = vec4(aQ, 0, 1); }`;
 const POST_FS = `#version 300 es
 precision highp float;
 in vec2 vU; out vec4 o;
-uniform sampler2D uT; uniform vec2 uRes; uniform float uTime, uG, uB; uniform vec3 uA1, uA2;
+uniform sampler2D uT; uniform vec2 uRes; uniform float uTime, uG, uB; uniform vec3 uA1, uA2; uniform vec4 uHalo;
 float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 void main() {
   vec2 uv = vU, px = 1.0 / uRes;
   float f = floor(uTime * 14.0), g = clamp(uG * .7 + uB, 0.0, 1.0);
-  if (g <= 0.0) { o = texture(uT, uv); return; }
+  if (g <= 0.0 && uHalo.a <= 0.0) { o = texture(uT, uv); return; }
   float rows = mix(90.0, 26.0, uB), band = floor(uv.y * rows);
   if (h(vec2(band, f)) < g * .22) uv.x += (h(vec2(band, f + 7.0)) - .5) * (.02 + .03 * uG + .12 * uB);
   vec2 blk = floor(uv * vec2(18.0, 32.0));
@@ -95,6 +103,12 @@ void main() {
   float k = clamp(.6 * uG + uB, 0.0, 1.0);
   vec4 ghost = vec4(uA1 * ga + uA2 * gb, max(ga, gb)) * k * .85;
   o = c + ghost * (1.0 - c.a);
+  if (uHalo.a > 0.0) {                                   // a soft rim round the lines, under them
+    float m = 0.0;
+    for (int i = 0; i < 8; i++) { float an = float(i) * .7854; m = max(m, texture(uT, uv + vec2(cos(an), sin(an)) * px * uHalo.a).a); }
+    for (int i = 0; i < 4; i++) { float an = float(i) * 1.5708 + .39; m = max(m, .6 * texture(uT, uv + vec2(cos(an), sin(an)) * px * uHalo.a * 1.9).a); }
+    o += vec4(uHalo.rgb, 1.0) * m * .9 * (1.0 - o.a);
+  }
 }`;
 
 M.create = function (cv, url) {
@@ -191,10 +205,17 @@ M.create = function (cv, url) {
        a near plane much closer than the nearest flower leaves too little for the far ones on some GPUs */
     function camera(c, items) {
       let lo = Infinity, hi = 0;
-      items.forEach(d => { const dist = c.z - d.p[2], r = R * d.s * 1.15; lo = Math.min(lo, dist - r); hi = Math.max(hi, dist + r); });
+      const e = [c.x || 0, c.y || 0, c.z], at = c.at || [e[0], e[1], e[2] - 1];
+      items.forEach(d => { const dist = Math.hypot(e[0] - d.p[0], e[1] - d.p[1], e[2] - d.p[2]), r = R * d.s * 1.15; lo = Math.min(lo, dist - r); hi = Math.max(hi, dist + r); });
       const t = Math.tan((c.fov || 32) * Math.PI / 360), f = 1 / t, m = new Float32Array(16);
       const n = items.length ? Math.min(Math.max(.1, lo * .9), 50) : 4, fr = items.length ? Math.max(n + 1, hi * 1.05 + .5) : 40;
-      m[0] = f / (W / H); m[5] = f; m[10] = (fr + n) / (n - fr); m[11] = -1; m[14] = m[10] * -c.z + 2 * fr * n / (n - fr); m[15] = c.z;
+      /* view basis: forward, right, up (world up is +y) */
+      let fw = [at[0] - e[0], at[1] - e[1], at[2] - e[2]]; const fl = Math.hypot(fw[0], fw[1], fw[2]) || 1; fw = fw.map(x => x / fl);
+      let rt = [-fw[2], 0, fw[0]]; const rl = Math.hypot(rt[0], rt[2]) || 1; rt = rt.map(x => x / rl);
+      const up = [rt[1] * fw[2] - rt[2] * fw[1], rt[2] * fw[0] - rt[0] * fw[2], rt[0] * fw[1] - rt[1] * fw[0]];
+      const dot = v => v[0] * e[0] + v[1] * e[1] + v[2] * e[2], a = f / (W / H), k = (fr + n) / (n - fr), q = 2 * fr * n / (n - fr);
+      for (let j = 0; j < 3; j++) { m[j * 4] = a * rt[j]; m[j * 4 + 1] = f * up[j]; m[j * 4 + 2] = -k * fw[j]; m[j * 4 + 3] = fw[j]; }
+      m[12] = -a * dot(rt); m[13] = -f * dot(up); m[14] = k * dot(fw) + q; m[15] = -dot(fw);
       return m;
     }
     const api = {
@@ -215,7 +236,7 @@ M.create = function (cv, url) {
         vp = camera(o.cam, items);
         items.forEach((d, i) => inst.set([d.p[0], d.p[1], d.p[2], d.q[0], d.q[1], d.q[2], d.q[3], d.s, (d.snap || 0) * dpr, d.alpha == null ? 1 : d.alpha, (d.jit || 0) * dpr, 0], i * 12));
         gl.bindBuffer(gl.ARRAY_BUFFER, instBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, inst, 0, n * 12);
-        const C = o.colours, cam = [0, 0, o.cam.z];
+        const C = o.colours, cam = [o.cam.x || 0, o.cam.y || 0, o.cam.z], fd = o.fade || [15, 9, .38], sl = o.slab || [0, 1e9];
         gl.bindFramebuffer(gl.FRAMEBUFFER, msFbo); gl.viewport(0, 0, W, H);
         gl.clearColor(0, 0, 0, 0); gl.clearDepth(1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         if (n) {
@@ -227,6 +248,7 @@ M.create = function (cv, url) {
           gl.disable(gl.POLYGON_OFFSET_FILL); gl.colorMask(true, true, true, true);
           gl.useProgram(LINE.p);
           gl.uniform1f(LINE.u.uW, (o.line || 1.4) * dpr); gl.uniform1f(LINE.u.uEps, o.eps || .006); gl.uniform1f(LINE.u.uPx, 2 * Math.tan((o.cam.fov || 32) * Math.PI / 360) / H); gl.uniform1f(LINE.u.uMode, o.mode == null ? 2 : o.mode);
+          gl.uniform1f(LINE.u.uRef, o.ref || 0); gl.uniform3f(LINE.u.uFade, fd[0], fd[1], fd[2]); gl.uniform2f(LINE.u.uSlab, sl[0], sl[1]);
           gl.uniform3fv(LINE.u.uInk, C.ink); gl.uniform3fv(LINE.u.uAcc, C.acc);
           gl.uniform3fv(LINE.u.uMat, new Float32Array(M.MAT.map((c, i) => (i === 5 ? C.ink : c)).flat()));
           gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
@@ -243,6 +265,7 @@ M.create = function (cv, url) {
         gl.uniform1i(POST.u.uT, 0); gl.uniform2f(POST.u.uRes, W, H); gl.uniform1f(POST.u.uTime, o.time || 0);
         gl.uniform1f(POST.u.uG, o.amb || 0); gl.uniform1f(POST.u.uB, o.burst || 0);
         gl.uniform3fv(POST.u.uA1, C.glA); gl.uniform3fv(POST.u.uA2, C.glB);
+        if (o.halo) gl.uniform4f(POST.u.uHalo, o.halo[0], o.halo[1], o.halo[2], 2.2 * dpr); else gl.uniform4f(POST.u.uHalo, 0, 0, 0, 0);
         gl.bindVertexArray(VP); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); gl.bindVertexArray(null);
         gl.disable(gl.SCISSOR_TEST);
       }
