@@ -407,10 +407,11 @@ a.gtile:hover b{text-decoration:underline;text-decoration-color:var(--accent);te
 .shot .fill--yt{aspect-ratio:16/9;height:auto}
 /* a clip with a node graph: a tab sticks out of its right edge and opens the node editor */
 .shot-v{position:relative}
-.ne-tab{position:absolute;z-index:2;top:0;right:0;display:flex;align-items:center;gap:.4rem;padding:.4rem .6rem;border:0;cursor:pointer;
+.ne-tab{position:absolute;z-index:4;top:0;right:0;display:flex;align-items:center;gap:.4rem;padding:.4rem .6rem;border:0;cursor:pointer;
   font:inherit;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;background:#C6FF1A;color:#0B0C0F;transition:filter .15s,transform .15s}
 .ne-tab svg{width:.95rem;height:.95rem;flex:none}
 .ne-tab:hover,.ne-tab:focus-visible{filter:brightness(1.08);outline:2px solid var(--ink);outline-offset:2px}
+.ne-tab[aria-expanded="true"]{background:#5285A6;color:#fff}
 @media (min-width:64rem){
   .ne-tab{right:auto;left:100%;top:1rem;width:min(var(--pad),2rem);padding:.7rem 0;flex-direction:column;writing-mode:vertical-rl;justify-content:center;gap:.5rem;
     clip-path:polygon(0 0,100% 6px,100% calc(100% - 6px),0 100%)}
@@ -928,8 +929,8 @@ body[data-view="page"] .lore--bg{display:none}
 </div>
 
 <script src="js/flower-gl.js"></script>
-<script src="js/node-editor.js?v=1" defer></script>
-<script src="js/graphs-fiffy.js?v=1" defer></script>
+<script src="js/node-editor.js?v=2" defer></script>
+<script src="js/graphs-fiffy.js?v=2" defer></script>
 <script src="js/flower-wave.js?v=3" defer></script>
 <script>
 (() => {
@@ -981,8 +982,8 @@ const ALL_PROJECTS = [
       { label: { en: 'Leaf arm ribbon: NURBS strips whose CVs are placed straight from matrices, with no skinCluster. The leaf joints are pinned to the strip with uvPin, so the bend controls shape the whole leaf.',
           ja: '葉の腕のリボン：CVをマトリクスから直接配置したNURBSストリップ（skinClusterなし）。葉のジョイントはuvPinでストリップに固定され、ベンドコントローラーで葉全体の形を作れます。' },
         src: 'media/fiffy-flower/ribbon.mp4', nodes: 'fiffy-ribbon' },
-      { label: { en: 'Mouth shapes driven from the mouth controllers: moving a control blends in the shapes (open, pucker, closed).',
-          ja: '口のコントローラーで駆動するブレンドシェイプ：コントローラーを動かすと形状（開く、すぼめる、閉じる）がブレンドされます。' },
+      { label: { en: 'Mouth shapes driven from the master mouth control: four attributes (0–10) remapped to the Smile, Omouth, CloseMouth and Disgusting blendshapes.',
+          ja: '口のマスターコントローラーで駆動するブレンドシェイプ：4つのアトリビュート（0〜10）を Smile・Omouth・CloseMouth・Disgusting のブレンドシェイプにリマップ。' },
         src: 'media/fiffy-flower/mouth-blendshapes.mp4', nodes: 'fiffy-mouth-bs' },
       { label: { en: 'Mouth setup: the lip controls ride on the blendshape result through a proximityPin, so they stay on the lips in every shape. The lip joints only carry the control offsets, so the blendshapes are not applied twice in Unreal.',
           ja: '口のセットアップ：唇のコントローラーはproximityPinでブレンドシェイプの結果に追従し、どの形でも唇の上に留まります。唇のジョイントはコントローラーの差分だけを持つため、Unrealでブレンドシェイプが二重にかかりません。' },
@@ -1424,8 +1425,8 @@ function renderProject(p) {
     if (m.nodes) {                                                          // a node graph for this clip: the tab that opens it
       const w = mk('div', 'shot-v'), b = mk('button', 'ne-tab');
       b.type = 'button'; b.innerHTML = NE_ICON; b.append(mk('span', '', tr('pj.nodes')));
-      b.setAttribute('aria-haspopup', 'dialog');
-      b.addEventListener('click', () => window.NodeEditor && NodeEditor.open(m.nodes, { video: srcFor(m.src) }));
+      b.setAttribute('aria-expanded', 'false');
+      b.addEventListener('click', () => window.NodeEditor && NodeEditor.open(m.nodes, { host: w, tab: b }));
       w.append(fr, b); f.append(w);
     } else f.append(fr);
     f.append(mk('figcaption', 'label', L(m.label))); box.append(f);
@@ -1448,6 +1449,7 @@ function show(name) {
   $$('.nav a[data-route], .tabbar a[data-route]').forEach(a => { if (a.dataset.route === navKey) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   scrollTo({ top: 0, behavior: 'instant' });
   document.dispatchEvent(new Event('viewchange'));
+  if (window.NodeEditor && NodeEditor.isOpen()) NodeEditor.close(true);
 }
 const labelOf = name => { const p = projOf(name); return p ? L(p.title) : name === 'home' ? tr('home') : tr(PAGES[name] ? PAGES[name].key : 'nav.' + name); };
 let wiping = false;
