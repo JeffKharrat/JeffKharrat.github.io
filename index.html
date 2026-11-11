@@ -948,6 +948,16 @@ const SITE = {
 const CATS = ['rigs', 'animation', 'research', 'tools'];
 
 const ALL_PROJECTS = [
+  { id: 'fiffy-flower', cat: 'rigs', year: '2026.11', thumb: 'media/fiffy-flower/thumb.jpg',
+    title: { en: 'Fiffy Flower', ja: 'Fiffy Flower' },
+    kind: { en: 'Stylized character rig', ja: 'スタイライズドキャラクターのリグ' },
+    role: { en: 'Rigging', ja: 'リギング' },
+    software: ['Maya', 'Python'],
+    summary: { en: 'A flower character rigged in Maya with AI-assisted Python tools I created for Maya. Fully matrix-based with no constraints, and every bind joint driven in a game-safe way so the rig exports cleanly to Unreal. Twelve FK petals that can spread out from the head, eyes, eyelids and cheeks, a mouth whose controls ride on the blendshapes, a neck with an FK/ribbon blend and a procedural sine wave, a ribbon spine with length preservation and volume, and IK/FK leaf arms and stem legs with soft IK, stretch, pinning and bendy ribbons.',
+      ja: '自作のAI補助Mayaツール（Python）でリギングした花のキャラクター。コンストレイントを使わない完全マトリクスベースのリグで、すべてのバインドジョイントをゲーム向けに安全な方法で駆動しているため、Unrealへきれいに書き出せます。頭から開くように動かせる12枚のFK花びら、目・まぶた・頬、ブレンドシェイプに乗って動く口のコントローラー、FKとリボンを切り替えられプロシージャルなサイン波を持つ首、長さ保持とボリューム付きのリボンスパイン、ソフトIK・ストレッチ・ピン留め・ベンディリボン付きのIK/FKの葉の腕と茎の脚。' },
+    media: [
+      { label: { en: 'Turnaround', ja: 'ターンアラウンド' }, src: 'media/fiffy-flower/fiffy-flower-360.mp4' },
+      { label: { en: 'Controls, front and side', ja: 'コントローラー（正面・側面）' }, src: 'media/fiffy-flower/front-side.jpg' }] },
   { id: 'kotsudo', cat: 'research', year: '2025 – now', thumb: 'media/kotsudo/thumb.jpg',
     title: { en: 'JEFF 骨道 (Kotsudō): Maya to UE5 Control Rig', ja: 'JEFF 骨道：Maya → UE5 Control Rig' },
     kind: { en: 'Research tool, work in progress', ja: '研究ツール（制作中）' },
