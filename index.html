@@ -132,7 +132,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .hdr[data-menu] .nav{display:grid;position:absolute;top:100%;left:var(--rail);right:var(--rail);background:var(--ground);
   border:1px solid var(--line);border-top:0}
 .hdr[data-menu] .nav a{padding:.35rem var(--pad);border-top:1px solid var(--line)}
-@media (max-width:26rem){.logo-t{display:none}}
+@media (max-width:26rem){.logo-r{display:none}}
+@media (max-width:21rem){.logo-t{display:none}}
 @media (min-width:64rem){
   /* Main nav: three chamfered keys spread across the free middle of the header.
      The 1px chamfered outline is the key's own fill (clip-path) with a ground-coloured
@@ -529,6 +530,99 @@ body[data-view="page"] .lore--bg{display:none}
 .lore-re{position:absolute;right:var(--pad);bottom:.35rem;z-index:2}
 .lore-cap > .hud-n,.lore-cap > .hud-m{display:none}   /* the origin plays without captions; only Skip stays */
 @media (min-width:64rem){.lore-re{bottom:auto;top:7.2rem}}
+
+/* ---------- narrow screens (phones, small tablets) ----------
+   Everything here is below 64rem only; the wide layout above is untouched.
+   - The stage is not pinned: it opens the home page in the flow, so nothing ever scrolls under it,
+     and the four layers are switched with the buttons under it (they also play on their own until one is tapped).
+   - The main navigation moves to a tab bar at the bottom, under the thumb; the header keeps the logo, language and theme.
+   - Touch targets are at least 44px. */
+.modes,.tabbar,.hdr-theme{display:none}
+@media (max-width:63.99rem){
+  :root{--tabbar:3.75rem;--safe-b:env(safe-area-inset-bottom,0px)}
+  html{scroll-padding-top:calc(var(--hdr) + .75rem)}
+  body{padding-bottom:calc(var(--tabbar) + var(--safe-b))}
+
+  /* header */
+  .hdr-contact,.menu-btn{display:none!important}
+  .hdr-theme{display:grid;width:44px;height:44px}
+  .logo-n{font-size:clamp(.95rem,4.3vw,1.25rem)}
+  .lang button{min-height:44px;min-width:44px;padding:0 clamp(.55rem,2.2vw,.8rem)}
+
+  /* tab bar */
+  .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:50;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
+    padding:0 env(safe-area-inset-right,0px) var(--safe-b) env(safe-area-inset-left,0px);
+    background:color-mix(in srgb,var(--ground) 94%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-top:1px solid var(--line)}
+  .tabbar a{position:relative;display:grid;justify-items:center;align-content:center;gap:.3rem;min-width:0;min-height:var(--tabbar);padding:.35rem .15rem;
+    text-decoration:none;font-size:.75rem;line-height:1.1;letter-spacing:.05em;text-transform:uppercase;text-align:center;color:var(--ink-2);
+    -webkit-tap-highlight-color:transparent;touch-action:manipulation}
+  .tabbar a + a{border-left:1px solid var(--line)}
+  .tabbar span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  html:lang(ja) .tabbar a{letter-spacing:0;font-size:.6875rem}
+  .tabbar svg{width:1.3rem;height:1.3rem;flex:none}
+  .tabbar a[aria-current="page"]{color:var(--ink);background:var(--panel)}
+  .tabbar a[aria-current="page"]::before{content:"";position:absolute;left:-1px;right:0;top:-1px;height:3px;background:var(--accent)}
+  .tabbar a:active{background:var(--key)}
+  .tabbar a:focus-visible{outline-offset:-3px}
+
+  /* home: the stage first and in the flow, its layer buttons under it, then the text */
+  .reveal{display:flex;flex-direction:column}
+  .reveal{--stage-h:max(14rem,min(clamp(21rem,58vh,40rem),calc(100vh - var(--hdr) - var(--tabbar) - 3.5rem)));
+    --stage-h:max(14rem,min(clamp(21rem,58svh,40rem),calc(100svh - var(--hdr) - var(--tabbar) - 3.5rem)))}
+  .stage{order:-2;position:relative;top:auto;z-index:0;height:var(--stage-h);border-top:0}
+  .modes{order:-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) 3rem;background:var(--ground);border-bottom:1px solid var(--line)}
+  .modes button{position:relative;display:grid;align-content:center;gap:.15rem;min-width:0;min-height:3.5rem;padding:.5rem clamp(.4rem,1.6vw,.7rem);border-right:1px solid var(--line);
+    font-size:.6875rem;line-height:1.2;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  html:lang(ja) .modes button{letter-spacing:0;font-size:.6875rem}
+  .modes .n{font-size:.6875rem;font-variant-numeric:tabular-nums}
+  html:lang(ja) .modes .t{overflow-wrap:anywhere}
+  .modes button[aria-pressed="true"]{color:var(--ink);background:var(--panel)}
+  .modes [data-step][aria-pressed="true"] .n{color:var(--accent)}
+  .modes [data-step] i{position:absolute;left:0;right:0;top:-1px;height:3px;background:var(--accent);transform-origin:0 50%;transform:scaleX(var(--p,0))}
+  .modes [data-step]:not([aria-pressed="true"]) i{display:none}
+  .modes-auto{place-items:center;border-right:0!important;color:var(--ink)!important;background:none!important}
+  .modes-auto svg{width:1rem;height:1rem}
+  @media (max-width:25rem){.modes button{letter-spacing:0}}
+  .modes:has(.modes-auto[hidden]){grid-template-columns:repeat(4,minmax(0,1fr))}
+  .modes-auto[aria-pressed="true"] .ic-play,.modes-auto[aria-pressed="false"] .ic-pause{display:none}
+  .modes button:focus-visible{outline-offset:-3px}
+  .intro{gap:1.25rem}
+  .intro .btn{max-width:none}
+  .hud{max-width:calc(100% - 2 * var(--pad))}
+  .lore-b{min-height:44px;min-width:44px}
+  .lore-re{top:.35rem;bottom:auto}
+  /* the gimbal tile becomes the viewport's gizmo, in the stage's bottom right corner */
+  .side{position:absolute;right:var(--pad);top:calc(var(--stage-h) - 5.5rem - var(--pad));z-index:1;padding:0;background:none;pointer-events:none}
+  .tile{width:5.5rem}
+  .tile.brk::before,.tile.brk::after{inset:.4rem}
+  .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:1.25rem 1rem}
+  .card h3{font-size:.9375rem;overflow-wrap:anywhere}
+  .latest .btn{width:100%}
+
+  /* touch targets */
+  .btn--line,.chip{min-height:44px}
+  .links a,.links span{min-height:44px}
+  #to-top{display:inline-flex;align-items:center;min-height:44px}
+  .foot{padding-bottom:calc(var(--pad) + .5rem)!important}
+
+  /* work */
+  .chips{gap:.5rem}
+
+  /* project: title and facts, then the media, then previous / next where the thumb is after watching */
+  .proj{display:flex;flex-direction:column;gap:1.4rem;padding:var(--pad);background:var(--ground)}
+  .proj-info,.proj-info .pin{display:contents}
+  .proj-media{order:1;padding:0;background:none}
+  .pj-nav{order:2;display:grid;grid-template-columns:1fr 1fr;padding-top:1.4rem;border-top:1px solid var(--line)}
+
+  /* about: the path's window stops above the tab bar */
+  .run-st{height:calc(100vh - var(--hdr) - var(--tabbar) - var(--safe-b));height:calc(100svh - var(--hdr) - var(--tabbar) - var(--safe-b))}
+  .run-tl{gap:.35rem}
+  .run-tl button{min-height:2.5rem;padding:.4rem .65rem}
+
+  /* overlays */
+  .reel{width:calc(100% - 1rem)}
+  .dlg-h .sq{width:3rem;height:3rem}
+}
 </style>
 
 <header class="hdr" id="hdr">
@@ -551,7 +645,10 @@ body[data-view="page"] .lore--bg{display:none}
       <button type="button" data-lang="en" aria-pressed="true">EN</button>
       <button type="button" data-lang="ja" aria-pressed="false" lang="ja">日本語</button>
     </div>
-    <button class="btn" type="button" data-open="dlg-contact" data-glitch><span class="t" data-i18n="nav.contact">Contact</span></button>
+    <button class="sq js-theme hdr-theme" type="button" aria-label="Switch light or dark" data-i18n-aria="ft.theme">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 3a7 7 0 0 1 0 14z" fill="currentColor"/></svg>
+    </button>
+    <button class="btn hdr-contact" type="button" data-open="dlg-contact" data-glitch><span class="t" data-i18n="nav.contact">Contact</span></button>
     <button class="sq menu-btn" type="button" id="menu" aria-expanded="false" aria-controls="nav" aria-label="Menu" data-i18n-aria="nav.menu">
       <svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6h14M3 10h14M3 14h14"/></svg>
     </button>
@@ -607,6 +704,18 @@ body[data-view="page"] .lore--bg{display:none}
             <button class="lore-b" id="lore-b" type="button" data-i18n="lore.skip">Skip</button>
           </div>
           <button class="lore-b lore-re" id="lore-re" type="button" data-i18n="lore.replay" hidden>Replay intro</button>
+        </div>
+
+        <!-- narrow screens only: the four layers by tap (and on their own until one is tapped), since the stage is not pinned there -->
+        <div class="modes" id="steps" role="group" aria-label="Viewport" data-i18n-aria="hud.viewport">
+          <button type="button" data-step="0" aria-pressed="true"><span class="n">01</span><span class="t" data-i18n="s1">Shaded</span><i aria-hidden="true"></i></button>
+          <button type="button" data-step="1" aria-pressed="false"><span class="n">02</span><span class="t" data-i18n="s2">Wireframe</span><i aria-hidden="true"></i></button>
+          <button type="button" data-step="2" aria-pressed="false"><span class="n">03</span><span class="t" data-i18n="s3">Skeleton</span><i aria-hidden="true"></i></button>
+          <button type="button" data-step="3" aria-pressed="false"><span class="n">04</span><span class="t" data-i18n="s4">Controls</span><i aria-hidden="true"></i></button>
+          <button type="button" class="modes-auto" id="tour-auto" aria-pressed="true" aria-label="Play the layers automatically" data-i18n-aria="tour.auto">
+            <svg class="ic-pause" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4h3v12H6zM11 4h3v12h-3z" fill="currentColor"/></svg>
+            <svg class="ic-play" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4l10 6-10 6z" fill="currentColor"/></svg>
+          </button>
         </div>
 
         <div class="side">
@@ -763,6 +872,15 @@ body[data-view="page"] .lore--bg{display:none}
     </main>
   </div>
 </div>
+
+<!-- narrow screens: the main navigation sits at the bottom, under the thumb -->
+<nav class="tabbar" id="tabbar" aria-label="Main">
+  <a href="#home" data-route="home"><svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9.5 10 3l7 6.5V17H12.5v-4.5h-5V17H3z" stroke-linejoin="round"/></svg><span data-i18n="home">Home</span></a>
+  <a href="#work" data-route="work"><svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3h6v6H3zM11 3h6v6h-6zM3 11h6v6H3zM11 11h6v6h-6z"/></svg><span data-i18n="nav.work">Work</span></a>
+  <a href="#reel" data-open="dlg-reel"><svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2.5 4.5h15v11h-15z"/><path d="M8.3 7.4v5.2l4.4-2.6z" fill="currentColor" stroke="none"/></svg><span data-i18n="nav.reel">Reel</span></a>
+  <a href="#about" data-route="about"><svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="7" r="3.2"/><path d="M3.5 17.5c.8-3.6 3.4-5.4 6.5-5.4s5.7 1.8 6.5 5.4"/></svg><span data-i18n="nav.about">About</span></a>
+  <a href="#contact" data-open="dlg-contact"><svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2.5 4.5h15v11h-15z"/><path d="m2.8 5 7.2 6 7.2-6"/></svg><span data-i18n="nav.contact">Contact</span></a>
+</nav>
 
 <dialog class="sheet" id="dlg-contact" aria-labelledby="ct-h">
   <div class="dlg-h">
@@ -925,6 +1043,7 @@ const T = {
     's1': 'Shaded', 's2': 'Wireframe', 's3': 'Skeleton', 's4': 'Controls',
     's1d': 'The final look.', 's2d': 'Topology and edge flow, laid out for deformation.',
     's3d': 'Joint placement and orientation.', 's4d': 'What the animator touches.',
+    'tour.auto': 'Play the layers automatically',
     'rw.head': 'Research', 'rw.live': 'In progress', 'rw.go': 'Open research', 'rw.n': 'Tokyo University of Technology',
     'rw.s1': 'Tag', 'rw.s1d': 'Joint chains labelled as modules in Maya', 'rw.s2': 'Export', 'rw.s2d': 'A manifest saved inside the FBX',
     'rw.s3': 'Import', 'rw.s3d': 'The skeleton arrives in Unreal Engine 5.6', 'rw.s4': 'Build', 'rw.s4d': 'A Control Rig rebuilt automatically',
@@ -974,6 +1093,7 @@ const T = {
     's1': 'シェーディング', 's2': 'ワイヤーフレーム', 's3': 'スケルトン', 's4': 'コントローラー',
     's1d': '完成時の見た目。', 's2d': '変形を考えたトポロジーとエッジフロー。',
     's3d': 'ジョイントの配置と軸の向き。', 's4d': 'アニメーターが触る部分。',
+    'tour.auto': 'レイヤーを自動で切り替える',
     'rw.head': '研究', 'rw.live': '進行中', 'rw.go': '研究を見る', 'rw.n': '東京工科大学',
     'rw.s1': 'タグ付け', 'rw.s1d': 'Mayaでジョイントチェーンをモジュールとして設定', 'rw.s2': '書き出し', 'rw.s2d': 'マニフェストをFBXに埋め込み',
     'rw.s3': '読み込み', 'rw.s3d': 'スケルトンをUnreal Engine 5.6へ', 'rw.s4': '構築', 'rw.s4d': 'Control Rigを自動で再構築',
@@ -1275,7 +1395,7 @@ function show(name) {
   current = name;
   document.body.dataset.view = key === 'home' ? 'home' : 'page';
   const navKey = p ? 'work' : name;
-  $$('.nav a[data-route]').forEach(a => { if (a.dataset.route === navKey) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  $$('.nav a[data-route], .tabbar a[data-route]').forEach(a => { if (a.dataset.route === navKey) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   scrollTo({ top: 0, behavior: 'instant' });
   document.dispatchEvent(new Event('viewchange'));
 }
@@ -1518,7 +1638,7 @@ function setMode(m) {
   if (hm._sc) hm._txt = tr(k); else hm.textContent = tr(k);
   $('#hud-i').textContent = '0' + (m + 1);
   if (!first) scramble(hm);
-  $$('#steps button').forEach((b, i) => { if (i === m) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
+  $$('#steps [data-step]').forEach((b, i) => { b.setAttribute('aria-pressed', String(i === m)); if (i === m) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
   $$('#ticks i').forEach((el, i) => { el.dataset.on = i < m ? 'past' : i === m ? 'now' : ''; });
 }
 /* Stage clips load one at a time: the first on arrival, each next one just before the scroll reaches it. */
@@ -1528,17 +1648,49 @@ function want(i) {
   v.dataset.on = '1'; v.src = srcFor(srcs[i]);
   v.addEventListener('loadedmetadata', () => { if (i) v.currentTime = vids[0].currentTime; v.play().catch(() => { /* autoplay refused: stays on first frame */ }); }, { once: true });
 }
+/* Narrow screens: the stage is not pinned (pinned, it covered the panels scrolling under it), so the layers are stepped
+   through with the buttons under it instead of the scroll. They also play on their own, one every few seconds, once the
+   intro is over, until a layer is tapped or the pause button is pressed. The same scan line wipes from one to the next. */
+const narrowMq = matchMedia('(max-width:63.99rem)');
+const TOUR = { from: 0, to: 0, t0: 0, next: 0, auto: !still.matches }, T_HOLD = 3800, T_SWAP = 700;
+const introBusy = () => { try { return !!(lore && lore.busy()); } catch (e) { return false; } };
+function tourGo(i, now) {
+  const seen = TOUR.from === TOUR.to || (now - TOUR.t0) / T_SWAP < .5 ? TOUR.from : TOUR.to;   // the layer mostly on screen now
+  TOUR.from = still.matches ? i : seen; TOUR.to = i; TOUR.t0 = now; TOUR.next = 0;
+  if (useVideo) { want(i); want((i + 1) % 4); }
+  kick();
+}
+function tourAuto(on) {
+  TOUR.auto = on && !still.matches; TOUR.next = 0;
+  const b = $('#tour-auto'); b.setAttribute('aria-pressed', String(TOUR.auto)); b.hidden = still.matches;
+  $$('#steps [data-step] i').forEach(i => i.style.removeProperty('--p'));
+  kick();
+}
+function tourStep(now) {                                   // [from, to, t] for this frame
+  if (TOUR.auto && !introBusy() && TOUR.from === TOUR.to) {
+    if (!TOUR.next) TOUR.next = now + T_HOLD;
+    else if (now >= TOUR.next) tourGo((TOUR.to + 1) % 4, now);
+  } else if (introBusy()) TOUR.next = 0;                   // the hold starts again once the intro is over
+  let t = TOUR.from === TOUR.to ? 0 : Math.min(1, (now - TOUR.t0) / T_SWAP);
+  if (t >= 1) { TOUR.from = TOUR.to; t = 0; }
+  const bar = $('#steps [data-step="' + TOUR.to + '"] i');
+  if (bar) bar.style.setProperty('--p', TOUR.auto && TOUR.next && TOUR.from === TOUR.to ? Math.min(1, 1 - (TOUR.next - now) / T_HOLD).toFixed(3) : TOUR.auto ? '0' : '1');
+  return [TOUR.from, TOUR.to, t * t * (3 - 2 * t)];
+}
 function draw(now) {
   if (!W || !H) return;
   const sec = still.matches ? 1.25 : now / 1000;
   const fr = useVideo ? vids[0].currentTime * 24 : (sec * 24) % 240;
-  const f = Math.min(3.999, Math.max(0, (scrollY - range.s0) / (range.s1 - range.s0)) * 4), i0 = Math.floor(f), t = i0 < 3 ? Math.max(0, (f - i0 - .66) / .34) : 0;
+  const nar = narrowMq.matches;
+  const f = Math.min(3.999, Math.max(0, (scrollY - range.s0) / (range.s1 - range.s0)) * 4);
+  let i0 = Math.floor(f), i1 = i0 + 1, t = i0 < 3 ? Math.max(0, (f - i0 - .66) / .34) : 0;
+  if (nar) [i0, i1, t] = tourStep(now);
   view.th = fr / 240 * 6.2832 - .55; view.S = Math.min(H * .41, W * .62); view.ox = W * (W < 560 ? .58 : .5); view.oy = H * .5 + view.S * .93;
   const bones = useVideo ? null : BN.map(([a, b, r, s]) => ({ A: JN[a], B: JN[b], a: P(JN[a]), b: P(JN[b]), r, s }))
     .sort((p, q) => (p.a[2] + p.b[2]) - (q.a[2] + q.b[2]));
-  if (useVideo) for (let i = 1; i < 4; i++) if (i <= f + .9) want(i);
+  if (useVideo && !nar) for (let i = 1; i < 4; i++) if (i <= f + .9) want(i);
   for (let i = 0; i < 4; i++) {
-    const el = (useVideo ? vids : layers)[i], on = i === i0 || (i === i0 + 1 && t > 0);
+    const el = (useVideo ? vids : layers)[i], on = i === i0 || (i === i1 && t > 0);
     el.style.opacity = on ? 1 : 0;
     if (on) el.style.clipPath = t <= 0 ? 'none' : i === i0 ? 'inset(' + (t * 100).toFixed(2) + '% 0 0 0)' : 'inset(0 0 ' + ((1 - t) * 100).toFixed(2) + '% 0)';
     if (useVideo || !on) continue;
@@ -1547,7 +1699,7 @@ function draw(now) {
     DRAW[i](ctx, bones);
   }
   scan.hidden = !(t > 0 && t < 1); scan.style.top = (t * 100).toFixed(2) + '%';
-  setMode(t > .5 ? i0 + 1 : i0);
+  setMode(t > .5 ? i1 : i0);
   const fs = String(Math.floor(fr) % 240 + 1).padStart(4, '0');
   if (fs !== lastF) { lastF = fs; $('#hud-f').textContent = fs; }
   if (gim.width) gimbal(sec, gim.width / dpr);
@@ -1559,10 +1711,25 @@ function loop(now) {
 }
 function kick() { if (!raf) raf = requestAnimationFrame(loop); }
 
-$$('#steps button').forEach(b => b.addEventListener('click', () => {
-  const i = +b.dataset.step, p = i ? (i + .5) / 4 : .02;
+$$('#steps [data-step]').forEach(b => b.addEventListener('click', () => {
+  const i = +b.dataset.step;
+  if (narrowMq.matches) {                              // a tap takes over from the auto play (and skips an intro still playing)
+    if (introBusy()) $('#lore-b').click();
+    tourAuto(false); tourGo(i, performance.now()); return;
+  }
+  const p = i ? (i + .5) / 4 : .02;
   scrollTo({ top: range.s0 + p * (range.s1 - range.s0), behavior: still.matches ? 'auto' : 'smooth' });
 }));
+$('#tour-auto').addEventListener('click', () => tourAuto(!TOUR.auto));
+tourAuto(TOUR.auto);
+/* arrow keys move along the four layer buttons */
+$('#steps').addEventListener('keydown', e => {
+  const bs = $$('#steps [data-step]'), k = bs.indexOf(document.activeElement);
+  if (k < 0 || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+  e.preventDefault();
+  const n = e.key === 'Home' ? 0 : e.key === 'End' ? 3 : (k + (e.key === 'ArrowRight' ? 1 : 3)) % 4;
+  bs[n].focus(); bs[n].click();
+});
 if (useVideo) {
   vids.forEach(v => { v.hidden = false; v.preload = 'auto'; });
   want(0);
@@ -4506,6 +4673,7 @@ document.addEventListener('viewchange', () => { resize(); kick(); });
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { measure(); kick(); });
 const h0 = location.hash.slice(1);
 if (h0 !== 'home' && known(h0)) show(h0);
+else $$('.tabbar a[data-route="home"]').forEach(a => a.setAttribute('aria-current', 'page'));
 resize(); draw(performance.now()); kick();
 if (lore) lore.wake();
 })();
