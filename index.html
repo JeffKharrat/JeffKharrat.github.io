@@ -1799,7 +1799,11 @@ if (useVideo) {
    One zoom in five beats: an uncharted system, the moon that built itself, its data center,
    the dive into a rack, and the digital world where the figure assembles.
    It is drawn in the theme's colours on one canvas: behind the whole page on wide screens, inside the stage on narrow ones.
-   Every beat is placed from the stage's own camera, so the last one lands on the figure at any window size,
+   The first four beats are one perspective camera flight through one space (see "the camera" below): low over the orbital
+   plane with its horizon, a banked turn in through the rocks bound for the moon, down onto the data center and level into the
+   socket of one rack's light. Whatever comes nearer than the page's pane (near halves of orbits, rocks, a planet, the moon's
+   ring and tug, the mast, the socket's rim, splinters at the punch-through) is drawn on the layer above the page.
+   The camera's vanishing point is the stage anchor, so the last beat lands on the figure at any window size,
    and the figure layers (stand-in or video) stay hidden until the scan at the end reveals them.
    SITE.intro: 'always' plays on every load, 'once' once per browser, 'off' never. */
 const lore = (() => {
@@ -1877,56 +1881,190 @@ const lore = (() => {
     lines.forEach((s, i) => text(s, f[0] + dir * 8, f[1] + i * 15, i ? C.ink2 : C.ink, al, dir < 0 ? 'right' : 'left'));
   }
 
-  /* ----- beat 1: the system ----- */
-  const TILT = .4, ROLL = -.2, CR = Math.cos(ROLL), SR = Math.sin(ROLL);
-  const flat = (x, z, y = 0) => { const v = z * TILT - y; return [x * CR - v * SR, x * SR + v * CR]; };   // the orbital plane, seen from above and rolled a little
+  /* ----- the camera: one perspective flight through all five beats -----
+     Everything sits in one space, in the system's units: the sun at the origin, the orbital plane y = 0, the moon above it at PM,
+     the data center on the moon's surface (WS wide) and the rack's light on it. One camera looks at a target that slides from the sun
+     to the moon to the light, from a distance FK / e^Z, so the zoom curve above is a real dolly. Its direction swings round (az, el)
+     and it banks into the turn, comes down on the data center from straight above, flares out to a low pass and flies at the rack.
+     The focal length is FK stage units and the vanishing point is the stage anchor G.A, so the last beat still lands on the figure.
+     The page is a pane of glass UIK of the way to the target: whatever comes nearer than that is drawn on the layer above the page. */
+  const FK = 2.2, UIK = .55;
+  const d3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const dirOf = (az, el) => [Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)];
   const ORB = [.16, .25, .36, .5, .68, .9, 1.18, 1.5].map((r, i) => ({ r, a0: rnd() * TAU, w: .5 * Math.pow(.16 / r, 1.5) + .02, k: [.011, .015, .021, .017, .04, .03, .022, .016][i] }));
+  ORB[5].a0 += 1.3; ORB[7].a0 += .6; ORB[7].k = .028;                      // one planet kept out from behind the moon, the outermost put where the camera passes it
   const BELT = Array.from({ length: 120 }, () => [.565 + rnd() * .06, rnd() * TAU]);
-  const MOON = [.52, .1, .32], T0 = flat(MOON[0], MOON[1], MOON[2]);     // the moon hangs above the plane, on no orbit
-  const FIND = [1.0, 1.45, 1.9, 2.35];                                    // when the search reticle leaves for each stop
-  function system(G, s, c, al, t) {
-    const B = G.B * s, X = G.A[0] - c[0] * B, Y = G.A[1] - c[1] * B;
-    const at = (x, z, y) => { const p = flat(x, z, y); return [X + p[0] * B, Y + p[1] * B]; };
-    const where = o => { const a = o.a0 + o.w * t; return at(o.r * Math.cos(a), o.r * Math.sin(a)); };
-    g.lineWidth = 1; g.strokeStyle = C.ink2;
-    ORB.forEach((o, i) => {                                               // orbits draw on, starting from their planet
-      const d = st(.15 + i * .1, 1 + i * .1, t), a = o.a0 + o.w * t;
-      if (!d) return;
-      g.globalAlpha = al * (i % 3 === 2 ? .4 : .6); g.setLineDash(i % 3 === 2 ? [2, 5] : []);
-      g.beginPath();
-      for (let k = 0; k <= 96 * d; k++) { const p = at(o.r * Math.cos(a + k / 96 * TAU), o.r * Math.sin(a + k / 96 * TAU)); if (k) g.lineTo(p[0], p[1]); else g.moveTo(p[0], p[1]); }
-      g.stroke();
-    });
+  const RM = .4, TX = .3, CZ = Math.cos(.2), SZR = Math.sin(.2), LAT0 = -1.5708, DLAT = .34907, DLON = .5236;
+  const DC_LAT = .16, DC_LON = -.22, SPIN = 2.5;
+  const PLATE = Array.from({ length: 34 }, (_, i) => ({ j: 1 + (rnd() * 6 | 0), k: rnd() * 12 | 0, d: rnd() * .25, acc: i % 9 === 4 }));
+  const RK = { w: .066, d: .05, h: .15 }, SITE3 = [];
+  for (let r = 0; r < 3; r++) for (let i = 0; i < 7; i++) SITE3.push({ t: 'rack', x: (i - 3) * .088, z: (r - 1) * .15, dl: .25 + rnd() * .5, id: r * 7 + i });
+  for (let i = 0; i < 3; i++) SITE3.push({ t: 'tower', x: .43, z: (i - 1) * .16, r: .04, h: .11, dl: .15 + i * .12 });
+  for (let r = 0; r < 5; r++) for (let i = 0; i < 2; i++) SITE3.push({ t: 'solar', x: -.47 + i * .075, z: (r - 2) * .1, dl: i * .1 + r * .07 });
+  SITE3.push({ t: 'mast', x: -.15, z: .41, h: .27, dl: .5 }, { t: 'pad', x: .22, z: .38, r: .07, dl: .1 }, { t: 'hut', x: .14, z: -.38, w: .2, d: .07, h: .05, dl: .2 });
+  const TARGET = 17, LED = { x: 0, y: RK.h * (.86 - 3 * .105), z: .15 + RK.d / 2, e: RK.w * .07 };   // the rack and the light the camera dives into
+  const WIRES = [[[-.36, -.2], [-.36, .2]], [[-.36, 0], [-.33, 0]], [[.39, -.16], [.39, .16]], [[.39, 0], [.33, 0]], [[.14, -.345], [.14, -.24]], [[-.15, .41], [-.15, .24]]];
+
+  const PM = [.52, .32, .1], RMW = RM * R0, WS = R0 * R1;                 // the moon hangs above the plane, on no orbit
+  const AZM = -.22, ELM = .4, MZ = dirOf(AZM, ELM), MX = unit(cross([0, 1, 0], MZ)), MY = cross(MZ, MX);   // the moon's frame faces the way the camera arrives
+  const lean = v => { v = rx(v, TX); return [v[0] * CZ - v[1] * SZR, v[0] * SZR + v[1] * CZ, v[2]]; };
+  const onMoon = (lat, lon, r = 1) => lean([r * Math.cos(lat) * Math.sin(lon), r * Math.sin(lat), r * Math.cos(lat) * Math.cos(lon)]);
+  const mw = v => [v[0] * MX[0] + v[1] * MY[0] + v[2] * MZ[0], v[0] * MX[1] + v[1] * MY[1] + v[2] * MZ[1], v[0] * MX[2] + v[1] * MY[2] + v[2] * MZ[2]];
+  const spinAt = t => DC_LON - SPIN * (1 - eo((t - 3.8) / 2.1));
+  /* the data center's own axes once the moon has stopped turning: N0 up, SZ the way the racks face, SX to their right */
+  const N0 = mw(onMoon(DC_LAT, DC_LON)), SZ = unit(sub(mul(N0, d3(MY, N0)), MY)), SX = cross(N0, SZ);
+  const LEDV = add(add(mul(SX, LED.x * WS), mul(N0, LED.y * WS)), mul(SZ, LED.z * WS));
+  function flight(t, Z) {
+    const s0 = Math.exp(Z), s1 = s0 * R0, s2 = s1 * R1, gz = Z - Z2, d = FK / s0;
+    /* the target slides to the next scene's centre as the zoom closes on it */
+    const k0 = 1 - (1 - st(.15, .15 + Z1 * .75, Z)) / Math.max(1, s0), k1 = 1 - (1 - st(.15, .15 + (Z2 - Z1) * .75, Z - Z1)) / Math.max(1, s1);
+    const k2 = 1 - (1 - st(.15, .15 + DIVE * .75, Z - Z2)) / Math.max(1, s2), nw = mw(onMoon(DC_LAT, spinAt(t)));
+    const L = [PM[0] * k0 + RMW * nw[0] * k1 + LEDV[0] * k2, PM[1] * k0 + RMW * nw[1] * k1 + LEDV[1] * k2, PM[2] * k0 + RMW * nw[2] * k1 + LEDV[2] * k2];
+    /* in space: swinging round to the moon's side and climbing a little, banking through the turn */
+    const az = AZM + .7 * (1 - st(0, 4.4, t)) + .05 * Math.sin(t * .6) * st(4.3, 5.2, t), el = ELM - .24 * (1 - st(.6, 4.4, t));
+    const roll = -.13 * (1 - st(2.4, 4.4, t)) + .2 * Math.sin(Math.PI * st(2.8, 4.7, t));
+    /* over the data center: from straight above, round and down to a low pass, then level at the rack */
+    const a = st(-1.7, 0, gz), dd = st(.5, 2.4, gz), yaw = (.62 + .1 * Math.sin(t * .8)) * a * (1 - dd), pit = mix(mix(1.5708, .6, a), .1, dd);
+    const zy = add(mul(SZ, Math.cos(yaw)), mul(SX, Math.sin(yaw))), bl = st(Z1 + .5, Z2 - 1.6, Z);
+    const dA = dirOf(az, el), dS = add(mul(N0, Math.sin(pit)), mul(zy, Math.cos(pit))), uS = sub(mul(N0, Math.cos(pit)), mul(zy, Math.sin(pit)));
+    const dir = unit([mix(dA[0], dS[0], bl), mix(dA[1], dS[1], bl), mix(dA[2], dS[2], bl)]), f = mul(dir, -1);
+    const r0 = unit(cross(f, [mix(0, uS[0], bl), mix(1, uS[1], bl), mix(0, uS[2], bl)])), u0 = cross(r0, f), ro = roll * (1 - bl), cr = Math.cos(ro), sr = Math.sin(ro);
+    return { p: add(L, mul(dir, d)), f, dir, r: add(mul(r0, cr), mul(u0, sr)), u: sub(mul(u0, cr), mul(r0, sr)), d, zu: UIK * d, n: .03 * d, s0, s1, s2, gz, nw,
+      ps: add(PM, mul(nw, RMW)), grow: st(-1.5, -.15, gz), F: 1, cx: 0, cy: 0 };
+  }
+  const toCam = (K, w) => { const x = w[0] - K.p[0], y = w[1] - K.p[1], z = w[2] - K.p[2]; return [x * K.r[0] + y * K.r[1] + z * K.r[2], x * K.u[0] + y * K.u[1] + z * K.u[2], x * K.f[0] + y * K.f[1] + z * K.f[2]]; };
+  const turn = (K, v) => [d3(v, K.r), d3(v, K.u), d3(v, K.f)];              // a direction, in camera space: [right, up, forward]
+  const toScr = (K, c) => [K.cx + K.F * c[0] / c[2], K.cy - K.F * c[1] / c[2], c[2]];
+  /* Lines in camera space: clipped at the near plane, cut where they cross the page's pane, and batched by colour, alpha and width.
+     With cue on, a line gets thicker and stronger the nearer it is. The far part goes to LB (behind the page), the near part to LF. */
+  const LB = new Map(), LF = new Map();
+  function lput(K, a, b, col, al, w, cue, M) {
+    if (cue) { const dc = K.d * 2 / (a[2] + b[2]); al *= cl(.25 + .75 * dc, .2, 1.3); w *= cl(Math.pow(dc, .6), .6, 2.6); }
+    if (al < .012) return;
+    const ai = Math.min(11, al * 12 | 0), wi = Math.min(10, Math.max(1, Math.round(w * 2))), key = col + '|' + ai + '|' + wi;
+    let L = M.get(key);
+    if (!L) M.set(key, L = { col, ai, al: Math.min(1, (ai + .6) / 12), w: wi / 2, p: [] });
+    L.p.push(K.cx + K.F * a[0] / a[2], K.cy - K.F * a[1] / a[2], K.cx + K.F * b[0] / b[2], K.cy - K.F * b[1] / b[2]);
+  }
+  function ln(K, a, b, col, al, w = 1, cue = 1, pane = 1) {
+    const n = K.n;
+    if (al < .012 || (a[2] < n && b[2] < n)) return;
+    if (a[2] < n) { const k = (n - a[2]) / (b[2] - a[2]); a = [mix(a[0], b[0], k), mix(a[1], b[1], k), n]; }
+    else if (b[2] < n) { const k = (n - b[2]) / (a[2] - b[2]); b = [mix(b[0], a[0], k), mix(b[1], a[1], k), n]; }
+    const zu = K.zu, na = a[2] < zu, nb = b[2] < zu;
+    if (!pane) lput(K, a, b, col, al, w, cue, LB);
+    else if (na !== nb) { const k = (zu - a[2]) / (b[2] - a[2]), m = [mix(a[0], b[0], k), mix(a[1], b[1], k), zu]; lput(K, a, m, col, al, w, cue, na ? LF : LB); lput(K, m, b, col, al, w, cue, nb ? LF : LB); }
+    else lput(K, a, b, col, al, w, cue, na ? LF : LB);
+  }
+  function lflush(M, halo) {                                              // faint and thin first; in front of the page, over a halo in the page's colour
+    if (!M.size) return;
+    const all = [...M.values()].sort((x, y) => x.ai - y.ai || x.w - y.w), run = L => { g.beginPath(); for (let i = 0; i < L.p.length; i += 4) { g.moveTo(L.p[i], L.p[i + 1]); g.lineTo(L.p[i + 2], L.p[i + 3]); } g.stroke(); };
     g.setLineDash([]);
-    g.globalAlpha = al * .5 * st(.9, 1.6, t); g.beginPath();              // ruler ticks on the sixth orbit
-    for (let k = 0; k < 72; k++) { const a = k / 72 * TAU + t * .05, r2 = .9 + (k % 6 ? .014 : .032), p = at(.9 * Math.cos(a), .9 * Math.sin(a)), q = at(r2 * Math.cos(a), r2 * Math.sin(a)); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); }
-    g.stroke();
-    g.fillStyle = C.ink2; g.globalAlpha = al * .55 * st(.6, 1.4, t);       // the belt
-    BELT.forEach(([r, a]) => { const p = at(r * Math.cos(a + t * .07), r * Math.sin(a + t * .07)); g.fillRect(p[0] - .8, p[1] - .8, 1.6, 1.6); });
+    if (halo) { g.strokeStyle = C.ground; all.forEach(L => { g.globalAlpha = Math.min(1, L.al * 1.2); g.lineWidth = L.w + 4; run(L); }); }
+    all.forEach(L => { g.globalAlpha = halo ? Math.min(1, L.al * 1.25) : L.al; g.strokeStyle = L.col; g.lineWidth = L.w + (halo ? .5 : 0); run(L); });
+    M.clear();
+  }
+  const l3 = (K, a, b) => {                                               // one clipped segment added to the current path
+    const n = K.n;
+    if (a[2] < n && b[2] < n) return;
+    if (a[2] < n) { const k = (n - a[2]) / (b[2] - a[2]); a = [mix(a[0], b[0], k), mix(a[1], b[1], k), n]; }
+    else if (b[2] < n) { const k = (n - b[2]) / (a[2] - b[2]); b = [mix(b[0], a[0], k), mix(b[1], a[1], k), n]; }
+    g.moveTo(K.cx + K.F * a[0] / a[2], K.cy - K.F * a[1] / a[2]); g.lineTo(K.cx + K.F * b[0] / b[2], K.cy - K.F * b[1] / b[2]);
+  };
+  function face(K, pts) {                                                 // a polygon in camera space, clipped at the near plane, as the current path
+    const n = K.n, out = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length], ia = a[2] >= n;
+      if (ia) out.push(a);
+      if (ia !== (b[2] >= n)) { const k = (n - a[2]) / (b[2] - a[2]); out.push([mix(a[0], b[0], k), mix(a[1], b[1], k), n]); }
+    }
+    if (out.length < 3) return false;
+    g.beginPath(); out.forEach((p, i) => { const x = K.cx + K.F * p[0] / p[2], y = K.cy - K.F * p[1] / p[2]; if (i) g.lineTo(x, y); else g.moveTo(x, y); }); g.closePath();
+    return true;
+  }
+  const NEAR = [];                                                        // shapes that came nearer than the pane this frame, drawn last on the front layer
 
-    const sun = at(0, 0), rs = .05 * B * eb(st(0, .6, t)), hp = (t * .7) % 1;
-    g.globalAlpha = al * (1 - hp) * .5; g.strokeStyle = C.acc; g.lineWidth = 1.2; oval(sun, rs * (1.5 + hp * 2.6), rs * (1.5 + hp * 2.6)); g.stroke();
-    g.globalAlpha = al; g.fillStyle = C.acc; oval(sun, rs, rs); g.fill();
-    g.strokeStyle = C.ink; g.lineWidth = 1; g.setLineDash([3, 4]); g.lineDashOffset = -t * 10; oval(sun, rs * 1.5, rs * 1.5); g.stroke(); g.setLineDash([]);
-    g.globalAlpha = al * .7; g.beginPath();
-    for (let k = 0; k < 24; k++) { const a = k / 24 * TAU + t * .25, r1 = rs * 1.85, r2 = rs * (k % 2 ? 2.05 : 2.35); g.moveTo(sun[0] + Math.cos(a) * r1, sun[1] + Math.sin(a) * r1); g.lineTo(sun[0] + Math.cos(a) * r2, sun[1] + Math.sin(a) * r2); }
-    g.stroke();
+  /* ----- beat 1: the system, seen low over its orbital plane ----- */
+  const STAR = Array.from({ length: 320 }, (_, i) => { const y = hash(i, 71) * 2 - 1, a = hash(i, 72) * TAU, r = Math.sqrt(1 - y * y); return [r * Math.cos(a), y, r * Math.sin(a), hash(i, 73)]; });
+  const GRID_R = [2, 2.7, 3.6, 4.8, 6.5, 9, 13];
+  const FIND = [1.0, 1.45, 1.9, 2.35];                                    // when the search reticle leaves for each stop
+  /* rocks on their way to the moon, strung along the line the camera will come in on: it flies through them */
+  const TRAIL = Array.from({ length: 96 }, (_, i) => {
+    const tt = 2.96 + 1.22 * hash(i, 81), k = flight(tt, zoomAt(tt)), far = Math.hypot(k.p[0] - PM[0], k.p[1] - PM[1], k.p[2] - PM[2]), a = hash(i, 82) * TAU, ro = far * (.05 + .3 * hash(i, 83));
+    return { p: add(k.p, add(mul(k.r, Math.cos(a) * ro), mul(k.u, Math.sin(a) * ro))), s: Math.min(.003, far * .006) * (.6 + .8 * hash(i, 84)), o: hash(i, 85) * TAU, acc: hash(i, 86) < .12 };
+  });
+  function planet(p, r, i, al, ang, sq, t) {
+    g.strokeStyle = C.ink; g.lineWidth = 1;
+    if (i === 4) { g.globalAlpha = al * .8; oval(p, r * 1.9, r * 1.9 * (sq + .08), ang - .25); g.stroke(); }
+    g.globalAlpha = al; g.fillStyle = C.ground; g.lineWidth = r > 14 ? 1.6 : 1.2; oval(p, r, r); g.fill(); g.stroke();
+    if (r > 5) { g.globalAlpha = al * .55; g.lineWidth = .8; oval(p, r, r * sq, ang); g.stroke(); oval(p, r * Math.abs(Math.cos(t * .5 + i)), r, ang); g.stroke(); }
+    if (i === 4) { g.globalAlpha = al * .8; g.lineWidth = 1; oval(p, r * 1.9, r * 1.9 * (sq + .08), ang - .25, 0, Math.PI); g.stroke(); }
+  }
+  function system(G, K, al, t) {
+    const F = K.F, s = K.s0, ang = Math.atan2(K.r[1], K.u[1]), sq = Math.max(.08, Math.abs(K.f[1]));   // how the plane's "up" and its circles look from here
+    const at = (x, z, y = 0) => toCam(K, [x, y, z]), where = o => { const a = o.a0 + o.w * t; return at(o.r * Math.cos(a), o.r * Math.sin(a)); };
+    const sky = al * st(.1, 1.2, t);
+    g.fillStyle = C.ink2;                                                   // stars: at infinity, so they only turn with the camera
+    STAR.forEach((v, i) => {
+      const z = d3(v, K.f); if (z < .2) return;
+      const x = K.cx + F * d3(v, K.r) / z, y = K.cy - F * d3(v, K.u) / z; if (x < 0 || x > cw || y < 0 || y > ch) return;
+      const q = v[3] > .8 ? 2 : 1.3; g.globalAlpha = sky * (.35 + .65 * v[3]) * (.75 + .25 * Math.sin(t * 3 + i)); g.fillRect(x - q / 2, y - q / 2, q, q);
+    });
+    /* the plane's chart: rings and spokes out to its horizon, and the horizon itself with a bearing scale */
+    const ga = al * .34 * st(.3, 1.4, t), fh = unit([K.f[0], 0, K.f[2]]), rh = cross(fh, [0, 1, 0]);
+    if (ga > 0) {
+      const gl = (a, b) => { const fz = st(K.zu, K.zu * 2.4, (a[2] + b[2]) / 2); if (fz > 0) ln(K, a, b, C.ink2, ga * fz, 1); };
+      GRID_R.forEach(r => { let p = at(r, 0); for (let k = 1; k <= 72; k++) { const a = k / 72 * TAU, q = at(r * Math.cos(a), r * Math.sin(a)); gl(p, q); p = q; } });
+      for (let k = 0; k < 24; k++) { const a = k / 24 * TAU, c = Math.cos(a), sn = Math.sin(a); let p = at(1.75 * c, 1.75 * sn); for (let j = 1; j < GRID_R.length; j++) { const q = at(GRID_R[j] * c, GRID_R[j] * sn); gl(p, q); p = q; } }
+      const hz = [], up = [Math.sin(ang), -Math.cos(ang)];
+      for (let k = -13; k <= 13; k++) { const a = k * .1, v = turn(K, add(mul(fh, Math.cos(a)), mul(rh, Math.sin(a)))); if (v[2] > .15) hz.push([K.cx + F * v[0] / v[2], K.cy - F * v[1] / v[2], k]); }
+      if (hz.length > 1) {
+        g.globalAlpha = Math.min(1, ga * 2); g.strokeStyle = C.ink2; g.lineWidth = 1; g.beginPath(); g.moveTo(hz[0][0], hz[0][1]); g.lineTo(hz[hz.length - 1][0], hz[hz.length - 1][1]);
+        hz.forEach(h => { const l = h[2] % 3 ? 4 : 9; g.moveTo(h[0], h[1]); g.lineTo(h[0] + up[0] * l, h[1] + up[1] * l); });
+        g.stroke();
+      }
+    }
+    ORB.forEach((o, i) => {                                               // orbits draw on, starting from their planet
+      const dr = st(.15 + i * .1, 1 + i * .1, t), a = o.a0 + o.w * t, N = 120, dash = i % 3 === 2;
+      if (!dr) return;
+      let p = at(o.r * Math.cos(a), o.r * Math.sin(a));
+      for (let k = 1; k <= N * dr; k++) { const an = a + k / N * TAU, q = at(o.r * Math.cos(an), o.r * Math.sin(an)); if (!dash || k % 2) ln(K, p, q, C.ink2, al * (dash ? .55 : .75), 1); p = q; }
+    });
+    const ta = al * .6 * st(.9, 1.6, t);                                   // ruler ticks on the sixth orbit
+    if (ta > 0) for (let k = 0; k < 72; k++) { const a = k / 72 * TAU + t * .05, r2 = .9 + (k % 6 ? .014 : .032); ln(K, at(.9 * Math.cos(a), .9 * Math.sin(a)), at(r2 * Math.cos(a), r2 * Math.sin(a)), C.ink2, ta, 1); }
+    lflush(LB);
+    g.fillStyle = C.ink2; g.globalAlpha = al * .6 * st(.6, 1.4, t);        // the belt
+    BELT.forEach(([r, a]) => { const c = at(r * Math.cos(a + t * .07), r * Math.sin(a + t * .07)); if (c[2] < K.n) return; const q = cl(1.6 * K.d / c[2], 1.1, 4); g.fillRect(K.cx + F * c[0] / c[2] - q / 2, K.cy - F * c[1] / c[2] - q / 2, q, q); });
+    const tr = al * st(2.7, 3.1, t);                                       // the rocks bound for the moon: the camera flies in among them
+    if (tr > 0) TRAIL.forEach((o, i) => {
+      const c = toCam(K, o.p); if (c[2] < K.n) return;
+      const p = toScr(K, c), q = o.s * F / c[2], rot = t * (.6 + (i % 5) * .25) + o.o;
+      if (p[0] < -q * 2 || p[0] > cw + q * 2 || p[1] < -q * 2 || p[1] > ch + q * 2) return;
+      const draw = () => {
+        if (q < 2.2) { g.globalAlpha = tr * .8; g.fillStyle = o.acc ? C.acc : C.ink2; const e = Math.max(1.3, q * 1.4); g.fillRect(p[0] - e / 2, p[1] - e / 2, e, e); }
+        else cube(p, q, rot, .5 + o.o, tr * (1 - st(18, 46, q)), o.acc ? C.acc : C.ground, C.ink);
+      };
+      if (c[2] < K.zu) NEAR.push(draw); else draw();
+    });
 
-    ORB.forEach((o, i) => {                                               // planets
-      const k = eb(st(.5 + i * .1, 1 + i * .1, t));
-      if (k <= 0) return;
-      const p = where(o), r = Math.max(1.5, o.k * B) * k;
-      g.strokeStyle = C.ink; g.lineWidth = 1;
-      if (i === 4) { g.globalAlpha = al * .8; oval(p, r * 1.9, r * .5, ROLL - .25); g.stroke(); }
-      g.globalAlpha = al; g.fillStyle = C.ground; g.lineWidth = 1.2; oval(p, r, r); g.fill(); g.stroke();
-      if (r > 5) { g.globalAlpha = al * .55; g.lineWidth = .8; oval(p, r, r * .3, ROLL); g.stroke(); oval(p, r * Math.abs(Math.cos(t * .5 + i)), r, ROLL); g.stroke(); }
-      if (i === 4) { g.globalAlpha = al * .8; g.lineWidth = 1; oval(p, r * 1.9, r * .5, ROLL - .25, 0, Math.PI); g.stroke(); }
+    const bodies = ORB.map((o, i) => { const k = eb(st(.5 + i * .1, 1 + i * .1, t)), c = where(o); return k > 0 && c[2] > K.n ? [c[2], i, toScr(K, c), Math.max(1.5, o.k * F / c[2]) * k] : null; }).filter(Boolean);
+    const sc = at(0, 0), sun = sc[2] > K.n ? toScr(K, sc) : null;
+    if (sun) bodies.push([sc[2], -1]);
+    bodies.sort((a, b) => b[0] - a[0]).forEach(([z, i, p, r]) => {
+      if (i >= 0) { if (z < K.zu) NEAR.push(() => planet(p, r, i, al, ang, sq, t)); else planet(p, r, i, al, ang, sq, t); return; }
+      const rs = .05 * F / z * eb(st(0, .6, t)), hp = (t * .7) % 1;
+      g.globalAlpha = al * (1 - hp) * .5; g.strokeStyle = C.acc; g.lineWidth = 1.2; oval(sun, rs * (1.5 + hp * 2.6), rs * (1.5 + hp * 2.6)); g.stroke();
+      g.globalAlpha = al; g.fillStyle = C.acc; oval(sun, rs, rs); g.fill();
+      g.strokeStyle = C.ink; g.lineWidth = 1; g.setLineDash([3, 4]); g.lineDashOffset = -t * 10; oval(sun, rs * 1.5, rs * 1.5); g.stroke(); g.setLineDash([]);
+      g.globalAlpha = al * .7; g.beginPath();
+      for (let k = 0; k < 24; k++) { const a = k / 24 * TAU + t * .25, r1 = rs * 1.85, r2 = rs * (k % 2 ? 2.05 : 2.35); g.moveTo(sun[0] + Math.cos(a) * r1, sun[1] + Math.sin(a) * r1); g.lineTo(sun[0] + Math.cos(a) * r2, sun[1] + Math.sin(a) * r2); }
+      g.stroke();
     });
 
     /* The search: three catalogued planets, then the empty spot where the moon turns out to be. */
-    const far = al * (1 - st(1.6, 4, s));
+    const far = al * (1 - st(1.6, 4, s)), B = G.B;
     if (t > FIND[0] - .15 && far > 0) {
-      const stops = [ORB[2], ORB[4], ORB[6]].map(where); stops.push(at(MOON[0], MOON[1], MOON[2]));
+      const stops = [ORB[2], ORB[4], ORB[6]].map(o => toScr(K, where(o))); stops.push(toScr(K, toCam(K, PM)));
       let i = 0; while (i < 3 && t > FIND[i + 1]) i++;
       const k = i ? eio((t - FIND[i]) / .34) : 1, from = stops[Math.max(0, i - 1)], p = [mix(from[0], stops[i][0], k), mix(from[1], stops[i][1], k)];
       const lock = i === 3 ? st(FIND[3] + .34, FIND[3] + .7, t) : 0, r = Math.max(9, mix(.07, .034, lock) * B), a = far * st(FIND[0] - .15, FIND[0], t);
@@ -1935,12 +2073,12 @@ const lore = (() => {
       g.lineWidth = 1; g.globalAlpha = a * .7; g.beginPath();
       [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { g.moveTo(p[0] + dx * r * 1.45, p[1] + dy * r * 1.45); g.lineTo(p[0] + dx * r * 2.3, p[1] + dy * r * 2.3); });
       g.stroke();
-      if (i === 3 && k >= 1) {                                            // its height above the plane
-        const foot = at(MOON[0], MOON[1], 0), m = stops[3], d = a * st(FIND[3] + .3, FIND[3] + .8, t);
+      if (i === 3 && k >= 1 && sun) {                                     // its height above the plane
+        const fc = at(PM[0], PM[2]), foot = toScr(K, fc), m = stops[3], d = a * st(FIND[3] + .3, FIND[3] + .8, t), fr = .035 * F / fc[2];
         g.strokeStyle = C.ink2; g.globalAlpha = d * .8; g.setLineDash([3, 4]); seg(foot, [mix(foot[0], m[0], d * .88), mix(foot[1], m[1], d * .88)]); seg(sun, foot); g.setLineDash([]);
-        oval(foot, .035 * B, .035 * B * TILT, ROLL); g.stroke();
+        oval(foot, fr, fr * sq, ang); g.stroke();
       }
-      if (G.B > 230 && k >= 1) {
+      if (B > 230 && k >= 1) {
         const lx = p[0] + r * 2.6, ly = p[1] - 8;
         if (i < 3) { text('P-0' + (i * 2 + 3), lx, ly, C.ink, a); text('CATALOGUED', lx, ly + 15, C.ink2, a); }
         else {
@@ -1951,170 +2089,179 @@ const lore = (() => {
     }
   }
 
-  /* ----- beat 2: the moon, laying its own shell from the south pole up ----- */
-  const RM = .4, TX = .3, CZ = Math.cos(.2), SZ = Math.sin(.2), LAT0 = -1.5708, DLAT = .34907, DLON = .5236;
-  const DC_LAT = .16, DC_LON = -.22, SPIN = 2.5;
-  const PLATE = Array.from({ length: 34 }, (_, i) => ({ j: 1 + (rnd() * 6 | 0), k: rnd() * 12 | 0, d: rnd() * .25, acc: i % 9 === 4 }));
-  const lean = v => { v = rx(v, TX); return [v[0] * CZ - v[1] * SZ, v[0] * SZ + v[1] * CZ, v[2]]; };
-  const onMoon = (lat, lon, r = 1) => lean([r * Math.cos(lat) * Math.sin(lon), r * Math.sin(lat), r * Math.cos(lat) * Math.cos(lon)]);
-  const spinAt = t => DC_LON - SPIN * (1 - eo((t - 3.8) / 2.1));
-  const moonTarget = t => { const v = onMoon(DC_LAT, spinAt(t)); return [v[0] * RM, -v[1] * RM, v[2]]; };
-  function moon(G, O, s, al, t) {
-    const R = RM * G.B * s, show = al * st(2.62, 2.9, t) * (t < 2.9 && (t * 20 | 0) % 2 ? .4 : 1);
+  /* ----- beat 2: the moon, laying its own shell from the south pole up -----
+     A real sphere now: its outline is the circle where the camera's sight lines touch it (so close up it becomes the horizon),
+     and a line on it shows when its point faces the camera. The collector ring and the tug go round it in depth. */
+  function moon(G, K, al, t) {
+    const show = al * st(2.62, 2.9, t) * (t < 2.9 && (t * 20 | 0) % 2 ? .4 : 1);
     if (show <= 0) return;
-    const pt = v => [O[0] + v[0] * R, O[1] - v[1] * R];
-    if (R < 5) { g.globalAlpha = show; g.fillStyle = C.ink; oval(O, Math.max(1.6, R), Math.max(1.6, R)); g.fill(); return; }
-    const ph = spinAt(t), b = st(3.5, 5.4, t), top = LAT0 + Math.PI * b, fine = R > 60;
-    const halo = (r, n, off, pass, fn) => {                               // a ring around the moon, one half at a time
-      for (let k = 0; k < n; k++) { const a = onMoon(0, k / n * TAU + off, r), c = onMoon(0, (k + 1) / n * TAU + off, r); if ((a[2] + c[2] > 0) === pass) fn(pt(a), pt(c), k); }
-    };
-    const collectors = pass => {
-      const on = st(.7, 1, b);
+    const F = K.F, Mc = toCam(K, PM), Dv = sub(K.p, PM), D = Math.hypot(Dv[0], Dv[1], Dv[2]), R = RMW * F / D, O = Mc[2] > K.n ? toScr(K, Mc) : null;
+    if (R < 5) { if (O) { g.globalAlpha = show; g.fillStyle = C.ink; oval(O, Math.max(1.6, R), Math.max(1.6, R)); g.fill(); } return; }
+    const bx = mul(turn(K, MX), RMW), by = mul(turn(K, MY), RMW), bz = mul(turn(K, MZ), RMW);
+    const mp = v => [Mc[0] + v[0] * bx[0] + v[1] * by[0] + v[2] * bz[0], Mc[1] + v[0] * bx[1] + v[1] * by[1] + v[2] * bz[1], Mc[2] + v[0] * bx[2] + v[1] * by[2] + v[2] * bz[2]];
+    const Dm = D / RMW, Cm = [d3(Dv, MX) / RMW, d3(Dv, MY) / RMW, d3(Dv, MZ) / RMW], Ch = mul(Cm, 1 / Dm), vis = v => d3(v, Cm) > 1;
+    const ph = spinAt(t), b = st(3.5, 5.4, t), top = LAT0 + Math.PI * b, fine = R > 60, close = 1 - st(4, 14, K.s1), low = 1 - .75 * st(1.5, 4, K.gz);
+    const dot = v => { const c = mp(v); return c[2] > K.n ? toScr(K, c) : null; };
+    const e1 = unit(cross(Ch, Math.abs(Ch[1]) < .9 ? [0, 1, 0] : [1, 0, 0])), e2 = cross(Ch, e1), lr = Math.sqrt(Math.max(0, 1 - 1 / (Dm * Dm))), limb = [];
+    for (let k = 0; k < 72; k++) { const a = k / 72 * TAU, c = Math.cos(a) * lr, sn = Math.sin(a) * lr; limb.push(mp([Ch[0] / Dm + e1[0] * c + e2[0] * sn, Ch[1] / Dm + e1[1] * c + e2[1] * sn, Ch[2] / Dm + e1[2] * c + e2[2] * sn])); }
+    const collectors = pass => {                                          // the ring: its far half before the moon is drawn, its near half after
+      const on = st(.7, 1, b) * mix(.35, 1, close);
       if (!on) return;
-      g.strokeStyle = C.ink2; g.lineWidth = 1; g.globalAlpha = show * on * (pass ? .7 : .3); g.beginPath();
-      halo(1.5, 72, 0, pass, (p, q) => { g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); }); g.stroke();
+      let p = mp(onMoon(0, 0, 1.5)), pv = onMoon(0, 0, 1.5);
+      for (let k = 1; k <= 72; k++) { const v = onMoon(0, k / 72 * TAU, 1.5), q = mp(v); if ((d3(v, Ch) + d3(pv, Ch) > 0) === pass) ln(K, p, q, C.ink2, show * on * (pass ? .8 : .3), 1, pass ? 1 : 0); p = q; pv = v; }
+      lflush(LB);
       for (let k = 0; k < 10; k++) {
-        const v = onMoon(0, k / 10 * TAU + t * .12, 1.5);
-        if ((v[2] > 0) !== pass || on < (k + 1) / 10) continue;
-        const p = pt(v), q = Math.max(2, R * .04);
-        g.globalAlpha = show * (pass ? 1 : .4); g.fillStyle = k % 3 ? C.ghost : C.acc; g.strokeStyle = C.ink; g.fillRect(p[0] - q, p[1] - q * .6, q * 2, q * 1.2); g.strokeRect(p[0] - q, p[1] - q * .6, q * 2, q * 1.2);
+        const v = onMoon(0, k / 10 * TAU + t * .12, 1.5), c = mp(v);
+        if ((d3(v, Ch) > 0) !== pass || on < (k + 1) / 10 || c[2] < K.n) continue;
+        const p2 = toScr(K, c), q = Math.max(2, .04 * RMW * F / c[2]), a = show * (pass ? 1 : .4) * mix(.35, 1, close), acc = !(k % 3);
+        const draw = () => { g.lineWidth = q > 12 ? 1.6 : 1; g.globalAlpha = a; g.fillStyle = acc ? C.acc : C.ghost; g.strokeStyle = C.ink; g.fillRect(p2[0] - q, p2[1] - q * .6, q * 2, q * 1.2); g.strokeRect(p2[0] - q, p2[1] - q * .6, q * 2, q * 1.2); };
+        if (c[2] < K.zu) NEAR.push(draw); else draw();
       }
     };
     collectors(false);
-    g.globalAlpha = show * b; g.fillStyle = C.ground; oval(O, R, R); g.fill();
-    g.globalAlpha = show * .7 * (1 - b); g.strokeStyle = C.ink2; g.lineWidth = 1; g.setLineDash([3, 5]); oval(O, R, R); g.stroke(); g.setLineDash([]);
+    if (face(K, limb)) {
+      g.globalAlpha = show * b; g.fillStyle = C.ground; g.fill();
+      g.globalAlpha = show * .7 * (1 - b); g.strokeStyle = C.ink2; g.lineWidth = 1; g.setLineDash([3, 5]); g.stroke(); g.setLineDash([]);
+    }
     const shell = pass => {
       g.beginPath();
       for (let j = 1; j < 9; j++) {
         const lat = LAT0 + j * DLAT; if (lat > top) break;
-        for (let k = 0; k < 48; k++) { const a = onMoon(lat, k / 48 * TAU + ph), c = onMoon(lat, (k + 1) / 48 * TAU + ph); if ((a[2] + c[2] > 0) === pass) { const p = pt(a), q = pt(c); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); } }
+        let a = onMoon(lat, ph), va = vis(a);
+        for (let k = 1; k <= 48; k++) { const c = onMoon(lat, k / 48 * TAU + ph), vc = vis(c); if ((va && vc) === pass) l3(K, mp(a), mp(c)); a = c; va = vc; }
       }
       for (let m = 0; m < 12; m++) for (let k = 0; k < 24; k++) {
         const la = LAT0 + k / 24 * Math.PI; if (la >= top) break;
         const a = onMoon(la, m * DLON + ph), c = onMoon(Math.min(top, la + Math.PI / 24), m * DLON + ph);
-        if ((a[2] + c[2] > 0) === pass) { const p = pt(a), q = pt(c); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); }
+        if ((vis(a) && vis(c)) === pass) l3(K, mp(a), mp(c));
       }
       g.stroke();
     };
-    g.strokeStyle = C.ink; g.lineWidth = 1; g.globalAlpha = show * .16; shell(false);
-    if (fine) PLATE.forEach(pl => {                                       // hull plates snap in behind the build line
-      const la = LAT0 + pl.j * DLAT, lo = pl.k * DLON + ph, mid = onMoon(la + DLAT / 2, lo + DLON / 2);
-      if (mid[2] < .1 || top < la + DLAT + pl.d) return;
+    g.strokeStyle = C.ink; g.lineWidth = 1;
+    if (close > 0) { g.globalAlpha = show * .16 * close; shell(false); }
+    if (fine && close > 0) PLATE.forEach(pl => {                           // hull plates snap in behind the build line
+      const la = LAT0 + pl.j * DLAT, lo = pl.k * DLON + ph, mid = onMoon(la + DLAT / 2, lo + DLON / 2), fc = (d3(mid, Cm) - 1) / Dm;
+      if (fc < .1 || top < la + DLAT + pl.d) return;
       const pts = [], e = .03;
-      for (let k = 0; k <= 4; k++) pts.push(pt(onMoon(la + e, lo + e + (DLON - 2 * e) * k / 4)));
-      for (let k = 4; k >= 0; k--) pts.push(pt(onMoon(la + DLAT - e, lo + e + (DLON - 2 * e) * k / 4)));
-      g.globalAlpha = show * cl(mid[2] * 2.2) * (pl.acc ? .85 : .9); g.fillStyle = pl.acc ? C.acc : C.ghost; poly(pts); g.fill();
+      for (let k = 0; k <= 4; k++) pts.push(mp(onMoon(la + e, lo + e + (DLON - 2 * e) * k / 4)));
+      for (let k = 4; k >= 0; k--) pts.push(mp(onMoon(la + DLAT - e, lo + e + (DLON - 2 * e) * k / 4)));
+      if (face(K, pts)) { g.globalAlpha = show * close * cl(fc * 2.2) * (pl.acc ? .85 : .9); g.fillStyle = pl.acc ? C.acc : C.ghost; g.fill(); }
     });
-    g.globalAlpha = show * .75; shell(true);
-    g.globalAlpha = show * b; g.lineWidth = 1.4; oval(O, R, R); g.stroke();
+    g.strokeStyle = C.ink; g.lineWidth = 1; g.globalAlpha = show * mix(.4, .75, close) * low; shell(true);
+    if (face(K, limb)) { g.globalAlpha = show * b * low; g.lineWidth = 1.4; g.stroke(); }
     if (b > 0 && b < 1) {                                                 // the build line and the four builders on it
       g.strokeStyle = C.acc; g.lineWidth = 2; g.globalAlpha = show; g.beginPath();
-      for (let k = 0; k < 48; k++) { const a = onMoon(top, k / 48 * TAU), c = onMoon(top, (k + 1) / 48 * TAU); if (a[2] + c[2] > 0) { const p = pt(a), q = pt(c); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); } }
+      for (let k = 0; k < 48; k++) { const a = onMoon(top, k / 48 * TAU), c = onMoon(top, (k + 1) / 48 * TAU); if (vis(a) && vis(c)) l3(K, mp(a), mp(c)); }
       g.stroke(); g.fillStyle = C.acc;
-      for (let k = 0; k < 4; k++) { const v = onMoon(top, t * 3 + k * 1.5708); if (v[2] > 0) { const p = pt(v); g.fillRect(p[0] - 3, p[1] - 3, 6, 6); } }
+      for (let k = 0; k < 4; k++) { const v = onMoon(top, t * 3 + k * 1.5708), p = vis(v) && dot(v); if (p) g.fillRect(p[0] - 3, p[1] - 3, 6, 6); }
     }
     collectors(true);
-    const sa = t * .9, sv = lean(rx([1.95 * Math.cos(sa), 0, 1.95 * Math.sin(sa)], .9)), sp = pt(sv);   // one tug on a steep orbit
-    if (b > .3 && !(sv[2] < 0 && Math.hypot(sv[0], sv[1]) < 1)) cube(sp, Math.max(2.5, R * .035), t * 1.3, .6, show * (sv[2] < 0 ? .45 : 1), C.ground, C.ink);
-    if (G.B > 230 && R > 90) {
-      const fade = show * (1 - st(1.5, 2.6, s));
+    const sa = t * 1.25 + .9, sv = lean(rx([3 * Math.cos(sa), 0, 3 * Math.sin(sa)], -.42)), sc = mp(sv);   // one tug on a steep orbit: round the back, then out in front of the page
+    if (b > .3 && close > 0 && sc[2] > K.n) {
+      const along = d3(sv, Ch), off2 = d3(sv, sv) - along * along, hid = along < 0 && off2 < 1, sp = toScr(K, sc), q = Math.max(2.5, .035 * RMW * F / sc[2]);
+      const draw = () => cube(sp, q, t * 1.3, .6, show * close * (along < 0 ? .45 : 1), C.ground, C.ink);
+      if (!hid) { if (sc[2] < K.zu) NEAR.push(draw); else draw(); }
+    }
+    if (G.B > 230 && R > 90 && O && K.s1 < 2.6) {
+      const fade = show * (1 - st(1.5, 2.6, K.s1));
       callout([O[0] + R * .78, O[1] - R * .63], 34, -30, ['BODY: ARTIFICIAL', 'BUILT BY ITSELF'], fade * st(.25, .45, b));
       callout([O[0] - R * 1.38, O[1] + R * .34], -30, 34, ['POWER: OWN RING', 'NO SUPPLY ROUTE'], fade * st(.85, 1, b));
     }
   }
 
-  /* ----- beat 3: the data center on the moon's surface ----- */
-  const RK = { w: .066, d: .05, h: .15 }, SITE3 = [];
-  for (let r = 0; r < 3; r++) for (let i = 0; i < 7; i++) SITE3.push({ t: 'rack', x: (i - 3) * .088, z: (r - 1) * .15, dl: .25 + rnd() * .5, id: r * 7 + i });
-  for (let i = 0; i < 3; i++) SITE3.push({ t: 'tower', x: .43, z: (i - 1) * .16, r: .04, h: .11, dl: .15 + i * .12 });
-  for (let r = 0; r < 5; r++) for (let i = 0; i < 2; i++) SITE3.push({ t: 'solar', x: -.47 + i * .075, z: (r - 2) * .1, dl: i * .1 + r * .07 });
-  SITE3.push({ t: 'mast', x: -.2, z: -.38, h: .26, dl: .5 }, { t: 'pad', x: .22, z: .38, r: .07, dl: .1 }, { t: 'hut', x: .14, z: -.38, w: .2, d: .07, h: .05, dl: .2 });
-  const TARGET = 17, LED = { x: 0, y: RK.h * (.86 - 3 * .105), z: .15 + RK.d / 2, e: RK.w * .07 };   // the rack and the light the camera dives into
-  const WIRES = [[[-.36, -.2], [-.36, .2]], [[-.36, 0], [-.33, 0]], [[.39, -.16], [.39, .16]], [[.39, 0], [.33, 0]], [[.14, -.345], [.14, -.24]], [[-.2, -.38], [-.2, -.24]]];
-  function siteCam(t, Z) {
-    const gz = Z - Z2, a = st(-1.7, 0, gz), d = st(.5, 2.4, gz);
-    const yaw = (.62 + .1 * Math.sin(t * .8)) * a * (1 - d), pit = mix(mix(1.5708, .6, a), .1, d);
-    const cam = { cy: Math.cos(yaw), sy: Math.sin(yaw), cp: Math.cos(pit), sp: Math.sin(pit), grow: st(-1.5, -.15, gz) };
-    cam.at = (x, y, z) => { const xr = x * cam.cy - z * cam.sy, zr = x * cam.sy + z * cam.cy; return [xr, zr * cam.sp - y * cam.cp, zr * cam.cp + y * cam.sp]; };
-    cam.T = cam.at(LED.x, LED.y, LED.z);
-    return cam;
-  }
-  function site(G, O, s, al, t, cam) {
-    const W2 = G.B * s;                                                   // the site's width on screen
+  /* ----- beat 3: the data center on the moon's surface -----
+     Built in its own axes (x along the rows, y up, z the way the racks face) and seen by the same camera: boxes show the faces
+     that are turned to it, far things are drawn first. The mast stands on the way in, so it sweeps past in front of the page. */
+  function site(G, K, al, t) {
     if (al <= 0) return null;
-    const full = st(16, 44, W2), pj = (x, y, z) => { const p = cam.at(x, y, z); return [O[0] + p[0] * W2, O[1] + p[1] * W2, p[2]]; };
-    if (full < 1) {                                                       // from orbit it is one blinking mark
-      const q = Math.max(3, W2 * .5), pu = (t * 1.1) % 1;
+    const F = K.F, W2 = G.B * K.s2, O3 = toCam(K, K.ps), full = st(16, 44, W2);   // W2: the site's width on screen
+    if (full < 1 && O3[2] > K.n) {                                        // from orbit it is one blinking mark
+      const O = toScr(K, O3), q = Math.max(3, W2 * .5), pu = (t * 1.1) % 1;
       g.globalAlpha = al * (1 - full); g.fillStyle = C.acc; g.fillRect(O[0] - q / 2, O[1] - q / 2, q, q);
       g.strokeStyle = C.acc; g.lineWidth = 1.2; g.globalAlpha = al * (1 - full) * (1 - pu); g.strokeRect(O[0] - q * (.5 + pu * 1.6), O[1] - q * (.5 + pu * 1.6), q * (1 + pu * 3.2), q * (1 + pu * 3.2));
-      if (!full) return null;
     }
-    const A = al * full, up = dl => eb(cl((cam.grow * 1.75 - dl) / .75)), dim = 1 - .82 * st(2, 14, s);   // the other lights fade as the camera closes on one
-    const quad = (pts, fill, fa, stroke, sa) => { poly(pts); if (fill) { g.globalAlpha = A * fa; g.fillStyle = fill; g.fill(); } if (stroke) { g.globalAlpha = A * sa; g.strokeStyle = stroke; g.stroke(); } };
+    if (!full) return null;
+    const ex = mul(turn(K, SX), WS), ey = mul(turn(K, N0), WS), ez = mul(turn(K, SZ), WS), Dv = sub(K.p, K.ps), Cs = [d3(Dv, SX) / WS, d3(Dv, N0) / WS, d3(Dv, SZ) / WS];
+    const P = (x, y, z) => [O3[0] + x * ex[0] + y * ey[0] + z * ez[0], O3[1] + x * ex[1] + y * ey[1] + z * ez[1], O3[2] + x * ex[2] + y * ey[2] + z * ez[2]];
+    const ok = c => c[2] > K.n * 1.5, px = c => WS * F / c[2];              // pixels per site unit at a point
+    const A = al * full, up = dl => eb(cl((K.grow * 1.75 - dl) / .75)), dim = 1 - .82 * st(2, 14, K.s2);   // the other lights fade as the camera closes on one
+    const quad = (pts, fill, fa, stroke, sa) => { if (!face(K, pts)) return; if (fill) { g.globalAlpha = A * fa; g.fillStyle = fill; g.fill(); } if (stroke) { g.globalAlpha = A * sa; g.strokeStyle = stroke; g.stroke(); } };
+    const line = (a, b) => { g.beginPath(); l3(K, a, b); g.stroke(); };
+    const flat = (x, y, z) => { const dx = Cs[0] - x, dy = Cs[1] - y, dz = Cs[2] - z; return Math.abs(dy) / Math.hypot(dx, dy, dz); };   // how squashed a level circle looks there
     g.lineWidth = 1; g.lineJoin = 'round';
-    quad([pj(-.5, 0, -.5), pj(.5, 0, -.5), pj(.5, 0, .5), pj(-.5, 0, .5)], C.ground, .94, C.ink, .9);
+    const plate = [P(-.5, 0, -.5), P(.5, 0, -.5), P(.5, 0, .5), P(-.5, 0, .5)];
+    quad(plate, C.ground, .94);
     g.strokeStyle = C.ink2; g.globalAlpha = A * .22; g.beginPath();
-    for (let k = -4; k <= 4; k++) { let p = pj(k * .1, 0, -.5), q = pj(k * .1, 0, .5); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); p = pj(-.5, 0, k * .1); q = pj(.5, 0, k * .1); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); }
+    for (let k = -4; k <= 4; k++) { l3(K, P(k * .1, 0, -.5), P(k * .1, 0, .5)); l3(K, P(-.5, 0, k * .1), P(.5, 0, k * .1)); }
     g.stroke();
-    quad([pj(-.33, 0, -.24), pj(.33, 0, -.24), pj(.33, 0, .24), pj(-.33, 0, .24)], C.panel, 1, C.ink2, .8);
-    g.globalAlpha = A * .8; g.strokeStyle = C.ink; g.beginPath();           // corner marks outside the plate
-    [-1, 1].forEach(i => [-1, 1].forEach(j => { const a = pj(i * .56, 0, j * .46), c = pj(i * .56, 0, j * .56), e = pj(i * .46, 0, j * .56); g.moveTo(a[0], a[1]); g.lineTo(c[0], c[1]); g.lineTo(e[0], e[1]); }));
-    g.stroke();
+    plate.forEach((p, i) => ln(K, p, plate[(i + 1) % 4], C.ink, A * .9, 1));
+    quad([P(-.33, 0, -.24), P(.33, 0, -.24), P(.33, 0, .24), P(-.33, 0, .24)], C.panel, 1, C.ink2, .8);
+    [-1, 1].forEach(i => [-1, 1].forEach(j => { const c = P(i * .56, 0, j * .56); ln(K, P(i * .56, 0, j * .46), c, C.ink, A * .8, 1); ln(K, c, P(i * .46, 0, j * .56), C.ink, A * .8, 1); }));   // corner marks outside the plate
+    lflush(LB);
     WIRES.forEach(([a, b], n) => {                                         // power lines, with a pulse running to the hall
-      const p = pj(a[0], 0, a[1]), q = pj(b[0], 0, b[1]), u = (t * .7 + n * .37) % 1, d = Math.max(1.5, W2 * .006);
-      g.globalAlpha = A * .7; g.strokeStyle = C.ink2; seg(p, q);
-      g.globalAlpha = A * cam.grow; g.fillStyle = C.acc; g.fillRect(mix(p[0], q[0], u) - d, mix(p[1], q[1], u) - d, d * 2, d * 2);
+      const u = (t * .7 + n * .37) % 1, c = P(mix(a[0], b[0], u), 0, mix(a[1], b[1], u));
+      g.lineWidth = 1; g.globalAlpha = A * .7; g.strokeStyle = C.ink2; line(P(a[0], 0, a[1]), P(b[0], 0, b[1]));
+      if (ok(c)) { const d = Math.max(1.5, px(c) * .004), p = toScr(K, c); g.globalAlpha = A * K.grow; g.fillStyle = C.acc; g.fillRect(p[0] - d, p[1] - d, d * 2, d * 2); }
     });
     const box = (x, z, w, d, h) => {
-      const x0 = x - w / 2, x1 = x + w / 2, z0 = z - d / 2, z1 = z + d / 2, xs = cam.sy >= 0 ? x1 : x0;
-      quad([pj(xs, 0, z0), pj(xs, 0, z1), pj(xs, h, z1), pj(xs, h, z0)], C.ghost, 1, C.ink, 1);
-      quad([pj(x0, 0, z1), pj(x1, 0, z1), pj(x1, h, z1), pj(x0, h, z1)], C.panel, 1, C.ink, 1);
-      quad([pj(x0, h, z0), pj(x1, h, z0), pj(x1, h, z1), pj(x0, h, z1)], C.ground, 1, C.ink, 1);
+      const x0 = x - w / 2, x1 = x + w / 2, z0 = z - d / 2, z1 = z + d / 2, xs = Cs[0] > x1 ? x1 : Cs[0] < x0 ? x0 : null, zs = Cs[2] > z1 ? z1 : Cs[2] < z0 ? z0 : null;
+      g.lineWidth = 1;
+      if (xs !== null) quad([P(xs, 0, z0), P(xs, 0, z1), P(xs, h, z1), P(xs, h, z0)], C.ghost, 1, C.ink, 1);
+      if (zs !== null) quad([P(x0, 0, zs), P(x1, 0, zs), P(x1, h, zs), P(x0, h, zs)], C.panel, 1, C.ink, 1);
+      if (Cs[1] > h) quad([P(x0, h, z0), P(x1, h, z0), P(x1, h, z1), P(x0, h, z1)], C.ground, 1, C.ink, 1);
     };
     let gate = null;
-    SITE3.map(o => [pj(o.x, 0, o.z)[2], o]).sort((a, b) => a[0] - b[0]).forEach(([, o]) => {
-      const k = up(o.dl);
+    SITE3.map(o => [Math.hypot(Cs[0] - o.x, Cs[2] - o.z), o]).sort((a, b) => b[0] - a[0]).forEach(([, o]) => {
+      const k = up(o.dl), b3 = P(o.x, 0, o.z);
       if (o.t === 'rack') {
-        const h = RK.h * k, fw = RK.w * W2;
+        const h = RK.h * k, zf = o.z + RK.d / 2;
         box(o.x, o.z, RK.w, RK.d, h);
-        if (fw < 9 || k < .5) return;
-        const e = Math.max(.8, LED.e * W2);
-        for (let c = 0; c < 3; c++) for (let r = 0; r < 8; r++) {
-          const hit = o.id === TARGET && c === 1 && r === 3, n = o.id * 24 + c * 8 + r, lit = hash(n, (t * 4 + hash(n) * 4) | 0);
-          if (!hit && lit < .45) continue;
-          const p = pj(o.x + (c - 1) * RK.w * .26, h * (.86 - r * .105), o.z + RK.d / 2);
-          g.globalAlpha = hit ? A : A * dim; g.fillStyle = hit || lit > .93 ? C.acc : C.ink2; g.fillRect(p[0] - e, p[1] - e, e * 2, e * 2);
-          if (hit) gate = { p, e };
+        if (!ok(b3) || RK.w * px(b3) < 9 || k < .5 || Cs[2] <= zf) return;
+        for (let pass = 0; pass < 2; pass++) {                             // its lights, as small patches lying on the front face
+          g.globalAlpha = A * dim; g.fillStyle = pass ? C.acc : C.ink2; g.beginPath();
+          for (let c = 0; c < 3; c++) for (let r = 0; r < 8; r++) {
+            const hit = o.id === TARGET && c === 1 && r === 3, n = o.id * 24 + c * 8 + r, lit = hash(n, (t * 4 + hash(n) * 4) | 0);
+            if (hit ? !pass : lit < .45 || (lit > .93) !== !!pass) continue;
+            const q = P(o.x + (c - 1) * RK.w * .26, h * (.86 - r * .105), zf); if (!ok(q)) continue;
+            const m = LED.e * F / q[2], p = toScr(K, q), ux = ex[0] * m, uy = -ex[1] * m, vx = ey[0] * m, vy = -ey[1] * m;
+            if (hit) { gate = { p, e: LED.e * px(q), c: q, ex, ey, ez, K }; continue; }
+            g.moveTo(p[0] - ux - vx, p[1] - uy - vy); g.lineTo(p[0] + ux - vx, p[1] + uy - vy); g.lineTo(p[0] + ux + vx, p[1] + uy + vy); g.lineTo(p[0] - ux + vx, p[1] - uy + vy); g.closePath();
+          }
+          g.fill();
         }
+        if (gate && o.id === TARGET) { g.globalAlpha = A; g.fillStyle = C.acc; g.fillRect(gate.p[0] - gate.e, gate.p[1] - gate.e, gate.e * 2, gate.e * 2); }
       } else if (o.t === 'tower') {
-        const b = pj(o.x, 0, o.z), tp = pj(o.x, o.h * k, o.z), r0 = o.r * W2, r1 = r0 * .78;
-        quad([[b[0] - r0, b[1]], [b[0] + r0, b[1]], [tp[0] + r1, tp[1]], [tp[0] - r1, tp[1]]], C.panel, 1);
-        g.globalAlpha = A; g.fillStyle = C.panel; g.strokeStyle = C.ink; oval(b, r0, r0 * cam.sp); g.fill();
-        oval(b, r0, r0 * cam.sp, 0, 0, Math.PI); g.stroke(); seg([b[0] - r0, b[1]], [tp[0] - r1, tp[1]]); seg([b[0] + r0, b[1]], [tp[0] + r1, tp[1]]);
-        g.fillStyle = C.ground; oval(tp, r1, r1 * cam.sp); g.fill(); g.stroke();
-        for (let j = 0; j < 3; j++) { const u = (t * .3 + j / 3) % 1, c = pj(o.x, o.h * k + u * .1, o.z); g.globalAlpha = A * k * (1 - u) * .7; g.strokeStyle = C.ink2; oval(c, r1 * (.7 + u), r1 * (.7 + u) * cam.sp); g.stroke(); }
+        const t3 = P(o.x, o.h * k, o.z); if (!ok(b3) || !ok(t3)) return;
+        const b = toScr(K, b3), tp = toScr(K, t3), r0 = o.r * px(b3), r1 = o.r * .78 * px(t3), f0 = flat(o.x, 0, o.z), f1 = flat(o.x, o.h * k, o.z);
+        g.lineWidth = 1; poly([[b[0] - r0, b[1]], [b[0] + r0, b[1]], [tp[0] + r1, tp[1]], [tp[0] - r1, tp[1]]]); g.globalAlpha = A; g.fillStyle = C.panel; g.fill();
+        g.strokeStyle = C.ink; oval(b, r0, r0 * f0); g.fill();
+        oval(b, r0, r0 * f0, 0, 0, Math.PI); g.stroke(); seg([b[0] - r0, b[1]], [tp[0] - r1, tp[1]]); seg([b[0] + r0, b[1]], [tp[0] + r1, tp[1]]);
+        g.fillStyle = C.ground; oval(tp, r1, r1 * f1); g.fill(); g.stroke();
+        for (let j = 0; j < 3; j++) { const u = (t * .3 + j / 3) % 1, c3 = P(o.x, o.h * k + u * .1, o.z); if (!ok(c3)) continue; const c = toScr(K, c3), rr = o.r * .78 * px(c3) * (.7 + u); g.globalAlpha = A * k * (1 - u) * .7; g.strokeStyle = C.ink2; oval(c, rr, rr * f1); g.stroke(); }
       } else if (o.t === 'solar') {
         const tl = .55 * cl(k), w = .06, len = .075, zf = o.z + len / 2, zb = zf - len * Math.cos(tl), yb = .006 + len * Math.sin(tl);
-        const pts = [pj(o.x - w / 2, .006, zf), pj(o.x + w / 2, .006, zf), pj(o.x + w / 2, yb, zb), pj(o.x - w / 2, yb, zb)];
-        g.globalAlpha = A; g.strokeStyle = C.ink; seg(pj(o.x, yb, zb), pj(o.x, 0, zb));
+        const pts = [P(o.x - w / 2, .006, zf), P(o.x + w / 2, .006, zf), P(o.x + w / 2, yb, zb), P(o.x - w / 2, yb, zb)];
+        g.lineWidth = 1; g.globalAlpha = A; g.strokeStyle = C.ink; line(P(o.x, yb, zb), P(o.x, 0, zb));
         quad(pts, C.ground, 1); quad(pts, C.acc, .26, C.ink, 1);
-        g.globalAlpha = A * .6; seg([(pts[0][0] + pts[3][0]) / 2, (pts[0][1] + pts[3][1]) / 2], [(pts[1][0] + pts[2][0]) / 2, (pts[1][1] + pts[2][1]) / 2]);
-      } else if (o.t === 'mast') {
-        const b = pj(o.x, 0, o.z), tp = pj(o.x, o.h * k, o.z);
-        g.globalAlpha = A; g.strokeStyle = C.ink; g.lineWidth = 1.4; seg(b, tp); g.lineWidth = 1;
-        [.35, .6, .85].forEach(f => { const c = pj(o.x, o.h * k * f, o.z), hw = W2 * .02 * (1.1 - f); seg([c[0] - hw, c[1]], [c[0] + hw, c[1]]); });
-        if ((t * 2 | 0) % 2) { const d = Math.max(1.5, W2 * .007); g.fillStyle = C.acc; g.fillRect(tp[0] - d, tp[1] - d, d * 2, d * 2); }
+        g.globalAlpha = A * .6; line(P(o.x - w / 2, (.006 + yb) / 2, (zf + zb) / 2), P(o.x + w / 2, (.006 + yb) / 2, (zf + zb) / 2));
+      } else if (o.t === 'mast') {                                         // lines only, so it can cross the pane
+        const h = o.h * k, t3 = P(o.x, h, o.z);
+        ln(K, b3, t3, C.ink, A, 1.4);
+        [.35, .6, .85].forEach(f => { const hw = .02 * (1.1 - f); ln(K, P(o.x - hw, h * f, o.z), P(o.x + hw, h * f, o.z), C.ink, A, 1); });
+        [-1, 1].forEach(sd => ln(K, P(o.x + sd * .05, 0, o.z + .03), P(o.x, h * .6, o.z), C.ink2, A * .7, .8));
+        if ((t * 2 | 0) % 2 && ok(t3)) { const d = Math.max(1.5, px(t3) * .007), p = toScr(K, t3), draw = () => { g.globalAlpha = A; g.fillStyle = C.acc; g.fillRect(p[0] - d, p[1] - d, d * 2, d * 2); }; if (t3[2] < K.zu) NEAR.push(draw); else draw(); }
       } else if (o.t === 'pad') {
-        const c = pj(o.x, 0, o.z), r = o.r * W2 * cl(k);
-        g.globalAlpha = A * .9; g.strokeStyle = C.ink; oval(c, r, r * cam.sp); g.stroke(); oval(c, r * .55, r * .55 * cam.sp); g.stroke();
-        seg(pj(o.x - o.r * .3, 0, o.z), pj(o.x + o.r * .3, 0, o.z)); seg(pj(o.x, 0, o.z - o.r * .3), pj(o.x, 0, o.z + o.r * .3));
+        const r = o.r * cl(k);
+        [1, .55].forEach(f => { let p = P(o.x + r * f, 0, o.z); for (let j = 1; j <= 32; j++) { const a = j / 32 * TAU, q = P(o.x + r * f * Math.cos(a), 0, o.z + r * f * Math.sin(a)); ln(K, p, q, C.ink, A * .9, 1); p = q; } });
+        ln(K, P(o.x - o.r * .3, 0, o.z), P(o.x + o.r * .3, 0, o.z), C.ink, A * .9, 1); ln(K, P(o.x, 0, o.z - o.r * .3), P(o.x, 0, o.z + o.r * .3), C.ink, A * .9, 1);
       } else box(o.x, o.z, o.w, o.d, o.h * k);
     });
-    if (gate && G.B > 230 && s > .7 && s < 6) {
-      const fade = al * (1 - st(2.2, 5, s));
-      brackets(gate.p, Math.max(8, RK.w * W2 * .55), C.acc, fade * st(9.0, 9.3, t));
-      callout([gate.p[0] + RK.w * W2 * .55, gate.p[1] - RK.w * W2 * .55], 40, -34, ['RACK 17 / ' + CAST, 'ONE PROCESS RUNNING'], fade * st(8.2, 8.6, t));
-      callout(pj(-.5, 0, 0), -24, 30, ['SOLAR FIELD', 'CLOSED LOOP'], fade * st(7.9, 8.3, t) * .9);
+    lflush(LB);
+    if (gate && G.B > 230 && K.s2 > .7 && K.s2 < 6) {
+      const fade = al * (1 - st(2.2, 5, K.s2)), rw = RK.w * px(gate.c), sf = P(-.5, 0, 0);
+      brackets(gate.p, Math.max(8, rw * .55), C.acc, fade * st(9.0, 9.3, t));
+      callout([gate.p[0] + rw * .55, gate.p[1] - rw * .55], 40, -34, ['RACK 17 / ' + CAST, 'ONE PROCESS RUNNING'], fade * st(8.2, 8.6, t));
+      if (ok(sf)) callout(toScr(K, sf), -24, 30, ['SOLAR FIELD', 'CLOSED LOOP'], fade * st(7.9, 8.3, t) * .9);
     }
     return gate;
   }
@@ -2198,16 +2345,26 @@ const lore = (() => {
     }
   }
 
-  /* ----- the dive: locking on to the rack's light, then going through it ----- */
-  function lockOn(G, gate, t, cover) {                                     // while the camera hovers: a bezel draws on and rings close onto it
-    const L = st(9.95, 10.3, t), out = 1 - st(.18, .42, cover), a = L > 0 ? out : 0;
-    if (a <= 0) return;
-    const c = gate.p, R = Math.max(10, gate.e * 1.9), ch2 = R * .28;
-    g.lineWidth = 1.5; g.strokeStyle = C.acc; g.globalAlpha = a;
-    g.setLineDash([R * 8 * L, R * 8]);                                     // the bezel, a chamfered square, drawn on
-    poly([[c[0] - R + ch2, c[1] - R], [c[0] + R, c[1] - R], [c[0] + R, c[1] + R - ch2], [c[0] + R - ch2, c[1] + R], [c[0] - R, c[1] + R], [c[0] - R, c[1] - R + ch2]]);
-    g.stroke(); g.setLineDash([]);
-    g.lineWidth = 1; g.strokeStyle = C.ink2; g.globalAlpha = a * .7 * st(.3, .8, L); g.beginPath();   // ticks along the bezel
+  /* ----- the dive: locking on to the rack's light, then going through it -----
+     The light sits at the bottom of a short socket standing off the rack's face. The socket is real geometry, so as the camera
+     goes in, its rim swells, crosses the page's pane and passes the viewer: that is the opening you fly through. */
+  const SOCK = 5;                                                          // the socket's depth, in half-widths of the light
+  function lockOn(G, gate, t, cover) {                                     // while the camera hovers: the socket draws on and rings close onto it
+    const L = st(9.95, 10.3, t), out = 1 - st(.18, .42, cover);
+    if (L <= 0) return;
+    const K = gate.K, c = gate.p, m = Math.max(1, 10 / (gate.e * 1.9)), R3 = LED.e * 1.9 * m, c3 = R3 * .28, dz = LED.e * SOCK * m, R = Math.max(10, gate.e * 1.9);
+    const P = (x, y, z) => [gate.c[0] + x * gate.ex[0] + y * gate.ey[0] + z * gate.ez[0], gate.c[1] + x * gate.ex[1] + y * gate.ey[1] + z * gate.ez[1], gate.c[2] + x * gate.ex[2] + y * gate.ey[2] + z * gate.ez[2]];
+    const V = [[-R3 + c3, R3], [R3, R3], [R3, -R3 + c3], [R3 - c3, -R3], [-R3, -R3], [-R3, R3 - c3]], deep = st(0, .12, cover);   // a chamfered square
+    V.forEach((a, i) => {
+      const b = V[(i + 1) % 6], k = cl(L * 6 - i), e = [mix(a[0], b[0], k), mix(a[1], b[1], k)];
+      if (k <= 0) return;
+      ln(K, P(a[0], a[1], dz), P(e[0], e[1], dz), C.acc, 1, 1.5, 0);         // the rim, drawn on
+      if (deep > 0) { ln(K, P(a[0], a[1], 0), P(e[0], e[1], 0), C.acc, .5 * deep, 1, 0); ln(K, P(a[0], a[1], 0), P(a[0], a[1], dz), C.ink, .7 * deep, 1.2, 0); }   // its foot on the rack, and the walls
+    });
+    if (deep > 0) for (let j = 1; j < 4; j++) V.forEach((a, i) => { const b = V[(i + 1) % 6]; ln(K, P(a[0], a[1], dz * j / 4), P(b[0], b[1], dz * j / 4), C.ink2, .45 * deep, 1, 0); });   // ribs down the socket
+    lflush(LB);
+    if (out <= 0) return;
+    g.lineWidth = 1; g.strokeStyle = C.ink2; g.globalAlpha = out * .7 * st(.3, .8, L); g.beginPath();   // ticks along the rim
     for (let k = 1; k < 8; k++) {
       const u = -R + k * R / 4, l = k % 2 ? R * .12 : R * .22;
       g.moveTo(c[0] + u, c[1] - R - 3); g.lineTo(c[0] + u, c[1] - R - 3 - l); g.moveTo(c[0] + u, c[1] + R + 3); g.lineTo(c[0] + u, c[1] + R + 3 + l);
@@ -2217,28 +2374,27 @@ const lore = (() => {
     for (let n = 0; n < 3; n++) {                                          // three rings closing in, one after another
       const u = eo(st(n * .18, .55 + n * .18, L)), r = R * mix(4.2 + n * 1.6, 1, u);
       if (u >= 1) continue;
-      g.globalAlpha = a * (.25 + .55 * u); g.strokeStyle = n === 2 ? C.acc : C.ink; g.lineWidth = 1;
-      brackets(c, r, n === 2 ? C.acc : C.ink, a * (.25 + .55 * u), 1.2);
+      brackets(c, r, n === 2 ? C.acc : C.ink, out * (.25 + .55 * u), 1.2);
     }
     if (G.B > 230 && R < cw * .2) {                                        // a read-out: the link filling up
       const x = c[0] + R * 1.55 + 14, y = c[1] - R + 4, cells = 12, on = Math.round(L * cells);
-      text('LINK', x, y, C.ink, a); text(L >= 1 ? 'OPEN' : String(Math.round(L * 100)).padStart(3, '0') + '%', x + 40, y, L >= 1 ? C.acc : C.ink2, a);
-      for (let k = 0; k < cells; k++) { g.globalAlpha = a * (k < on ? 1 : .25); g.fillStyle = k < on ? C.acc : C.ink2; g.fillRect(x + k * 7, y + 12, 5, 5); }
+      text('LINK', x, y, C.ink, out); text(L >= 1 ? 'OPEN' : String(Math.round(L * 100)).padStart(3, '0') + '%', x + 40, y, L >= 1 ? C.acc : C.ink2, out);
+      for (let k = 0; k < cells; k++) { g.globalAlpha = out * (k < on ? 1 : .25); g.fillStyle = k < on ? C.acc : C.ink2; g.fillRect(x + k * 7, y + 12, 5, 5); }
     }
   }
-  function through(gate, t, cover) {                                       // as the light fills the frame: streaks rushing past and a split edge
-    const k = st(.08, .45, cover);
+  function through(gate, t, cover) {                                       // as the light fills the frame: streaks down the socket's walls and a split edge
+    const k = st(.03, .3, cover);
     if (k <= 0) return;
-    const c = gate.p, e = gate.e;
-    g.lineWidth = 1.2;
-    for (let n = 0; n < 64; n++) {
-      const ang = hash(n, 1) * TAU, ca = Math.cos(ang), sa = Math.sin(ang), edge = e / Math.max(Math.abs(ca), Math.abs(sa));
-      const u = (t * 2.4 + hash(n, 7)) % 1, r0 = edge * (1.02 + u * 1.5), len = edge * (.3 + u * 1.5) * k;
-      g.lineWidth = n % 5 ? 1.4 : 2; g.globalAlpha = k * Math.sin(u * Math.PI); g.strokeStyle = n % 5 ? C.ink2 : C.acc;
-      seg([c[0] + ca * r0, c[1] + sa * r0], [c[0] + ca * (r0 + len), c[1] + sa * (r0 + len)]);
+    const K = gate.K, c = gate.p, e = gate.e, R3 = LED.e * 1.9;
+    const P = (x, y, z) => [gate.c[0] + x * gate.ex[0] + y * gate.ey[0] + z * gate.ez[0], gate.c[1] + x * gate.ex[1] + y * gate.ey[1] + z * gate.ez[1], gate.c[2] + x * gate.ex[2] + y * gate.ey[2] + z * gate.ez[2]];
+    for (let n = 0; n < 56; n++) {
+      const ang = hash(n, 1) * TAU, ca = Math.cos(ang), sa = Math.sin(ang), edge = R3 * (1 + .5 * hash(n, 3)) / Math.max(Math.abs(ca), Math.abs(sa));
+      const u = (t * 2.4 + hash(n, 7)) % 1, z0 = LED.e * (-1 + u * 2.4 * SOCK), len = LED.e * (.6 + u * 2.5) * k;
+      ln(K, P(ca * edge, sa * edge, z0), P(ca * edge, sa * edge, z0 + len), n % 5 ? C.ink2 : C.acc, k * Math.sin(u * Math.PI), n % 5 ? 1.2 : 1.8, 0);
     }
+    lflush(LB);
     const o = 1.5 + 7 * k;
-    g.lineWidth = 2; g.globalAlpha = .75 * k;
+    g.lineWidth = 2; g.globalAlpha = .75 * st(.08, .45, cover);
     g.strokeStyle = C.glA; g.strokeRect(c[0] - e - o, c[1] - e, e * 2, e * 2);
     g.strokeStyle = C.glB; g.strokeRect(c[0] - e + o, c[1] - e, e * 2, e * 2);
   }
@@ -2250,6 +2406,24 @@ const lore = (() => {
     g.globalAlpha = (1 - u) * .6; g.lineWidth = 2;
     g.strokeStyle = C.glA; g.strokeRect(cx - r - 10 * (1 - u), cy - r, r * 2, r * 2);
     g.strokeStyle = C.glB; g.strokeRect(cx - r + 10 * (1 - u), cy - r, r * 2, r * 2);
+  }
+  /* Splinters of the light, knocked loose at the punch-through: they start small and deep in the picture, come at the viewer,
+     cross the pane (from there on they are drawn over the page) and leave past the edges of the screen. */
+  function shards(G, t, layer) {
+    const u = (t - T_VOX + .22) / 1.15;
+    if (u <= 0 || u >= 1) return;
+    const fly = eo((t - T_FLY) / 2.4), cx = mix(G.A[0], G.ox, fly), cy = mix(G.A[1], G.cy, fly), F = FK * G.B, A = st(0, .1, u) * (1 - st(.8, 1, u));
+    for (let n = 0; n < 34; n++) {
+      const z = 1.1 + hash(n, 91) * 6 - u * 8.5, near = z < 1.5;
+      if (z < .12 || near !== layer) continue;
+      const a = hash(n, 92) * TAU, ro = .22 + hash(n, 93) * .8, x = cx + Math.cos(a) * ro * F / z * .45, y = cy + Math.sin(a) * ro * F / z * .45, q = (.01 + hash(n, 94) * .022) * F / z, rot = hash(n, 95) * TAU + t * (2 + hash(n, 96) * 4);
+      if (x < -q || x > cw + q || y < -q || y > ch + q) continue;
+      const c = Math.cos(rot) * q, s = Math.sin(rot) * q, sk = .45 + .5 * hash(n, 97), acc = n % 4 === 0;
+      poly([[x + c, y + s], [x - s * sk, y + c * sk], [x - c, y - s], [x + s * sk, y - c * sk]]);
+      if (near) { g.globalAlpha = A * .9; g.strokeStyle = C.ground; g.lineWidth = 5; g.stroke(); }
+      g.globalAlpha = A * (acc ? .9 : .8) * cl(.3 + .5 / z); if (acc) { g.fillStyle = C.acc; g.fill(); }
+      g.strokeStyle = acc ? C.acc : C.ink; g.lineWidth = near ? 1.8 : 1; g.stroke();
+    }
   }
 
   function fadeWorld(G, tw, wa) {                                           // the digital floor, faded in through an off-screen canvas
@@ -3341,19 +3515,17 @@ const lore = (() => {
     scramble(ttl);
   }
   function origin(G, t) {
-    const Z = zoomAt(t), s0 = Math.exp(Z), s1 = s0 * R0, s2 = s1 * R1, grow = (T, e, s) => [T[0] * (1 - (1 - e) / Math.max(1, s)), T[1] * (1 - (1 - e) / Math.max(1, s))];
     const rev = done ? 1 : cl((t - T_SCAN) / .8), amb = done ? 1 : st(12.2, END, t);
     let pr = null;
+    NEAR.length = 0;
     if (t < T_VOX) {
-      /* Each scene's target drifts to the anchor as the zoom closes on it; the next scene is drawn at that target. */
-      const c0 = grow(T0, st(.15, .15 + Z1 * .75, Z), s0), O1 = [G.A[0] + (T0[0] - c0[0]) * s0 * G.B, G.A[1] + (T0[1] - c0[1]) * s0 * G.B];
-      const T1 = moonTarget(t), c1 = grow(T1, st(.15, .15 + (Z2 - Z1) * .75, Z - Z1), s1), M = [O1[0] - c1[0] * s1 * G.B, O1[1] - c1[1] * s1 * G.B];
-      const cam = siteCam(t, Z), c2 = grow(cam.T, st(.15, .15 + DIVE * .75, Z - Z2), s2);
-      const O2 = [M[0] + (T1[0] - c2[0] * R1) * s1 * G.B, M[1] + (T1[1] - c2[1] * R1) * s1 * G.B];
-      const a0 = 1 - st(5, 26, s0), a1 = 1 - st(4, 14, s1);
-      if (a0 > 0) system(G, s0, c0, a0 * st(-.35, .1, t), Math.max(0, t));
-      if (a1 > 0) moon(G, M, s1, a1, t);
-      const gate = site(G, O2, s2, st(2.62, 2.9, t) * (s2 < .1 ? st(0, .2, T1[2]) : 1), t, cam);
+      /* One camera for the first four beats: its focal length follows the stage, its vanishing point is the stage anchor. */
+      const Z = zoomAt(t), K = flight(t, Z);
+      K.F = FK * G.B; K.cx = G.A[0]; K.cy = G.A[1];
+      const a0 = (1 - .5 * st(Z1 - 1.2, Z1 - .2, Z)) * (1 - st(Z1 + .8, Z1 + 2.2, Z));   // the system stays on as a backdrop behind the moon
+      if (a0 > 0) system(G, K, a0 * st(-.35, .1, t), Math.max(0, t));
+      moon(G, K, 1 - st(3.2, 5.6, K.gz), t);
+      const gate = site(G, K, st(2.62, 2.9, t) * (K.s2 < .1 ? st(0, .2, d3(K.nw, K.dir)) : 1), t);
       const cover = gate ? cl(gate.e * 2 / Math.max(cw, ch), 0, 2) : 0;
       if (gate) lockOn(G, gate, t, cover);
       if (gate && t > T_FLY - .2) {                                        // the light is a window: the digital world shows through it as it grows
@@ -3363,9 +3535,17 @@ const lore = (() => {
         through(gate, t, cover);
         g.globalAlpha = 1; g.strokeStyle = C.acc; g.lineWidth = Math.min(8, 1 + gate.e * .05); g.strokeRect(gate.p[0] - gate.e, gate.p[1] - gate.e, gate.e * 2, gate.e * 2);
       }
-    } else { pr = world(G, t, amb); passed(G, t); }
+    } else pr = world(G, t, amb);
     if (pr && rev < 1) voxels(G, pr, t, G.y0 + rev * H);
+    shards(G, t, false);
     tear(t);
+    /* Last, whatever came nearer than the page's pane, on the layer above the page (behind it where there is no such layer). */
+    const live = t > T_VOX - .25 && t < T_VOX + 1;
+    if (LF.size || NEAR.length || live) {
+      const near = () => { lflush(LF, true); NEAR.forEach(f => f()); if (live) { passed(G, t); shards(G, t, true); } };
+      if (!front(near)) near();
+    }
+    LB.clear(); LF.clear();
     return rev;
   }
   function render(now) {
