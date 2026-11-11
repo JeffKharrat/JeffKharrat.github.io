@@ -2736,8 +2736,24 @@ const lore = (() => {
      Then the sandwich f(p) = q1·p·q2 with q2 = q1⁻¹ (times -1): every surface tumbles as one rigid body, a 3D rotation.
      A second turn stops on the plane (θ = 270°) while the whole scene turns to look straight down the i line, so the plane ends flat
      on the screen: the j-k ring is a circle and the other two rings are a cross through it. The cross lines slide out onto the page's
-     own rules and become them, the circle flies into the gimbal tile, and the figure scans in. */
+     own rules and become them, the circle flies into the gimbal tile, and the figure scans in.
+     Camera and depth: one pinhole camera throughout. It dollies slowly in on the gimbal, pushes close and looks down on it for
+     the lock, and pulls back out as the rings fold into the sphere; it eases a little further off while the sphere goes through
+     infinity. Lines are weighted by depth (four bands, far thin and faint, near heavy). The page is a pane of glass in front of
+     the lens: during the lock the near arcs of the three rings swing out through it, over the page, and back; when a ring blows
+     up through infinity, the part that sweeps past the viewer does so in front of the page; the i line comes out through the
+     glass at the end; the circle lifts off the plane and crosses the page in front on its way to the tile; and the cross flashes
+     on the glass as it locks onto the page's rules. Nothing stays in front once the figure is in. */
   const Q_CAM = [2.3, .14, .55];   // where the camera ends up: 2.3 back along the i line from the plane, a little above it and to one side
+  /* One pinhole camera for the whole intro: fixed focal length, so a dolly is what changes size. QD0 is its usual distance from the
+     gimbal's centre; the page's UI is a pane of glass QZG in front of the lens. Whatever comes nearer than the glass is drawn on the
+     layer above the page (front()), split at the glass, so a ring can be half behind the text and half in front of it. */
+  const QD0 = 1 / .14, QZG = 3.9;
+  function qcamG(t) {                                                      // [yaw, pitch, distance]: slow dolly in, a push onto the lock, back out for the sphere
+    const push = eio(st(2.05, 2.9, t)), out = eio(st(3.7, 4.95, t));
+    const D = mix(mix(mix(8, 6.1, eo(st(-.3, 2.2, t))), 4.2, push), QD0, out) + .45 * st(6.3, 7.6, t) * (1 - st(9.1, 10.1, t));
+    return [-.55 + .1 * t + .3 * (st(1.9, 2.9, t) - st(3.6, 5.2, t)), .42 + .34 * push * (1 - out), D];
+  }
   const Q_FLAT = 14.4, Q_END = Q_FLAT + 1.9, QBEAT = [0, 2.1, 3.9, 5.7, Q_FLAT], Q_RAD = [1, .86, .72], QO = Q_FLAT - 11.9;   // QO: the end runs this much later than at first
   const rz = (v, a) => { const c = Math.cos(a), s = Math.sin(a); return [v[0] * c - v[1] * s, v[0] * s + v[1] * c, v[2]]; };
   /* θ over time, slow through the plane at 90°; a keyed curve with flat ends */
@@ -2823,16 +2839,64 @@ const lore = (() => {
     });
     return out;
   }
-  function qstroke(list, front) {                                          // [{ pts (screen, null breaks the line), col, al, w }]: one depth half
+  /* Pieces nearer than the glass wait here until the frame is drawn, then go on the front layer in one go: a ground-coloured
+     halo under each so it visibly covers the text it crosses, thicker the nearer it is, and a small mark where it goes through. */
+  const QF = new Map(), QPM = [], QFN = [];                                // lines by colour and weight, marks, and anything else to draw in front (functions)
+  function qfseg(col, w, al, a, b) {
+    const z = QV.z0 - (a[2] + b[2]) / 2, wq = Math.round(w * 1.25 * cl(QV.zg / Math.max(.2, z), 1, 2.2) * 2) / 2, aq = Math.round(cl(al) * 8);
+    if (!aq) return;
+    const key = col + '|' + wq + '|' + aq; let L = QF.get(key);
+    if (!L) QF.set(key, L = { col, w: wq, al: aq / 8, p: [] });
+    L.p.push(a[0], a[1], b[0], b[1]);
+  }
+  function qfflush() {
+    if (!QF.size && !QPM.length && !QFN.length) return;
+    const run = L => { g.beginPath(); for (let i = 0; i < L.p.length; i += 4) { g.moveTo(L.p[i], L.p[i + 1]); g.lineTo(L.p[i + 2], L.p[i + 3]); } g.stroke(); };
+    const draw = () => {
+      g.lineCap = 'round'; g.setLineDash([]);
+      g.strokeStyle = C.ground; QF.forEach(L => { g.globalAlpha = L.al * .85; g.lineWidth = L.w + 4; run(L); });
+      QF.forEach(L => { g.globalAlpha = L.al; g.strokeStyle = L.col; g.lineWidth = L.w; run(L); });
+      for (let i = 0; i < QPM.length; i += 4) { g.globalAlpha = QPM[i + 3]; g.fillStyle = C.ground; g.fillRect(QPM[i] - 3.5, QPM[i + 1] - 3.5, 7, 7); g.fillStyle = QPM[i + 2]; g.fillRect(QPM[i] - 2, QPM[i + 1] - 2, 4, 4); }
+      g.lineCap = 'butt'; QFN.forEach(f => f()); g.globalAlpha = 1;
+    };
+    if (!front(draw)) draw();
+    QF.clear(); QPM.length = 0; QFN.length = 0;
+  }
+  function qcut(a, b, gl) {                                                // the part of a projected segment nearer than the glass: [from, to, where it goes through] or null
+    const na = a[2] > gl, nb = b[2] > gl;
+    if (!na && !nb) return null;
+    if (na && nb) return [a, b, null];
+    const za = QV.z0 - a[2], zb = QV.z0 - b[2], s = (1 / (QV.z0 - gl) - 1 / za) / (1 / zb - 1 / za), m = [mix(a[0], b[0], s), mix(a[1], b[1], s), gl];
+    return na ? [a, m, m, b] : [m, b, m, a];
+  }
+  const qglass = () => (QV.zg ? QV.z0 - QV.zg : 1e9);                       // the glass, as a depth
+  function qnear(a, b, col, w, al, mark) {                                 // a projected segment: queue what is nearer than the glass, return what stays behind (or null)
+    const c = qcut(a, b, qglass());
+    if (!c) return [a, b];
+    qfseg(col, w, al, c[0], c[1]);
+    if (c[2] && mark) QPM.push(c[2][0], c[2][1], col, al);
+    return c[2] ? (c[3] === a ? [a, c[2]] : [c[2], b]) : null;
+  }
+  /* Lines by depth: four bands, far ones thin and faint, near ones heavy; the far two are drawn before the cube, the near two
+     after it. Lines marked fr (the three rings) are cut at the glass and their near part goes to the front layer. */
+  const QDA = [.17, .32, .78, 1], QDW = [.75, .9, 1, 1.25];
+  function qstroke(list, near) {                                           // [{ pts (screen, null breaks the line), col, al, w, fr }]: one depth half
     list.forEach(L => {
       if (L.al <= .01) return;
-      g.globalAlpha = L.al * (front ? 1 : .28); g.strokeStyle = L.col; g.lineWidth = L.w; g.setLineDash(L.dash ? [4, 5] : []); g.beginPath();
-      for (let i = 1; i < L.pts.length; i++) {
-        const a = L.pts[i - 1], b = L.pts[i];
-        if (!a || !b || (a[2] + b[2] > -.004) !== front) continue;
-        g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]);
+      g.strokeStyle = L.col; g.setLineDash(L.dash ? [4, 5] : []);
+      for (let k = near ? 2 : 0, e = k + 2; k < e; k++) {
+        g.globalAlpha = L.al * QDA[k]; g.lineWidth = L.w * QDW[k]; g.beginPath();
+        for (let i = 1; i < L.pts.length; i++) {
+          const a = L.pts[i - 1], b = L.pts[i];
+          if (!a || !b) continue;
+          const m = (a[2] + b[2]) / 2;
+          if ((m < -.5 ? 0 : m < -.004 ? 1 : m < .5 ? 2 : 3) !== k) continue;
+          const r = L.fr && near ? qnear(a, b, L.col, L.w, L.al, true) : L.pts;
+          if (!r) continue;
+          if (r === L.pts) { g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); } else { g.moveTo(r[0][0], r[0][1]); g.lineTo(r[1][0], r[1][1]); }
+        }
+        g.stroke();
       }
-      g.stroke();
     });
     g.setLineDash([]);
   }
@@ -2864,35 +2928,41 @@ const lore = (() => {
     return { v, h };
   }
   /* The i line: the circle through 1, i, -1 and -i, straight because it runs through -1. Drawn in perspective, clipped at the
-     camera, thicker as it comes closer. Once the camera lines up with it, the part nearer than the page's stage edge is drawn on
-     a layer above the page, so the line comes out from behind the page and runs over it; a small mark shows where it goes through. */
+     camera, thicker as it comes closer; while the camera orbits it thins out a few units from the sphere. Once the camera lines
+     up with it, the part nearer than the glass is drawn on the layer above the page, so the line comes out through the page and
+     runs over it toward the viewer; a small pulsing mark shows where it goes through. */
   function qiline(G, t, al, k2) {
     if (al <= .01) return;
     const a = [12, 0, 0], b = [-12, 0, 0], za = dot3(sub(a, QV.E), QV.f), zb = dot3(sub(b, QV.E), QV.f), near = .03;
     if (za < near && zb < near) return;
-    const s1 = zb < near ? (za - near) / (za - zb) : 1, N = 60, P = [];
-    for (let n = 0; n <= N; n++) { const s = s1 * (1 - Math.pow(1 - n / N, 3)), v = [mix(a[0], b[0], s), 0, 0], z = mix(za, zb, s); P.push([qp(v), z]); }
-    const edge = fxOn() && k2 > .3 ? stage.getBoundingClientRect().left - cv.getBoundingClientRect().left : -1e9;
-    let cross = -1;
+    const s1 = zb < near ? (za - near) / (za - zb) : 1, N = 60, P = [], F = [], full = st(0, .4, k2);
+    for (let n = 0; n <= N; n++) { const s = s1 * (1 - Math.pow(1 - n / N, 3)), v = [mix(a[0], b[0], s), 0, 0], z = mix(za, zb, s); P.push([qp(v), z, mix(1 - st(4, 9, Math.abs(v[0])), 1, full)]); }
+    const one = (o, p, w, fa) => {
+      g.globalAlpha = al * fa * .5 * (1 - k2); g.strokeStyle = C.R; g.lineWidth = w; g.beginPath(); g.moveTo(o[0], o[1]); g.lineTo(p[0], p[1]); g.stroke();
+      g.globalAlpha = al * fa * .8 * k2; g.strokeStyle = C.ink; g.stroke();
+    };
+    let cross = null;
+    g.lineCap = 'butt';
     for (let n = 1; n <= N; n++) {
-      const [p, z] = P[n], [o, zo] = P[n - 1];
-      if (!p || !o) continue;
-      const over = p[0] < edge && o[0] < edge;
-      if (over && cross < 0) cross = n - 1;
-      const ctx = over ? fg : g, w = Math.min(14, 1.2 * Math.max(1, QV.z0 / Math.max(.05, (z + zo) / 2)));
-      ctx.lineCap = 'butt';
-      ctx.globalAlpha = al * .5 * (1 - k2); ctx.strokeStyle = C.R; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(o[0], o[1]); ctx.lineTo(p[0], p[1]); ctx.stroke();
-      ctx.globalAlpha = al * .8 * k2; ctx.strokeStyle = C.ink; ctx.stroke();
-      if (over) fxUsed = true;
+      const [p, z, fa] = P[n], [o, zo] = P[n - 1];
+      if (!p || !o || fa <= .01) continue;
+      const zm = (z + zo) / 2, w = Math.min(14, 1.2 * Math.max(1, QV.z0 / Math.max(.05, zm)));
+      if (zm < QV.zg) { if (!F.length) cross = o; F.push(o, p, w, fa); } else one(o, p, w, fa);
     }
-    if (cross > 0 && P[cross][0]) {                                        // where it goes through the page: a ring and four ticks, pulsing
-      const c = P[cross][0], r = 7 + 4 * Math.sin(t * 7), a2 = al * k2;
-      fg.globalAlpha = a2; fg.strokeStyle = C.acc; fg.lineWidth = 1.5; fg.beginPath(); fg.ellipse(c[0], c[1], r * .45, r, 0, 0, TAU); fg.stroke();
-      fg.beginPath(); [[0, -1], [0, 1]].forEach(([dx, dy]) => { fg.moveTo(c[0], c[1] + dy * (r + 4)); fg.lineTo(c[0], c[1] + dy * (r + 11)); }); fg.stroke();
-      fg.globalAlpha = a2 * .7; fg.strokeStyle = C.glA; fg.beginPath(); fg.ellipse(c[0] - 2, c[1], r * .45, r, 0, 0, TAU); fg.stroke();
-      fg.strokeStyle = C.glB; fg.beginPath(); fg.ellipse(c[0] + 2, c[1], r * .45, r, 0, 0, TAU); fg.stroke();
-      fxUsed = true;
-    }
+    if (!F.length) return;
+    const over = () => {
+      g.lineCap = 'butt';
+      for (let i = 0; i < F.length; i += 4) { g.globalAlpha = al * F[i + 3] * .7; g.strokeStyle = C.ground; g.lineWidth = F[i + 2] + 3; g.beginPath(); g.moveTo(F[i][0], F[i][1]); g.lineTo(F[i + 1][0], F[i + 1][1]); g.stroke(); }
+      for (let i = 0; i < F.length; i += 4) one(F[i], F[i + 1], F[i + 2], F[i + 3]);
+      if (cross && k2 > .3) {                                              // where it goes through the page: a ring and two ticks, pulsing
+        const c = cross, r = 7 + 4 * Math.sin(t * 7), a2 = al * k2;
+        g.globalAlpha = a2; g.strokeStyle = C.acc; g.lineWidth = 1.5; g.beginPath(); g.ellipse(c[0], c[1], r * .45, r, 0, 0, TAU); g.stroke();
+        g.beginPath(); [-1, 1].forEach(dy => { g.moveTo(c[0], c[1] + dy * (r + 4)); g.lineTo(c[0], c[1] + dy * (r + 11)); }); g.stroke();
+        g.globalAlpha = a2 * .7; g.strokeStyle = C.glA; g.beginPath(); g.ellipse(c[0] - 2, c[1], r * .45, r, 0, 0, TAU); g.stroke();
+        g.strokeStyle = C.glB; g.beginPath(); g.ellipse(c[0] + 2, c[1], r * .45, r, 0, 0, TAU); g.stroke();
+      }
+    };
+    if (!front(over)) over();
   }
   function qsurfaces(Q1, Q2, al, list) {                                  // translucent surfaces, back to front, and their wire circles into list
     if (al <= .01) return;
@@ -2929,7 +2999,8 @@ const lore = (() => {
     /* The view: an orbit around the gimbal. In the second turn the camera comes down off the orbit and lines itself up with
        the i line, just beside it on the side where it runs off to the left, then looks along it at the plane. The plane is then
        square to the camera, so it lands flat on the screen, and the i line runs from beside the camera to its vanishing point. */
-    const k2 = eio(st(12.3, Q_FLAT, t)), V0 = qorbit(G.A[0], G.A[1], R0, -.55 + .1 * t, .42, .14);
+    const k2 = eio(st(12.3, Q_FLAT, t)), cm = qcamG(t), sc = QD0 / cm[2], V0 = qorbit(G.A[0], G.A[1], R0 * sc, cm[0], cm[1], 1 / cm[2]);
+    V0.zg = QZG;
     if (k2 <= 0) Object.assign(QV, V0);
     else {
       const E1 = [-Q_CAM[0], Q_CAM[1], Q_CAM[2]], E = [mix(V0.E[0], E1[0], k2), mix(V0.E[1], E1[1], k2), mix(V0.E[2], E1[2], k2)];
@@ -2937,6 +3008,7 @@ const lore = (() => {
       cam.r = unit(cross(cam.f, [mix(V0.u[0], 0, k2), mix(V0.u[1], 1, k2), mix(V0.u[2], 0, k2)])); cam.u = cross(cam.r, cam.f);
       cam.z0 = -dot3(E, cam.f); cam.F = R0 * cam.z0;                       // the sphere keeps its size and its place on the page
       cam.x = G.A[0] + R0 * dot3(E, cam.r); cam.y = G.A[1] - R0 * dot3(E, cam.u);
+      cam.zg = cam.z0 - mix(V0.z0 - QZG, .4, k2);                           // the glass ends up just in front of the plane
       Object.assign(QV, cam);
     }
     const e = qeul(Math.min(t, 3.9)), fold = eio(st(3.9, 4.65, t)), tile = t > Q_FLAT - .1 ? qtile() : null;
@@ -2951,7 +3023,7 @@ const lore = (() => {
       const pts = qcirc(nn, r, 240, st(.05 + i * .17, .75 + i * .17, t)).map(Q);
       /* on the plane the j-k ring (red) stays a circle and is drawn on its own below; Y and Z are the cross, handed to the full-length lines */
       const al = A * flick * (i === 1 ? (t < Q_FLAT ? 1 : 0) : 1 - st(Q_FLAT, Q_FLAT + .25, t));
-      lines.push({ pts: qproj(pts), col: col[i], al, w: i ? 2 : 2.4 });
+      lines.push({ pts: qproj(pts), col: col[i], al, w: i ? 2 : 2.4, fr: t < Q_FLAT });
       if (lock > 0 && i !== 1) {                                           // the two rings that became one: a split edge
         const o = (i ? 1 : -1) * 3 * lock * ((t * 16 | 0) % 2 ? 1 : .4);
         lines.push({ pts: pts.map(v => { if (!v) return null; const p = qp(v); return [p[0] + o, p[1], p[2]]; }), col: i ? C.glB : C.glA, al: A * lock * .7, w: 1.2 });
@@ -3021,7 +3093,7 @@ const lore = (() => {
 
     /* the lock: corner marks round the two rings that became one */
     if (lock > 0) {
-      const p = qp([0, 0, 0]), r = R0 * (1.12 + .3 * (1 - eo(st(2.62, 2.95, t))));
+      const p = qp([0, 0, 0]), r = R0 * sc * (1.12 + .3 * (1 - eo(st(2.62, 2.95, t))));
       brackets(p, r, C.acc, A * lock * ((t * 14 | 0) % 2 && t < 2.95 ? .35 : 1), 1.6);
     }
 
@@ -3030,15 +3102,17 @@ const lore = (() => {
       const cx = G.A[0], cy = G.A[1], rules = qrules(), lineAt = (x0, y0, x1, y1, c, a, w) => { g.globalAlpha = a; g.strokeStyle = c; g.lineWidth = w; seg([x0, y0], [x1, y1]); };
       const into = st(Q_FLAT - .3, Q_FLAT, t);                             // full length, faded in over the projected rings as they reach infinity
       const go = (base, to, n) => { const d = Math.abs(to - base), k = eio(st(12.05 + QO + n * .05 + d / 3000, 12.6 + QO + n * .05 + d / 3000, t)); return [mix(base, to, k), k]; };
-      const vt = rules ? rules.v : [cx], hz = rules ? rules.h : [cy];
+      const vt = rules ? rules.v : [cx], hz = rules ? rules.h : [cy], lockOn = [];   // lockOn: the flash as a line lands, on the glass itself
       vt.forEach((xv, n) => {
         const [x, k] = go(cx, xv, n), a = A * into * (rules ? 1 - st(.85, 1, k) * st(12.7 + QO, 13.1 + QO, t) : 1 - st(12.1 + QO, 12.6 + QO, t));
-        if (a > .01) { lineAt(x, 0, x, ch, C.Y, a * (1 - k * .6), 2); if (k > .9) lineAt(x, 0, x, ch, C.acc, a * (k - .9) * 10 * (1 - st(12.75 + QO, 13 + QO, t)), 2); }
+        if (a > .01) { lineAt(x, 0, x, ch, C.Y, a * (1 - k * .6), 2); if (k > .9) lockOn.push(x, 0, x, ch, a * (k - .9) * 10 * (1 - st(12.75 + QO, 13 + QO, t))); }
       });
       hz.forEach((yh, n) => {
         const [y, k] = go(cy, yh, n + 2), a = A * into * (rules ? 1 - st(.85, 1, k) * st(12.7 + QO, 13.1 + QO, t) : 1 - st(12.1 + QO, 12.6 + QO, t));
-        if (a > .01) { lineAt(0, y, cw, y, C.L, a * (1 - k * .6), 2); if (k > .9) lineAt(0, y, cw, y, C.acc, a * (k - .9) * 10 * (1 - st(12.75 + QO, 13 + QO, t)), 2); }
+        if (a > .01) { lineAt(0, y, cw, y, C.L, a * (1 - k * .6), 2); if (k > .9) lockOn.push(0, y, cw, y, a * (k - .9) * 10 * (1 - st(12.75 + QO, 13 + QO, t))); }
       });
+      const flash = () => { for (let i = 0; i < lockOn.length; i += 5) lineAt(lockOn[i], lockOn[i + 1], lockOn[i + 2], lockOn[i + 3], C.acc, lockOn[i + 4], 2); };
+      if (lockOn.length && !front(flash)) flash();
     }
     /* ...and the j-k ring, a plain circle now, flies into the gimbal tile (or folds into the figure where there is no tile) */
     if (t >= Q_FLAT) {
@@ -3049,7 +3123,15 @@ const lore = (() => {
         nn = unit([mix(1, tn[0] * sg, kt), mix(0, tn[1] * sg, kt), mix(0, tn[2] * sg, kt)]); r = mix(1, tile.rad[1], kt); V = qmixV(base, tile.V, kt);
         if (kt >= 1) al = 0;
       } else { r = 1 - kt; al *= 1 - st(.8, 1, kt); }
-      if (al > 0) { const pts = qcirc(nn, r, 160).map(v => { const p = qp(v, V); return [p[0], p[1], 1]; }); qstroke([{ pts, col: C.R, al, w: 2 }], true); }
+      if (al > 0) {                                                        // it lifts off the plane, comes through the glass (bigger, heavier) and crosses the page in front of it
+        const lift = tile ? Math.sin(Math.PI * kt) : 0, pts = qcirc(nn, r * (1 + .35 * lift), 96).map(v => qp(v, V));
+        const ring = halo => {
+          g.lineJoin = 'round'; g.beginPath(); pts.forEach((p, i) => (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])));
+          if (halo) { g.globalAlpha = al * .85 * Math.min(1, lift * 5); g.strokeStyle = C.ground; g.lineWidth = 6 + 2 * lift; g.stroke(); }
+          g.globalAlpha = al; g.strokeStyle = C.R; g.lineWidth = 2 + 1.6 * lift; g.stroke(); g.lineJoin = 'miter';
+        };
+        if (!(tile && kt > 0 && kt < 1 && front(() => ring(true)))) ring(false);
+      }
     }
 
     /* the read-out, beside the sphere */
@@ -3058,6 +3140,7 @@ const lore = (() => {
       let x = G.A[0] + R0 * 1.16 + 12, al = 'left';
       if (x + 140 > cw) { x = G.A[0] - R0 * 1.16 - 12; al = 'right'; }
       const y = G.A[1] - R0 * .78, L = (i, s, c, a = 1) => text(s, x, y + i * 15, c, ra * a, al);
+      if (ra > .01 && t < 5.8) { g.globalAlpha = ra * .8 * st(2.0, 2.6, t) * (1 - st(3.9, 4.6, t)); g.fillStyle = C.ground; g.fillRect(al === 'left' ? x - 8 : x - 132, y - 12, 140, 126); }   // a backing while the rings come close
       if (t < 3.9) {
         L(0, 'ROTATE ORDER ZXY', C.ink2);
         L(1, 'Y ' + qdeg(e[0]), C.Y); L(2, 'X ' + qdeg(e[1]), C.R); L(3, 'Z ' + qdeg(e[2]), C.L);
@@ -3086,20 +3169,27 @@ const lore = (() => {
         brackets(G.A, R0 * (.08 + eo(u) * 1.3), n === 1 ? C.ink : C.acc, Math.pow(1 - u, 1.5), 1.6);
       }
     }
+    qfflush();
     tear(t - 3.72 + 10.42); tear(t - 12.75 - QO + 10.42);
     return cl((t - 12.75 - QO) / .9);
   }
   /* ===== intro 5: matrix =====
-     After 3Blue1Brown's linear transformations and the "mm" matmul visualiser. All in 3D, through a perspective camera.
-     1. Space: a cube of arrows from the origin to every lattice point, coloured by direction, with X, Y, Z.
-     2. Transform: a 3x3 matrix bends the whole field (the read-out shows it live); the cube's volume is the determinant:
-        it squashes flat (det 0) and turns inside out (det < 0).
+     After 3Blue1Brown's linear transformations and the "mm" matmul visualiser. All in 3D, through the gimbal's pinhole camera:
+     fixed focal length, an eased orbit, and size that only changes by dollying. Arrows, edges and cells are weighted by depth.
+     The page is a pane of glass MZG in front of the lens; what comes nearer is cut at the glass and drawn in front of the page.
+     1. Space: the camera dollies in on a cube of arrows from the origin to every lattice point, coloured by direction, with X, Y, Z.
+     2. Transform: a 3x3 matrix bends the whole field (the read-out shows it live) and pushes the near arrows and the cube's near
+        corner out through the glass; the cube's volume is the determinant: it squashes flat (det 0, held) and turns inside out
+        (det < 0, held).
      3. Multiply: A (16x16) on the left wall, B on the floor; each cell of A·B is the dot product of a row of A and a column of B,
-        a line of light through the cube; the result fills the front face in a diagonal wave.
-     4. Chain: the cells of A·B fly off and become the left wall of a second cube, C goes on its floor, and A·B·C fills its face:
-        the way a rig chain multiplies parent and local matrices.
-     5. Online: the camera flies square onto A·B·C until four of its cells are one page column; its lines land on the page's own lines. */
-  const M_END = 13.8, MBEAT = [0, 2.8, 5.6, 8.6, 11.2], MN = 16, MC = 2 / MN, M_X2 = 3.2, MG = .32;   // MG: the gap the three matrices stand off the cube (exploded view)
+        a line of light through the cube; the result fills the front face in a diagonal wave while the camera pushes in on it
+        (the cube's near corner comes through the glass).
+     4. Chain: the cells of A·B fly off in a loop that bulges out toward the viewer, in front of the page, and come back in as
+        the left wall of a second cube; C goes on its floor, and A·B·C fills its face: the way a rig chain multiplies parent
+        and local matrices.
+     5. Online: the camera flies square onto A·B·C until four of its cells are one page column and the face lies on the glass.
+        Its every-fourth lines carry on through the glass for a moment, sink back and lock onto the page's own lines with a flash. */
+  const M_END = 13.8, MBEAT = [0, 2.6, 5.6, 8.6, 11.2], MN = 16, MC = 2 / MN, M_X2 = 3.2, MG = .32;   // MG: the gap the three matrices stand off the cube (exploded view)
   const m3mul = (M, v) => [M[0] * v[0] + M[1] * v[1] + M[2] * v[2], M[3] * v[0] + M[4] * v[1] + M[5] * v[2], M[6] * v[0] + M[7] * v[1] + M[8] * v[2]];
   const m3det = M => M[0] * (M[4] * M[8] - M[5] * M[7]) - M[1] * (M[3] * M[8] - M[5] * M[6]) + M[2] * (M[3] * M[7] - M[4] * M[6]);
   const L3I = [1, 0, 0, 0, 1, 0, 0, 0, 1], L3A = [1.15, .5, 0, .55, 1.3, .45, -.35, .25, .85];
@@ -3107,10 +3197,22 @@ const lore = (() => {
   const L3F = [L3A[0], L3A[1], L3A[2], L3A[3], L3A[4], L3A[5], -L3A[6], -L3A[7], -L3A[8]];                          // row 3 negated: inside out
   const m3l = (A, B, k) => A.map((v, i) => mix(v, B[i], k));
   function mat3(t) {
-    if (t < 4.1) return m3l(L3I, L3A, eio(st(2.9, 3.6, t)));
-    if (t < 4.65) return m3l(L3A, L3Z, eio(st(4.1, 4.6, t)));
-    if (t < 5.15) return m3l(L3Z, L3F, eio(st(4.7, 5.1, t)));
-    return m3l(L3F, L3I, eio(st(5.2, 5.6, t)));
+    if (t < 3.85) return m3l(L3I, L3A, eio(st(2.65, 3.35, t)));              // bend, hold; flat, hold; inside out, hold; back
+    if (t < 4.55) return m3l(L3A, L3Z, eio(st(3.85, 4.3, t)));
+    if (t < 5.25) return m3l(L3Z, L3F, eio(st(4.55, 4.95, t)));
+    return m3l(L3F, L3I, eio(st(5.25, 5.65, t)));
+  }
+  /* The camera: the gimbal's pinhole camera (fixed focal length), on an orbit. MD0 is the distance at which a unit is R0 pixels;
+     the page's glass is MZG in front of the lens. Size only ever changes by dollying: in on the field, back for the cube, a push
+     onto each product, wide for the two cubes. Returns [yaw, pitch, distance]. */
+  const MD0 = 1 / .17, MZG = 5.5;
+  const MLOOP = unit([-.5, .42, .72]);                                       // roughly toward the viewer while the cells fly: the way their loop bulges
+  function mcamM(t) {
+    let D = mix(8.4, 6.9, eo(st(-.3, 2.2, t)));
+    D = mix(D, 6.45, eio(st(2.6, 3.4, t))); D = mix(D, 7.6, eio(st(5.35, 6.3, t))); D = mix(D, 6.6, eio(st(7.2, 8.35, t)));
+    D = mix(D, 8.7, eio(st(8.45, 9.5, t))); D = mix(D, 7.9, eio(st(9.7, 11, t)));
+    const turn = eio(st(5.4, 6.6, t));
+    return [-.62 + .1 * t + .45 * turn, mix(.36, .5, turn), D];
   }
   /* the field: arrows to the 5x5x5 lattice */
   const MFIELD = [];
@@ -3126,10 +3228,12 @@ const lore = (() => {
   for (let i = 0; i < MN; i++) for (let j = 0; j < MN; j++) MABC[i][j] /= mMax || 1;
   let MCT = [0, 0, 0];
   const mp = v => qp(sub(v, MCT));                                           // the scene through the camera, around a moving centre
-  function mcell(c, ax, ay, val, al, lit) {                                // one matrix cell: a small quad, red for +, cyan for -
+  function mcell(c, ax, ay, val, al, lit, edge) {                          // one matrix cell: a small quad, red for +, cyan for -; fainter with distance
     const k = .43, p = [add(add(c, mul(ax, k)), mul(ay, k)), add(sub(c, mul(ay, k)), mul(ax, k)), sub(sub(c, mul(ax, k)), mul(ay, k)), add(sub(c, mul(ax, k)), mul(ay, k))].map(mp);
     if (p.some(q => !q)) return;
-    poly(p); g.globalAlpha = al * (.14 + .42 * Math.abs(val)); g.fillStyle = lit ? C.ink : val >= 0 ? C.glA : C.glB; g.fill();
+    const col = lit ? C.ink : val >= 0 ? C.glA : C.glB;
+    poly(p); g.globalAlpha = al * (.14 + .42 * Math.abs(val)) * mix(.62, 1.12, st(-2, 2, p[0][2])); g.fillStyle = col; g.fill();
+    if (edge) { g.globalAlpha = al * .9; g.strokeStyle = col; g.lineWidth = 1; g.stroke(); }
   }
   function mlabel(v, s, al, size = 22) { const p = mp(v); if (p && al > .01) text(s, p[0], p[1], C.ink, al, 'center', size); }
   function msweepFace(G, t, t0, t1, left, right, out, frame, al, appear) {   // one multiply: left wall (i, k), floor (k, j), front face (i, j)
@@ -3139,7 +3243,12 @@ const lore = (() => {
     /* the cube's edges */
     g.lineWidth = 1; g.strokeStyle = C.ink2;
     const cv8 = MCUBE_V.map(v => add(o, [v[0] + 1, v[1] - 1, v[2] + 1]));
-    MCUBE_E.forEach(([a, b]) => { const p = mp(cv8[a]), q = mp(cv8[b]); if (p && q) { g.globalAlpha = al * .5 * appear; seg(p, q); } });
+    MCUBE_E.forEach(([a, b]) => {                                           // nearer edges heavier; what is nearer than the glass goes in front of the page
+      const p = mp(cv8[a]), q = mp(cv8[b]); if (!p || !q) return;
+      const dn = st(-1.6, 1.6, (p[2] + q[2]) / 2), ea = al * appear * mix(.25, .8, dn), r = qnear(p, q, C.ink2, 1.2, ea, true);
+      if (r) { g.globalAlpha = ea; g.lineWidth = mix(.7, 1.4, dn); seg(r[0], r[1]); }
+    });
+    g.lineWidth = 1;
     if (left) for (let i = 0; i < MN; i++) for (let k = 0; k < MN; k++) {   // left wall x = o.x: rows down, k into depth
       const a = st(0, .5, appear * 1.6 - i / MN * .6); if (a <= 0) continue;
       mcell(add(o, [-MG, -(i + .5) * MC, (k + .5) * MC]), Z, Yd, left[i][k], al * a);
@@ -3159,7 +3268,8 @@ const lore = (() => {
       lines.forEach(([i, j, f]) => {                                      // the dot product: a line of light along k, with the row and column it reads
         const a = mp(at(j, i, -.5)), b = mp(add(at(j, i, MN - .5), [0, 0, MG + MC / 2])), ra = mp(add(o, [-MG, -(i + .5) * MC, 1])), rb = mp(add(o, [(j + .5) * MC, -2 - MG, 1]));
         if (!a || !b) return;
-        g.globalAlpha = al * f * .8; g.strokeStyle = C.acc; g.lineWidth = 1.3; seg(a, b);
+        const r = qnear(a, b, C.acc, 1.3, al * f * .8, false);
+        if (r) { g.globalAlpha = al * f * .8; g.strokeStyle = C.acc; g.lineWidth = 1.3; seg(r[0], r[1]); }
         if (ra && rb && f > .7) { g.globalAlpha = al * (f - .7) * 2; g.strokeStyle = C.ink2; g.lineWidth = 1; seg(ra, a); seg(rb, a); }
       });
     }
@@ -3186,9 +3296,9 @@ const lore = (() => {
     if (t >= M_END) return 1;
     const A = st(-.35, .05, t), R0 = Math.min(G.S * .46, cw * .34);
     /* the centre moves from the field to the first cube, then to the second; the camera orbits, then flies square onto A·B·C */
-    MCT = [mix(mix(0, M_X2 / 2, eio(st(8.5, 9.4, t))), M_X2, eio(st(11, 12, t))), 0, 0];
-    const Rz = R0 * mix(mix(1, .78, eio(st(5.5, 6.2, t))), .58, eio(st(8.5, 9.4, t)));
-    const V0 = qorbit(G.A[0], G.A[1], Rz, -.62 + .1 * t + .45 * eio(st(5.4, 6.6, t)), mix(.36, .5, eio(st(5.4, 6.6, t))), .17), k2 = eio(st(11, 12, t));
+    MCT = [mix(mix(0, M_X2 / 2, eio(st(8.5, 9.4, t))), M_X2, eio(st(11, 12, t))), -.55 * eio(st(5.4, 6.4, t)) * (1 - eio(st(11, 12, t))), 0];   // it also looks a little lower while the cubes are up, so they sit clear of the strip
+    const cm = mcamM(t), V0 = qorbit(G.A[0], G.A[1], R0 * MD0 / cm[2], cm[0], cm[1], 1 / cm[2]), k2 = eio(st(11, 12, t));
+    V0.zg = MZG;
     let fin = null;
     if (k2 > 0) {
       const c = cv.getBoundingClientRect(), rr = reveal.getBoundingClientRect(), wide2 = wide.matches;
@@ -3200,6 +3310,7 @@ const lore = (() => {
       cam.r = unit(cross(cam.f, [mix(V0.u[0], 0, k2), mix(V0.u[1], 1, k2), mix(V0.u[2], 0, k2)])); cam.u = cross(cam.r, cam.f);
       cam.z0 = -dot3(E, cam.f);
       const FC = [0, 0, 1 + MG], zf = dot3(sub(FC, E), cam.f), zf0 = dot3(sub(FC, V0.E), V0.f), pv = qp(FC, V0);
+      cam.zg = mix(MZG, zf, k2);                                             // the face comes up from behind until it lies on the glass
       cam.F = mix(V0.F / zf0, s, k2) * zf;                                   // pixels per unit at the face: from the orbit's to the page's
       const ax = mix(pv[0], L2 + s, k2), ay = mix(pv[1], T2 + s, k2);         // where the face's centre lands
       cam.x = ax - cam.F * dot3(sub(FC, E), cam.r) / zf; cam.y = ay + cam.F * dot3(sub(FC, E), cam.u) / zf;
@@ -3211,18 +3322,24 @@ const lore = (() => {
     if (fa > 0) {
       const grow = eo(st(.1, .9, t)), o = mp([0, 0, 0]);
       g.lineWidth = 1;
-      MCUBE_E.forEach(([a, b]) => {                                        // the plain cube, and the cube the matrix makes of it
-        const p = mp(MCUBE_V[a]), q = mp(MCUBE_V[b]); g.globalAlpha = fa * .35; g.strokeStyle = C.line; seg(p, q);
-        const p2 = mp(m3mul(M, MCUBE_V[a])), q2 = mp(m3mul(M, MCUBE_V[b])); g.globalAlpha = fa * .9 * st(2.9, 3.2, t); g.strokeStyle = det < 0 ? C.glA : C.acc; g.lineWidth = 1.4; seg(p2, q2); g.lineWidth = 1;
+      const gl = qglass(), near = v => st(-1.7, 1.7, v), cubeA = fa * st(2.65, 2.95, t);
+      MCUBE_E.forEach(([a, b]) => {                                        // the plain cube, and the cube the matrix makes of it; both heavier where they are near
+        const p = mp(MCUBE_V[a]), q = mp(MCUBE_V[b]), dn = near((p[2] + q[2]) / 2); g.lineWidth = mix(.7, 1.3, dn); g.globalAlpha = fa * mix(.2, .55, dn); g.strokeStyle = C.line; seg(p, q);
+        if (cubeA <= .01) return;
+        const p2 = mp(m3mul(M, MCUBE_V[a])), q2 = mp(m3mul(M, MCUBE_V[b])), col = det < 0 ? C.glA : C.acc; if (!p2 || !q2) return;
+        const d2 = near((p2[2] + q2[2]) / 2), ea = cubeA * mix(.35, 1, d2), r = qnear(p2, q2, col, 1.5, ea, true);
+        if (r) { g.globalAlpha = ea; g.strokeStyle = col; g.lineWidth = mix(.9, 1.8, d2); seg(r[0], r[1]); }
       });
-      MFIELD.map(v => { const w = m3mul(M, mul(v, grow)), p = mp(w); return [p, v]; }).sort((a, b) => a[0][2] - b[0][2]).forEach(([p, v]) => {
+      MFIELD.map(v => { const w = m3mul(M, mul(v, grow)), p = mp(w); return [p, v]; }).filter(e => e[0]).sort((a, b) => a[0][2] - b[0][2]).forEach(([p, v]) => {
         const hue = (Math.atan2(v[2], v[0]) * 180 / Math.PI + 360) % 360, lt = 50 + v[1] * 14, col = 'hsl(' + hue.toFixed(0) + ',62%,' + lt.toFixed(0) + '%)';
-        const ang = Math.atan2(p[1] - o[1], p[0] - o[0]), h = 6, a = fa * (p[2] < 0 ? .45 : .9);
-        g.globalAlpha = a; g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1; seg(o, p);
-        poly([p, [p[0] - Math.cos(ang - .45) * h, p[1] - Math.sin(ang - .45) * h], [p[0] - Math.cos(ang + .45) * h, p[1] - Math.sin(ang + .45) * h]]); g.fill();
+        const ang = Math.atan2(p[1] - o[1], p[0] - o[0]), dn = near(p[2]), h = 4.5 + 4 * dn, a = fa * mix(.25, .95, dn);
+        const head = k => { poly([p, [p[0] - Math.cos(ang - .45) * h * k, p[1] - Math.sin(ang - .45) * h * k], [p[0] - Math.cos(ang + .45) * h * k, p[1] - Math.sin(ang + .45) * h * k]]); g.globalAlpha = a; g.fillStyle = col; g.fill(); };
+        const r = qnear(o, p, col, 1.3, a, false);                          // an arrow that reaches past the glass: its tip is in front of the page
+        g.globalAlpha = a; g.strokeStyle = col; g.lineWidth = mix(.6, 1.6, dn); if (r) seg(r[0], r[1]);
+        if (p[2] > gl) QFN.push(() => head(1.35)); else head(1);
       });
       [[1, 0, 0, C.R, 'X'], [0, 1, 0, C.Y, 'Y'], [0, 0, 1, C.L, 'Z']].forEach(([x, y, z, col, lab]) => {
-        const tip = mp(m3mul(M, [x * 1.15 * grow, y * 1.15 * grow, z * 1.15 * grow])); marrow(o, tip, col, fa, 2.6); text(lab, tip[0] + 8, tip[1] - 8, col, fa, 'left', 13);
+        const tip = mp(m3mul(M, [x * 1.15 * grow, y * 1.15 * grow, z * 1.15 * grow])); marrow(o, tip, col, fa, mix(2, 3.2, near(tip[2]))); text(lab, tip[0] + 8, tip[1] - 8, col, fa, 'left', 13);
       });
     }
 
@@ -3235,12 +3352,13 @@ const lore = (() => {
       if (t > 7.9 && t < 9) mlabel([0, 0, 1 + MG], 'A·B', c1 * st(7.9, 8.2, t) * (1 - st(8.55, 8.75, t)));
     }
     if (t > 8.5) {                                                          // A·B's cells fly from the first cube's face to the second cube's wall
-      const al = A * (1 - st(11.2, 11.7, t));
+      const al = A * (1 - st(11.2, 11.7, t)), glz = qglass();
       for (let i = 0; i < MN; i++) for (let j = 0; j < MN; j++) {
         const u = eio(st(8.55 + j * .025 + i * .006, 9.25 + j * .025 + i * .006, t)), y = 1 - (i + .5) * MC;
         const p1 = [-1 + (j + .5) * MC, y, 1 + MG], p2 = [M_X2 - 1 - MG, y, -1 + (j + .5) * MC];
-        const c = [mix(p1[0], p2[0], u), y + Math.sin(u * Math.PI) * .35, mix(p1[2], p2[2], u)];
-        mcell(c, mul(unit([mix(1, 0, u), 0, mix(0, 1, u)]), MC), [0, -MC, 0], MAB[i][j], al, u > 0 && u < 1 && (i + j) % 7 === 0);
+        const c = add([mix(p1[0], p2[0], u), y, mix(p1[2], p2[2], u)], mul(MLOOP, Math.sin(u * Math.PI) * 3.3));   // the way over loops out toward the viewer, through the glass
+        const ax = mul(unit([mix(1, 0, u), 0, mix(0, 1, u)]), MC), lit = u > 0 && u < 1 && (i + j) % 7 === 0, pc = u > 0 && u < 1 ? mp(c) : null;
+        if (pc && pc[2] > glz) QFN.push(() => mcell(c, ax, [0, -MC, 0], MAB[i][j], al, lit, true)); else mcell(c, ax, [0, -MC, 0], MAB[i][j], al, lit);
       }
       const ap2 = st(9.0, 9.7, t), c2 = A * (1 - st(11.95, 12.1, t));
       msweepFace(G, t, 9.7, 11.0, null, MCm, MABC, { o: o2 }, c2, ap2);
@@ -3257,17 +3375,35 @@ const lore = (() => {
         const v = MABC[i][j]; g.globalAlpha = base * cellA * (.08 + .22 * Math.abs(v)); g.fillStyle = v >= 0 ? C.glA : C.glB;
         g.fillRect(x0 + j * cell + cell * .07, y0 + i * cell + cell * .07, cell * .86, cell * .86);
       }
-      const Lr = (a, b, al, f) => { if (al <= .01) return; g.globalAlpha = al; g.strokeStyle = C.ink2; g.lineWidth = 1.2; seg(a, b); if (f > 0) { g.globalAlpha = al * f; g.strokeStyle = C.acc; g.lineWidth = 2; seg(a, b); } };
+      /* The grid has come up from behind the glass. Its every-fourth lines carry on a little way through it (a few percent
+         bigger, heavier, in front of the page for a moment), sink back onto it and lock there with a flash; the rest stay behind and fade. */
+      const pop = st(11.97, 12.12, t) * (1 - st(12.2, 12.42, t)), mx = x0 + fin.s, my = y0 + fin.s, FL = [];
+      const Lr = (a, b, al, f, fr) => {
+        if (al <= .01) return;
+        if (fr) { FL.push(a, b, al, f); return; }
+        g.globalAlpha = al; g.strokeStyle = C.ink2; g.lineWidth = 1.2; seg(a, b); if (f > 0) { g.globalAlpha = al * f; g.strokeStyle = C.acc; g.lineWidth = 2; seg(a, b); }
+      };
+      const onGlass = t < 12.8 && (pop > .02 || flash > .02);
       for (let n = 0; n <= MN; n++) {
-        const major = n % 4 === 0, x = x0 + n * cell, y = y0 + n * cell;
-        Lr([x, 0], [x, ch], base * (major && rules ? gone : 1 - st(12, 12.4, t)) * .8, major ? flash : 0);
-        Lr([0, y], [cw, y], base * (n === 0 && rules ? gone : 1 - st(12, 12.4, t)) * .8, n === 0 ? flash : 0);
+        const major = n % 4 === 0, k = major ? 1 + .045 * pop : 1, x = mx + (x0 + n * cell - mx) * k, y = my + (y0 + n * cell - my) * k;
+        Lr([x, 0], [x, ch], base * (major && rules ? gone : 1 - st(12, 12.4, t)) * .8, major ? flash : 0, major && onGlass);
+        Lr([0, y], [cw, y], base * (n === 0 && rules ? gone : 1 - st(12, 12.4, t)) * .8, n === 0 ? flash : 0, major && onGlass);
       }
       if (rules) [[-1, rules.h[0]], [1, rules.h[rules.h.length - 1]]].forEach(([n, yr]) => {   // one row up slides to the header, one down to the strip
         if (yr == null || Math.abs(yr - y0) < 4) return;
         const y = mix(y0 + n * colW, yr, eio(st(12.0, 12.35, t)));
-        Lr([0, y], [cw, y], base * gone * .8, flash);
+        Lr([0, y], [cw, y], base * gone * .8, flash, onGlass);
       });
+      if (FL.length) {
+        const over = () => {
+          for (let i = 0; i < FL.length; i += 4) { g.globalAlpha = FL[i + 2] * .7 * pop; g.strokeStyle = C.ground; g.lineWidth = 5; seg(FL[i], FL[i + 1]); }
+          for (let i = 0; i < FL.length; i += 4) {
+            g.globalAlpha = FL[i + 2]; g.strokeStyle = C.ink2; g.lineWidth = 1.2 + pop; seg(FL[i], FL[i + 1]);
+            if (FL[i + 3] > 0) { g.globalAlpha = FL[i + 2] * FL[i + 3]; g.strokeStyle = C.acc; g.lineWidth = 2; seg(FL[i], FL[i + 1]); }
+          }
+        };
+        if (!front(over)) over();
+      }
     }
 
     /* the read-out */
@@ -3275,8 +3411,8 @@ const lore = (() => {
       const ra = A * st(.5, .9, t) * (1 - st(11, 11.4, t)), sr = stage.getBoundingClientRect(), x = Math.max(24, sr.left - cv.getBoundingClientRect().left + 22), y = G.A[1] - R0 * .82;
       if (t < 5.6) {
         const flat = Math.abs(det) < .05;
-        mhud(x, y, [[M[0], M[1], M[2]], [M[3], M[4], M[5]], [M[6], M[7], M[8]]], [C.R, C.Y, C.L], ra, t < 2.8 ? 'M = [ X  Y  Z ]' : 'det M = ' + (det < -.005 ? '-' : '') + Math.abs(det).toFixed(2),
-          t < 2.8 ? 'COLUMNS = WHERE X, Y, Z LAND' : flat ? 'FLAT: A DIMENSION LOST' : det < 0 ? 'INSIDE OUT' : 'VOLUME OF THE CUBE', t < 2.8 ? '' : 'det = VOLUME SCALE');
+        mhud(x, y, [[M[0], M[1], M[2]], [M[3], M[4], M[5]], [M[6], M[7], M[8]]], [C.R, C.Y, C.L], ra, t < 2.6 ? 'M = [ X  Y  Z ]' : 'det M = ' + (det < -.005 ? '-' : '') + Math.abs(det).toFixed(2),
+          t < 2.6 ? 'COLUMNS = WHERE X, Y, Z LAND' : flat ? 'FLAT: A DIMENSION LOST' : det < 0 ? 'INSIDE OUT' : 'VOLUME OF THE CUBE', t < 2.6 ? '' : 'det = VOLUME SCALE');
       } else {
         const a = ra * st(5.8, 6.2, t), L = (i, s, c) => text(s, x, y + i * 15, c, a);
         g.globalAlpha = a * .82; g.fillStyle = C.ground; g.fillRect(x - 10, y - 26, 200, 112);
@@ -3290,6 +3426,7 @@ const lore = (() => {
       const u = (t - 12.4 - n * .14) / .7; if (u < 0 || u >= 1) continue;
       brackets(G.A, R0 * (.08 + eo(u) * 1.3), n === 1 ? C.ink : C.acc, Math.pow(1 - u, 1.5), 1.6);
     }
+    qfflush();
     tear(t - 4.75 + 10.42); tear(t - 12.65 + 10.42);
     return cl((t - 12.6) / .9);
   }
