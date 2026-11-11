@@ -405,6 +405,18 @@ a.gtile:hover b{text-decoration:underline;text-decoration-color:var(--accent);te
 .shot .fill{aspect-ratio:auto;object-fit:contain}
 .shot video.fill{aspect-ratio:16/9}   /* reserve the frame before the clip loads */
 .shot .fill--yt{aspect-ratio:16/9;height:auto}
+/* a clip with a node graph: a tab sticks out of its right edge and opens the node editor */
+.shot-v{position:relative}
+.ne-tab{position:absolute;z-index:2;top:0;right:0;display:flex;align-items:center;gap:.4rem;padding:.4rem .6rem;border:0;cursor:pointer;
+  font:inherit;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;background:#C6FF1A;color:#0B0C0F;transition:filter .15s,transform .15s}
+.ne-tab svg{width:.95rem;height:.95rem;flex:none}
+.ne-tab:hover,.ne-tab:focus-visible{filter:brightness(1.08);outline:2px solid var(--ink);outline-offset:2px}
+@media (min-width:64rem){
+  .ne-tab{right:auto;left:100%;top:1rem;width:min(var(--pad),2rem);padding:.7rem 0;flex-direction:column;writing-mode:vertical-rl;justify-content:center;gap:.5rem;
+    clip-path:polygon(0 0,100% 6px,100% calc(100% - 6px),0 100%)}
+  .ne-tab svg{transform:rotate(90deg)}
+  .ne-tab:hover,.ne-tab:focus-visible{transform:translateX(3px);outline:0}
+}
 @media (min-width:64rem){
   .proj{grid-template-columns:repeat(4,minmax(0,1fr))}
   .proj-info{grid-column:4;grid-row:1;border-bottom:0;background:none}
@@ -916,6 +928,8 @@ body[data-view="page"] .lore--bg{display:none}
 </div>
 
 <script src="js/flower-gl.js"></script>
+<script src="js/node-editor.js?v=1" defer></script>
+<script src="js/graphs-fiffy.js?v=1" defer></script>
 <script src="js/flower-wave.js?v=3" defer></script>
 <script>
 (() => {
@@ -960,19 +974,19 @@ const ALL_PROJECTS = [
       { label: { en: 'Controls, front and side', ja: 'コントローラー（正面・側面）' }, src: 'media/fiffy-flower/front-side.jpg' },
       { label: { en: 'Stem spine: a 7-row ribbon driven by 3 IK controls, with FK riding on top. The length is preserved by a spline IK chain on the ribbon, with an optional stretch blend and volume kept per joint.',
           ja: '茎のスパイン：3つのIKコントローラーで動く7列のリボン。上にFKを重ねています。リボン上のスプラインIKチェーンで長さを保持し、ストレッチのブレンドと関節ごとのボリューム保持も可能。' },
-        src: 'media/fiffy-flower/body-spline.mp4' },
+        src: 'media/fiffy-flower/body-spline.mp4', nodes: 'fiffy-spine' },
       { label: { en: 'Stem legs: IK/FK with a pole vector, soft IK, stretch and pinning, plus bendy ribbons along the leg.',
           ja: '茎の脚：ポールベクター付きのIK/FK、ソフトIK、ストレッチ、ピン留め、脚に沿ったベンディリボン。' },
-        src: 'media/fiffy-flower/legs.mp4' },
+        src: 'media/fiffy-flower/legs.mp4', nodes: 'fiffy-legs' },
       { label: { en: 'Leaf arm ribbon: NURBS strips whose CVs are placed straight from matrices, with no skinCluster. The leaf joints are pinned to the strip with uvPin, so the bend controls shape the whole leaf.',
           ja: '葉の腕のリボン：CVをマトリクスから直接配置したNURBSストリップ（skinClusterなし）。葉のジョイントはuvPinでストリップに固定され、ベンドコントローラーで葉全体の形を作れます。' },
-        src: 'media/fiffy-flower/ribbon.mp4' },
+        src: 'media/fiffy-flower/ribbon.mp4', nodes: 'fiffy-ribbon' },
       { label: { en: 'Mouth shapes driven from the mouth controllers: moving a control blends in the shapes (open, pucker, closed).',
           ja: '口のコントローラーで駆動するブレンドシェイプ：コントローラーを動かすと形状（開く、すぼめる、閉じる）がブレンドされます。' },
-        src: 'media/fiffy-flower/mouth-blendshapes.mp4' },
+        src: 'media/fiffy-flower/mouth-blendshapes.mp4', nodes: 'fiffy-mouth-bs' },
       { label: { en: 'Mouth setup: the lip controls ride on the blendshape result through a proximityPin, so they stay on the lips in every shape. The lip joints only carry the control offsets, so the blendshapes are not applied twice in Unreal.',
           ja: '口のセットアップ：唇のコントローラーはproximityPinでブレンドシェイプの結果に追従し、どの形でも唇の上に留まります。唇のジョイントはコントローラーの差分だけを持つため、Unrealでブレンドシェイプが二重にかかりません。' },
-        src: 'media/fiffy-flower/mouth-setups.mp4' }] },
+        src: 'media/fiffy-flower/mouth-setups.mp4', nodes: 'fiffy-mouth' }] },
   { id: 'kotsudo', cat: 'research', year: '2025 – now', thumb: 'media/kotsudo/thumb.jpg',
     title: { en: 'JEFF 骨道 (Kotsudō): Maya to UE5 Control Rig', ja: 'JEFF 骨道：Maya → UE5 Control Rig' },
     kind: { en: 'Research tool, work in progress', ja: '研究ツール（制作中）' },
@@ -1074,7 +1088,7 @@ const T = {
     'rw.s3': 'Import', 'rw.s3d': 'The skeleton arrives in Unreal Engine 5.6', 'rw.s4': 'Build', 'rw.s4d': 'A Control Rig rebuilt automatically',
     'latest.title': 'Latest additions', 'latest.all': 'See all work', 'slot.todo': 'add file',
     'wk.all': 'All', 'wk.empty': 'Empty slot', 'cat.rigs': 'Rigs', 'cat.tools': 'Tools', 'cat.animation': 'Animation', 'cat.research': 'Research',
-    'pj.back': 'All work', 'pj.prev': 'Previous', 'pj.next': 'Next',
+    'pj.back': 'All work', 'pj.prev': 'Previous', 'pj.next': 'Next', 'pj.nodes': 'Node graph',
     'pj.type': 'Type', 'pj.year': 'Date', 'pj.time': 'Time spent', 'pj.role': 'Role', 'pj.rig': 'Rig by', 'pj.soft': 'Software',
     'ab.bio1': 'I am a rigging artist and technical animator. Through research on 3D animation and rigging, I work on improving the workflow between Maya and Unreal Engine.',
     'ab.bio2': 'Data compatibility and production efficiency between the two are where I kept running into problems, so I have been developing a rigging pipeline that is more intuitive and more flexible.',
@@ -1124,7 +1138,7 @@ const T = {
     'rw.s3': '読み込み', 'rw.s3d': 'スケルトンをUnreal Engine 5.6へ', 'rw.s4': '構築', 'rw.s4d': 'Control Rigを自動で再構築',
     'latest.title': '最新の追加', 'latest.all': 'すべての作品を見る', 'slot.todo': 'ファイル未設定',
     'wk.all': 'すべて', 'wk.empty': '空き枠', 'cat.rigs': 'リグ', 'cat.tools': 'ツール', 'cat.animation': 'アニメーション', 'cat.research': '研究',
-    'pj.back': '作品一覧', 'pj.prev': '前へ', 'pj.next': '次へ',
+    'pj.back': '作品一覧', 'pj.prev': '前へ', 'pj.next': '次へ', 'pj.nodes': 'ノードグラフ',
     'pj.type': '種別', 'pj.year': '制作日', 'pj.time': '制作期間', 'pj.role': '担当', 'pj.rig': 'リグ提供', 'pj.soft': '使用ソフト',
     'ab.bio1': '3Dアニメーションとリギングの研究を通して、MayaとUnreal Engineのワークフローを改善することを目指しています。',
     'ab.bio2': 'これまで、両ソフト間のデータ互換性や制作効率に課題があることを実感し、より直感的で柔軟なリギングパイプラインの開発に取り組んできました。',
@@ -1396,6 +1410,7 @@ function softify(node, list) {
 }
 $$('[data-soft]').forEach(n => softify(n, n.dataset.soft));
 
+const NE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="2" width="5" height="4"/><rect x="10" y="10" width="5" height="4"/><path d="M6 4c4 0 0 8 4 8"/></svg>';
 function renderProject(p) {
   $('#pj-title').textContent = L(p.title);
   const facts = $('#pj-facts'); facts.textContent = '';
@@ -1404,7 +1419,17 @@ function renderProject(p) {
   });
   $('#pj-sum').textContent = L(p.summary);
   const box = $('#pj-media'); box.textContent = '';
-  p.media.forEach(m => { const f = mk('figure', 'shot'); f.append(frame(m.src, 'wide', false, L(m.label)), mk('figcaption', 'label', L(m.label))); box.append(f); });
+  p.media.forEach(m => {
+    const f = mk('figure', 'shot'), fr = frame(m.src, 'wide', false, L(m.label));
+    if (m.nodes) {                                                          // a node graph for this clip: the tab that opens it
+      const w = mk('div', 'shot-v'), b = mk('button', 'ne-tab');
+      b.type = 'button'; b.innerHTML = NE_ICON; b.append(mk('span', '', tr('pj.nodes')));
+      b.setAttribute('aria-haspopup', 'dialog');
+      b.addEventListener('click', () => window.NodeEditor && NodeEditor.open(m.nodes, { video: srcFor(m.src) }));
+      w.append(fr, b); f.append(w);
+    } else f.append(fr);
+    f.append(mk('figcaption', 'label', L(m.label))); box.append(f);
+  });
   const i = PROJECTS.indexOf(p), n = PROJECTS.length;
   link($('#pj-prev'), 'p-' + PROJECTS[(i + n - 1) % n].id); link($('#pj-next'), 'p-' + PROJECTS[(i + 1) % n].id);
 }
