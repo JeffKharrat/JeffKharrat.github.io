@@ -974,7 +974,7 @@ body[data-view="page"] .lore--bg{display:none}
 </div>
 
 <script src="js/flower-gl.js"></script>
-<script src="js/lookdev-ball.js?v=1"></script>
+<script src="js/lookdev-ball.js?v=2"></script>
 <script src="js/node-editor.js?v=8" defer></script>
 <script src="js/graphs-fiffy.js?v=3" defer></script>
 <script src="js/flower-wave.js?v=3" defer></script>
@@ -1588,8 +1588,8 @@ const stage = $('#stage'), reveal = $('#reveal'), mark = $('#mark');
 const layers = $$('canvas[data-layer]', stage), vids = $$('video[data-layer]', stage);
 const ctxs = layers.map(c => c.getContext('2d'));
 const gim = $('#gimbal'), gctx = gim.getContext('2d'), scan = $('#scan');
-/* The lookdev ball sits over the gimbal: it computes itself in, cell by cell, once no intro is playing (the gimbal intro
-   lands its ring on the gimbal first), and hovering the tile runs the cell front across it. */
+/* The lookdev ball sits over the gimbal: it computes itself in, cell by cell, on load (during the gimbal intro it waits
+   until that intro has landed its ring on the gimbal), and hovering the tile runs the cell front across it. */
 let ballOn = false, gimClear = false;
 const ball = (() => { try { return window.LookdevBall ? LookdevBall($('#ball'), { variant: SITE.ball || 'wire', hoverEl: gim.parentElement,
   accent: () => getComputedStyle(root).getPropertyValue('--accent'), build: true }) : null; } catch (e) { return null; } })();
@@ -1817,7 +1817,10 @@ function draw(now) {
   setMode(t > .5 ? i1 : i0);
   const fs = String(Math.floor(fr) % 240 + 1).padStart(4, '0');
   if (fs !== lastF) { lastF = fs; $('#hud-f').textContent = fs; }
-  if (ball) { const on = !introBusy(); if (on !== ballOn) { ballOn = on; ball.build(on); } }
+  if (ball) {                                         // hidden only while the gimbal intro lands its ring on the rings underneath
+    let on = true; try { on = !(introBusy() && lore.mode && lore.mode() === 'gimbal'); } catch (e) { /* no intro */ }
+    if (on !== ballOn) { ballOn = on; ball.build(on); }
+  }
   if (gim.width && (!ball || ball.built < 1)) { gimbal(sec, gim.width / dpr); gimClear = false; }
   else if (gim.width && !gimClear) { gctx.setTransform(1, 0, 0, 1, 0, 0); gctx.clearRect(0, 0, gim.width, gim.height); gimClear = true; }
 }
@@ -3965,7 +3968,7 @@ const lore = (() => {
   document.addEventListener('visibilitychange', wake); document.addEventListener('viewchange', refit);
   new MutationObserver(wake).observe(root, { attributes: true, attributeFilter: ['data-theme', 'data-accent'] });
   darkMq.addEventListener('change', wake);
-  return { wake, busy: () => !done && current === 'home' && !still.matches };
+  return { wake, busy: () => !done && current === 'home' && !still.matches, mode: () => mode };
 })();
 
 /* ---------- gravity grid: the page's grid, sagging under the pointer like a sheet under a mass ----------
