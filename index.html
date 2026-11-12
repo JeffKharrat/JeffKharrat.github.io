@@ -3907,7 +3907,7 @@ const lore = (() => {
    A patch of grid (anchored to the page, so it does not slide with the mouse) shows around the pointer and pinches in toward it.
    Holding the button down on empty space adds mass: the patch tilts into a 3D well that deepens for about a second and the orbiters
    are drawn in; letting go springs it back with a wobble and sends a ripple out. The page's own border lines near the pointer bend
-   with it (drawn as accent copies on a layer above the page). Behind the content, so panels and text cover the grid.
+   with it. Drawn above the page with text, media and filled controls cut out, so solid panels and the header do not hide it.
    Off while a home intro plays, and off for reduced motion. On touch it shows where you touch and fades after you let go. */
 const grav = (() => {
   if (still.matches) return null;
@@ -3917,29 +3917,80 @@ const grav = (() => {
   const ss = (a, c, v) => { const x = Math.min(1, Math.max(0, (v - a) / (c - a))); return x * x * (3 - 2 * x); };
   const S = { x: -1e4, y: -1e4, vis: 0, visT: 0, m: .3, mv: 0, tl: 0, tv: 0, hold: -1, rip: [], off: 0, touch: false,
     orb: [[22, 0, 1], [34, 2.1, .7], [48, 4.2, .5]].map(([r, a, s]) => ({ r, a, rr: r, s })) };
-  let W = 0, H = 0, dpr = 1, raf = 0, last = 0, segs = [], scanY = 0, scanX = 0, scanDue = true, scanTimer = 0;
+  let W = 0, H = 0, dpr = 1, raf = 0, last = 0, segs = [], holes = [], scanY = 0, scanX = 0, scanDue = true, scanTimer = 0, lastScan = 0;
+  let gx0 = 0, gy0 = 0, gap = GAP;                                      // grid origin and spacing, in page coordinates
+  const oc = mk('canvas'), g = oc.getContext('2d');                    // the patch is drawn here, then the text and media are cut out of it
 
   function size() {
     dpr = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight;
-    [cb, cf].forEach(c => { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); });
+    [cb, cf, oc].forEach(c => { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); });
     scanDue = true; kick();
   }
-  /* the page's visible border lines, in viewport coordinates at scan time (non-fixed ones are moved by the scroll since) */
+  /* is this element (or an ancestor) held in place on screen right now: fixed, or sticky and stuck */
+  const pinned = new Map();
+  function isPinned(e) {
+    if (!e || e === document.body || e === document.documentElement) return false;
+    if (pinned.has(e)) return pinned.get(e);
+    const cs = getComputedStyle(e); let v;
+    if (cs.position === 'fixed') v = true;
+    else if (cs.position === 'sticky') { const r = e.getBoundingClientRect(), tp = parseFloat(cs.top); v = !isNaN(tp) && Math.abs(r.top - tp) < 1.5; }
+    else v = isPinned(e.parentElement);
+    pinned.set(e, v); return v;
+  }
+  /* the page's visible lines, and what the grid must not cross (text, media, filled controls), in viewport coordinates at scan time */
   function scan() {
-    scanDue = false; segs = []; scanX = scrollX; scanY = scrollY;
+    scanDue = false; segs = []; holes = []; pinned.clear(); scanX = scrollX; scanY = scrollY; lastScan = performance.now();
+    const near = r => r.bottom > -300 && r.top < H + 300 && r.right > 0 && r.left < W, area = W * H;
+    // the layout frame: grid squares start on its corner and fit its columns exactly, so its column lines fall on grid lines
+    const fr = [...document.querySelectorAll('.grid')].map(e => [e, e.getBoundingClientRect()]).find(([, r]) => r.width > 200 && r.height > 0 && near(r));
+    gap = GAP; gx0 = 0; gy0 = 0;
+    if (fr) {
+      const [e, r] = fr, cs = getComputedStyle(e), cols = Math.max(1, Math.round(100 / (parseFloat(cs.backgroundSize) || 100)));
+      const bl = parseFloat(cs.borderLeftWidth) || 0, br = parseFloat(cs.borderRightWidth) || 0, colW = (r.width - bl - br) / cols;
+      gap = colW / Math.max(1, Math.round(colW / GAP));
+      gx0 = r.left + bl + scrollX; gy0 = r.top + scrollY;
+      for (let k = 1; k < cols; k++) { const x = r.left + bl + k * colW + .5; segs.push([x, r.top, x, r.bottom, false]); }   // its column lines are a background, not borders
+    }
     document.querySelectorAll('body *').forEach(e => {
-      if (e === cb || e === cf || e.tagName === 'CANVAS' || e.tagName === 'SCRIPT') return;
+      if (e === cb || e === cf || e.tagName === 'SCRIPT' || e.tagName === 'STYLE') return;
       const r = e.getBoundingClientRect();
-      if (!r.width || !r.height || (r.width < 60 && r.height < 60) || r.bottom < -400 || r.top > H + 400) return;
+      if (!r.width || !r.height || !near(r)) return;
       const cs = getComputedStyle(e);
       if (cs.visibility === 'hidden' || +cs.opacity === 0) return;
-      const fixed = cs.position === 'fixed' || cs.position === 'sticky';
+      const fixed = isPinned(e), tag = e.tagName;
+      const filled = (cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent') || cs.backgroundImage.startsWith('url');
+      if (/^(IMG|VIDEO|CANVAS|IFRAME|svg|INPUT|SELECT|TEXTAREA)$/.test(tag) || e.matches('.ne-clip') || (filled && r.width < W * .45 && r.height < H * .45 && r.width * r.height < area * .12 && !e.matches('.grid,.row,.frame'))) {
+        const bi = parseFloat(cs.borderTopWidth) || 0;            // inside the border, so a bent copy of the border can still show
+        holes.push([r.left + bi, r.top + bi, r.right - bi, r.bottom - bi, fixed]);
+      }
+      if (r.width < 24 && r.height < 24) return;
+      // border lines: on the middle of the border, stopping short of rounded corners
+      const rad = Math.max(parseFloat(cs.borderTopLeftRadius) || 0, parseFloat(cs.borderBottomRightRadius) || 0);
       const side = (w, st, x1, y1, x2, y2) => { if (parseFloat(w) > 0 && st !== 'none' && st !== 'hidden') segs.push([x1, y1, x2, y2, fixed]); };
-      side(cs.borderTopWidth, cs.borderTopStyle, r.left, r.top, r.right, r.top);
-      side(cs.borderBottomWidth, cs.borderBottomStyle, r.left, r.bottom, r.right, r.bottom);
-      side(cs.borderLeftWidth, cs.borderLeftStyle, r.left, r.top, r.left, r.bottom);
-      side(cs.borderRightWidth, cs.borderRightStyle, r.right, r.top, r.right, r.bottom);
+      const bt = parseFloat(cs.borderTopWidth) / 2, bb = parseFloat(cs.borderBottomWidth) / 2, bl = parseFloat(cs.borderLeftWidth) / 2, br = parseFloat(cs.borderRightWidth) / 2;
+      side(cs.borderTopWidth, cs.borderTopStyle, r.left + rad, r.top + bt, r.right - rad, r.top + bt);
+      side(cs.borderBottomWidth, cs.borderBottomStyle, r.left + rad, r.bottom - bb, r.right - rad, r.bottom - bb);
+      side(cs.borderLeftWidth, cs.borderLeftStyle, r.left + bl, r.top + rad, r.left + bl, r.bottom - rad);
+      side(cs.borderRightWidth, cs.borderRightStyle, r.right - br, r.top + rad, r.right - br, r.bottom - rad);
     });
+    // the line under the header is a pseudo-element
+    const hd = document.querySelector('.hdr');
+    if (hd) {
+      const r = hd.getBoundingClientRect(), a = getComputedStyle(hd, '::after');
+      if (r.height && a.content !== 'none') segs.push([r.left + (parseFloat(a.left) || 0), r.bottom - .5, r.right - (parseFloat(a.right) || 0), r.bottom - .5, isPinned(hd)]);
+    }
+    // text: each line box, padded a little
+    const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, { acceptNode: n => n.data.trim() ? 1 : 2 }), rg = document.createRange();
+    for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+      const pe = n.parentElement; if (!pe || pe.closest('script,style,.ne-clip')) continue;
+      rg.selectNodeContents(n);
+      let fixed = null;
+      for (const q of rg.getClientRects()) {
+        if (!q.width || !near(q)) continue;
+        if (fixed === null) fixed = isPinned(pe);
+        holes.push([q.left - 3, q.top - 2, q.right + 3, q.bottom + 2, fixed]);
+      }
+    }
   }
 
   /* the sheet: pinch toward the pointer, depth of the well, ripples; then the tilt into 3D */
@@ -3980,32 +4031,43 @@ const grav = (() => {
   function draw(now) {
     b.setTransform(dpr, 0, 0, dpr, 0, 0); b.clearRect(0, 0, W, H);
     f.setTransform(dpr, 0, 0, dpr, 0, 0); f.clearRect(0, 0, W, H);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
     if (S.vis < .005) return;
+    if (scanDue || now - lastScan > 400) scan();                         // keeps up with layout changes while the patch shows
     const lines = [], st = 5, x0 = S.x - RP, x1 = S.x + RP, y0 = S.y - RP, y1 = S.y + RP;
-    const ox = (-scrollX % GAP + GAP) % GAP, oy = (-scrollY % GAP + GAP) % GAP;   // the grid sits on the page, not on the pointer
-    for (let x = Math.floor((x0 - ox) / GAP) * GAP + ox; x <= x1; x += GAP) { const L = []; for (let y = y0; y <= y1; y += st) L.push([x - S.x, y - S.y]); lines.push(L); }
-    for (let y = Math.floor((y0 - oy) / GAP) * GAP + oy; y <= y1; y += GAP) { const L = []; for (let x = x0; x <= x1; x += st) L.push([x - S.x, y - S.y]); lines.push(L); }
-    drawLines(b, lines, C.acc, .85, now, 1);
+    const ox = gx0 - scrollX, oy = gy0 - scrollY;                         // the grid sits on the page's frame, not on the pointer
+    for (let x = ox + Math.ceil((x0 - ox) / gap) * gap; x <= x1; x += gap) { const L = []; for (let y = y0; y <= y1; y += st) L.push([x - S.x, y - S.y]); lines.push(L); }
+    for (let y = oy + Math.ceil((y0 - oy) / gap) * gap; y <= y1; y += gap) { const L = []; for (let x = x0; x <= x1; x += st) L.push([x - S.x, y - S.y]); lines.push(L); }
+    drawLines(g, lines, C.acc, .85, now, 1);
 
-    /* the page's border lines near the pointer, bent the same way, on the layer above the page */
-    if (scanDue) scan();
+    /* orbiters, drawn in while the mass grows */
+    const p = [0, 0, 0, 0], pull = Math.min(1, Math.max(0, (S.m - .3) / 1.5));
+    S.orb.forEach((ob, i) => {
+      const P0 = P(Math.cos(ob.a) * ob.rr, Math.sin(ob.a) * ob.rr, now, p), d = Math.max(2, 3.2 - i * .4);
+      g.globalAlpha = S.vis * (.75 + .25 * pull); g.fillStyle = i ? C.ink2 : C.acc; g.fillRect(P0[0] - d / 2, P0[1] - d / 2, d, d);
+    });
+
+    /* the page's lines near the pointer, bent the same way */
     const dX = scanX - scrollX, dY = scanY - scrollY, ui = [];
     segs.forEach(([ax, ay, bx, by, fixed]) => {
       const sx = fixed ? 0 : dX, sy = fixed ? 0 : dY, X1 = ax + sx, Y1 = ay + sy, X2 = bx + sx, Y2 = by + sy;
       if (Math.max(X1, X2) < x0 || Math.min(X1, X2) > x1 || Math.max(Y1, Y2) < y0 || Math.min(Y1, Y2) > y1) return;
       const L = [];
-      if (Y1 === Y2) for (let x = Math.max(x0, Math.min(X1, X2)); x <= Math.min(x1, Math.max(X1, X2)); x += 6) L.push([x - S.x, Y1 - S.y]);
-      else for (let y = Math.max(y0, Math.min(Y1, Y2)); y <= Math.min(y1, Math.max(Y1, Y2)); y += 6) L.push([X1 - S.x, y - S.y]);
+      if (Math.abs(Y1 - Y2) < .01) { const a0 = Math.max(x0, Math.min(X1, X2)), a1 = Math.min(x1, Math.max(X1, X2)); for (let x = a0; x < a1; x += 6) L.push([x - S.x, Y1 - S.y]); L.push([a1 - S.x, Y1 - S.y]); }
+      else { const a0 = Math.max(y0, Math.min(Y1, Y2)), a1 = Math.min(y1, Math.max(Y1, Y2)); for (let y = a0; y < a1; y += 6) L.push([X1 - S.x, y - S.y]); L.push([X1 - S.x, a1 - S.y]); }
       if (L.length > 1) ui.push(L);
     });
-    if (ui.length) drawLines(f, ui, C.acc, .8, now, 1.4);
+    if (ui.length) drawLines(g, ui, C.acc, .8, now, 1.4);
 
-    /* orbiters, drawn in while the mass grows */
-    const p = [0, 0, 0, 0], pull = Math.min(1, Math.max(0, (S.m - .3) / 1.5));
-    S.orb.forEach((o, i) => {
-      const P0 = P(Math.cos(o.a) * o.rr, Math.sin(o.a) * o.rr, now, p), d = Math.max(2, 3.2 - i * .4);
-      b.globalAlpha = S.vis * (.75 + .25 * pull); b.fillStyle = i ? C.ink2 : C.acc; b.fillRect(P0[0] - d / 2, P0[1] - d / 2, d, d);
+    /* cut out the text, media and filled controls, then show it above the page (solid panels no longer hide it) */
+    g.globalAlpha = 1; g.globalCompositeOperation = 'destination-out'; g.fillStyle = '#000';
+    holes.forEach(([l, t, r, bt, fixed]) => {
+      const sx = fixed ? 0 : dX, sy = fixed ? 0 : dY;
+      if (r + sx < x0 || l + sx > x1 || bt + sy < y0 || t + sy > y1) return;
+      g.fillRect(l + sx, t + sy, r - l, bt - t);
     });
+    g.globalCompositeOperation = 'source-over';
+    f.setTransform(1, 0, 0, 1, 0, 0); f.globalAlpha = 1; f.drawImage(oc, 0, 0);
   }
 
   function tick(now) {
@@ -4045,7 +4107,8 @@ const grav = (() => {
   addEventListener('pointercancel', () => release(false), { passive: true });
   document.addEventListener('pointerout', e => { if (!e.relatedTarget && e.pointerType !== 'touch') { S.visT = 0; release(false); kick(); } });
   addEventListener('blur', () => { S.visT = 0; release(false); kick(); });
-  addEventListener('scroll', () => { clearTimeout(scanTimer); scanTimer = setTimeout(() => { scanDue = true; kick(); }, 120); kick(); }, { passive: true });
+  document.addEventListener('scroll', e => { if (e.target !== document) scanDue = true; clearTimeout(scanTimer); scanTimer = setTimeout(() => { scanDue = true; kick(); }, 80); kick(); }, { passive: true, capture: true });
+  if ('ResizeObserver' in window) new ResizeObserver(() => { scanDue = true; }).observe(document.body);
   addEventListener('resize', size); document.addEventListener('viewchange', () => { scanDue = true; kick(); });
   size();
   return { kick };
