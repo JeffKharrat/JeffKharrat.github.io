@@ -2,6 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>
+/* Language, decided before first paint: ?lang= in the URL > the visitor's own click (saved) > the browser's language. */
+(function () {
+  var pick = null;
+  try { var q = new URLSearchParams(location.search).get('lang'); if (q === 'ja' || q === 'en') pick = q; } catch (e) {}
+  if (!pick) { try { var c = localStorage.getItem('lang-choice'); if (c === 'ja' || c === 'en') pick = c; } catch (e) {} }
+  if (!pick) {
+    var prefs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ''];
+    pick = String(prefs[0] || '').toLowerCase().indexOf('ja') === 0 ? 'ja' : 'en';
+  }
+  window.__lang0 = pick;
+  document.documentElement.lang = pick;
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Jeff Kharrat Portfolio</title>
 <meta name="description" content="Jeff Kharrat: character rigging and technical animation, Maya and Unreal Engine 5. Based in Tokyo.">
@@ -1237,18 +1251,18 @@ document.addEventListener('focusin', e => {
 });
 
 /* ---------- language ---------- */
-function setLang(l) {
+function setLang(l, chosen) {
   lang = T[l] ? l : 'en';
   root.lang = lang;
   $$('[data-i18n]').forEach(el => { const v = tr(el.dataset.i18n); if (el._sc) el._txt = v; else el.textContent = v; });
   $$('[data-i18n-aria]').forEach(el => el.setAttribute('aria-label', tr(el.dataset.i18nAria)));
   $$('[data-lang]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
-  store.set('lang', lang);
+  if (chosen) store.set('lang-choice', lang);   // only a real click is remembered; otherwise the browser language decides each visit
   renderLinks();
   renderLatest(); renderResearch();
   renderView(current);
 }
-$$('[data-lang]').forEach(b => b.addEventListener('click', () => setLang(b.dataset.lang)));
+$$('[data-lang]').forEach(b => b.addEventListener('click', () => setLang(b.dataset.lang, true)));
 
 /* ---------- contact links ---------- */
 const ARROW = '<svg viewBox="0 0 10 10" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 8l6-6M3 2h5v5"/></svg>';
@@ -5165,7 +5179,8 @@ const run = (() => {
 const th0 = store.get('theme');
 if (th0 === 'dark' || th0 === 'light') root.dataset.theme = th0;
 setAccent(ACCENTS[accentI]);
-setLang(store.get('lang') || ((navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en'));
+try { localStorage.removeItem('lang'); } catch (e) {}   // old key: it was saved automatically, so it can't be trusted as a choice
+setLang(window.__lang0 || 'en');
 readColours();
 const repaint = () => {
   readColours(); kick();
