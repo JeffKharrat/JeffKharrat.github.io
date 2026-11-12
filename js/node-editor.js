@@ -70,7 +70,7 @@
 .ne-clip{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:3}
 .ne{position:absolute;inset:0;pointer-events:auto;overflow:hidden;touch-action:none;overscroll-behavior:contain;cursor:default;outline:none;
   user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;background-color:${MAYA.graph};
-  background-image:linear-gradient(${MAYA.grid} 2px,transparent 2px),linear-gradient(90deg,${MAYA.grid} 2px,transparent 2px);
+  background-image:linear-gradient(${MAYA.grid} 1px,transparent 1px),linear-gradient(90deg,${MAYA.grid} 1px,transparent 1px);
   font:13px/1.2 "Segoe UI",Tahoma,"Lucida Grande","Helvetica Neue",Arial,sans-serif;letter-spacing:0;text-transform:none;color:${MAYA.label};
   transform:translateX(102%);transition:transform .32s cubic-bezier(.2,.8,.2,1)}
 .ne.is-on{transform:none}
@@ -81,9 +81,9 @@
 .ne-fr{fill:rgba(255,255,255,.035);stroke:rgba(255,255,255,.13);stroke-width:2;transition:opacity .3s}
 .ne-fr.is-cur{fill:rgba(110,190,153,.06);stroke:rgba(110,190,153,.55)}
 .ne-w{fill:none;stroke-width:2;transition:opacity .3s}
-.ne-f{fill:none;stroke-width:5;stroke-linecap:round;stroke-dasharray:0 26;opacity:0;transition:opacity .3s}
-.ne-f.is-run{opacity:1;animation:ne-flow 1.15s linear infinite}
-@keyframes ne-flow{to{stroke-dashoffset:-26}}
+.ne-f{fill:none;stroke-width:5;stroke-linecap:round;stroke-dasharray:0 90;opacity:0;transition:opacity .3s}
+.ne-f.is-run{opacity:1;animation:ne-flow 2.6s linear infinite}
+@keyframes ne-flow{to{stroke-dashoffset:-90}}
 .ne-dim{opacity:.16}
 .ne-n{position:absolute;transition:opacity .3s}
 .ne-nm{position:absolute;left:3px;bottom:100%;margin-bottom:3px;font-size:14px;color:${MAYA.name};white-space:nowrap;pointer-events:none}
@@ -220,7 +220,7 @@
       const row = st.nodes[a].rows.find(r => r.a === aa), col = MAYA.port[row ? row.dt : 'd'] || '#888';
       const d = `M${x1} ${y1}C${x1 + dx} ${y1} ${x2 - dx} ${y2} ${x2} ${y2}`;
       const p = sv('path', { d, class: 'ne-w', stroke: col === '#000000' ? '#111' : col });
-      const f = sv('path', { d, class: 'ne-f', stroke: col === '#000000' ? '#9A9A9A' : lighten(col), style: `animation-delay:${-(i * .23) % 1.15}s` });
+      const f = sv('path', { d, class: 'ne-f', stroke: col === '#000000' ? '#9A9A9A' : lighten(col), style: `animation-delay:${-(i * .53) % 2.6}s` });
       svg.append(p, f);
       return { a, b, p, f, sa: st.nodes[a].s, sb: st.nodes[b].s };
     });

@@ -407,15 +407,17 @@ a.gtile:hover b{text-decoration:underline;text-decoration-color:var(--accent);te
 .shot .fill--yt{aspect-ratio:16/9;height:auto}
 /* a clip with a node graph: a tab sticks out of its right edge and opens the node editor */
 .shot-v{position:relative}
-.ne-tab{position:absolute;z-index:4;top:0;right:0;display:flex;align-items:center;gap:.4rem;padding:.4rem .6rem;border:0;cursor:pointer;
-  font:inherit;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;background:#C6FF1A;color:#0B0C0F;transition:filter .15s,transform .15s}
+.ne-tab{position:absolute;z-index:4;top:0;right:0;display:flex;align-items:center;justify-content:center;gap:.4rem;padding:.45rem .65rem;border:0;cursor:pointer;
+  font:inherit;font-family:var(--mono);font-size:.74rem;font-weight:700;line-height:1;letter-spacing:.1em;text-transform:uppercase;
+  background:var(--accent);color:var(--on-accent);transition:filter .15s,transform .15s,background-color .2s,color .2s}
 .ne-tab svg{width:.95rem;height:.95rem;flex:none}
 .ne-tab:hover,.ne-tab:focus-visible{filter:brightness(1.08);outline:2px solid var(--ink);outline-offset:2px}
-.ne-tab[aria-expanded="true"]{background:#5285A6;color:#fff}
+.ne-tab[aria-expanded="true"]{background:var(--ink);color:var(--ground)}
 @media (min-width:64rem){
-  .ne-tab{right:auto;left:100%;top:1rem;width:min(var(--pad),2rem);padding:.7rem 0;flex-direction:column;writing-mode:vertical-rl;justify-content:center;gap:.5rem;
+  /* sticks out of the clip's right edge: the label reads top to bottom, centred, in the site's current accent */
+  .ne-tab{right:auto;left:100%;top:1rem;width:max(1.65rem,min(var(--pad),2.1rem));padding:.95rem 0;writing-mode:vertical-rl;text-orientation:mixed;
     clip-path:polygon(0 0,100% 6px,100% calc(100% - 6px),0 100%)}
-  .ne-tab svg{transform:rotate(90deg)}
+  .ne-tab svg{display:none}
   .ne-tab:hover,.ne-tab:focus-visible{transform:translateX(3px);outline:0}
 }
 @media (min-width:64rem){
@@ -929,7 +931,7 @@ body[data-view="page"] .lore--bg{display:none}
 </div>
 
 <script src="js/flower-gl.js"></script>
-<script src="js/node-editor.js?v=7" defer></script>
+<script src="js/node-editor.js?v=8" defer></script>
 <script src="js/graphs-fiffy.js?v=3" defer></script>
 <script src="js/flower-wave.js?v=3" defer></script>
 <script>
