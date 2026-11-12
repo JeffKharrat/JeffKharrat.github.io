@@ -929,7 +929,7 @@ body[data-view="page"] .lore--bg{display:none}
 </div>
 
 <script src="js/flower-gl.js"></script>
-<script src="js/node-editor.js?v=2" defer></script>
+<script src="js/node-editor.js?v=3" defer></script>
 <script src="js/graphs-fiffy.js?v=2" defer></script>
 <script src="js/flower-wave.js?v=3" defer></script>
 <script>
@@ -4032,7 +4032,7 @@ const grav = (() => {
 
   addEventListener('pointermove', e => {
     S.x = e.clientX; S.y = e.clientY;
-    if (e.pointerType !== 'touch') { S.touch = false; S.visT = 1; }
+    if (e.pointerType !== 'touch') { S.touch = false; S.visT = e.target.closest && e.target.closest('.ne') ? 0 : 1; }   // not over a node graph
     kick();
   }, { passive: true });
   addEventListener('pointerdown', e => {
