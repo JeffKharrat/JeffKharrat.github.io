@@ -281,7 +281,7 @@ function world() {
   F = RF(0, 0, 1);
   /* the causeway: planks on a 1.5 m pitch, each placed on its own as the camera comes (see the vertex shader); it ends at the
      mouth of the spark's aisle */
-  const ZPE = cfg.aisle ? cfg.aisle[1] - 6 : ZEND - 26;
+  const ZPE = cfg.aisle ? cfg.aisle[1] - 1.6 : ZEND - 26;   // the last plank stops short of the aisle's mouth
   NPL = 0;
   for (let z = -14; z < ZPE && NPL < 192; z += 1.5) { box([0, CH / 2, z], [CW * 2, CH, 1.3], C.slate, 1); NPL++; }
   STOPS.forEach((S, k) => {
@@ -291,7 +291,15 @@ function world() {
     label('c-' + S.id, [0, 2.0, -.08], 1.3, [0, 0, -1], [0, 1, 0], C.ink);
     label('a-' + S.id, [0, 1.62, -.08], 1.5, [0, 0, -1], [0, 1, 0], C.ink2);
   });
-  STOPS.forEach((S, k) => { F = HF(S); if (BUILD[S.id]) BUILD[S.id](S, k); F = RF(0, 0, 1); });
+  /* each place, then pushed sideways off the causeway if any part of it reaches over (it keeps to its own side of the path) */
+  STOPS.forEach((S, k) => {
+    const v0 = V.length; F = HF(S); if (BUILD[S.id]) BUILD[S.id](S, k); F = RF(0, 0, 1);
+    let lo = 1e9;
+    for (let i = v0; i < V.length; i += 21) if (V[i + 2] > S.z - 40 && V[i + 2] < S.z + 40) lo = Math.min(lo, S.s * (V[i] - xs(V[i + 2])));
+    const push = Math.max(0, CW + .6 - lo) * S.s;
+    if (push) for (let i = v0; i < V.length; i += 21) { V[i] += push; if (V[i + 16]) V[i + 14] += push; }
+    PUSH[S.id] = push;
+  });
   let rs = 11; const rr = () => { rs = (rs * 16807) % 2147483647; return rs / 2147483647; };
   /* the made moon's industry between and behind the places (after concept 09): low blunt halls with cell bands, stacks,
      lattice masts, tank farms, terraces; kept off the road and out of every parked camera's line of sight */
@@ -351,7 +359,7 @@ function world() {
 const NUM = { '0': ['.#####', '######', '##..##', '##..##', '##.###', '###.##', '##..##', '##..##', '######', '#####.'],
   '6': ['.#####', '######', '##....', '##....', '#####.', '######', '##..##', '##..##', '######', '#####.'] };
 function aisle() {
-  const [ax0, az0] = cfg.aisle, HALF = 1.5, RH = 2.25, TRAY = 2.75, CEIL = 3.25, ZF = 18, ZB = -7;
+  const [ax0, az0] = cfg.aisle, HALF = 1.5, RH = 2.25, TRAY = 2.75, CEIL = 3.25, ZF = 18, ZB = -.5;
   F = { hero: true, o: [ax0, 0, az0], X: [1, 0, 0], Z: [0, 0, 1] };
   const L = ZF - ZB, zc = (ZF + ZB) / 2;
   box([0, -.02, zc], [HALF * 2, .04, L], C.ground);                                   // floor, 0.5 m tiles, lines along it
@@ -554,13 +562,13 @@ gl.bindBuffer(gl.ARRAY_BUFFER, fb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Ar
 let nV = 0, onReady = null;
 /* the planks: each one is placed when the camera comes within 'aheadPath' of it and takes its own 0.45 s to drop in, so they
    land one by one and none hangs half-placed when the camera stops; one that falls well out of reach again is taken away */
-let NPL = 0, PLT = 0; const PL0 = new Float32Array(192), PLP = new Float32Array(192);
+let NPL = 0, PLT = 0; const PUSH = {}; const PL0 = new Float32Array(192), PLP = new Float32Array(192);
 function planks(camZ, reach, now) {
   for (let i = 0; i < NPL; i++) {
     const d = -14 + i * 1.5 - camZ;
-    if (!PL0[i] && d < reach) { PL0[i] = Math.max(now, PLT + .05); PLT = PL0[i]; }   // several at once still land in turn
+    if (!PL0[i] && d < reach) { PL0[i] = Math.max(now, PLT + .018); PLT = PL0[i]; }   // several at once still land in turn
     else if (PL0[i] && d > reach + 4) PL0[i] = 0;
-    PLP[i] = PL0[i] ? Math.min(1, Math.max(0, (now - PL0[i]) / .45)) : 0;
+    PLP[i] = PL0[i] ? Math.min(1, Math.max(0, (now - PL0[i]) / .22)) : 0;
   }
 }
 function upload() {
