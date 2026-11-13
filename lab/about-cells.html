@@ -215,11 +215,9 @@ function world() {
   /* data-center machines in the background: rack rows set back in the field on both sides, facing the causeway */
   let rs = 11; const rr = () => { rs = (rs * 16807) % 2147483647; return rs / 2147483647; };
   F = { o: [0, 0, 0], s: 1 };
-  for (let z = -4; z < ZEND - 10; z += 13 + rr() * 9) for (const sd of [-1, 1]) {
-    if (rr() < .25) continue;
-    const x0 = sd * (24 + rr() * 16), n = 4 + (rr() * 6 | 0), hR = 2.2 + (rr() < .3 ? 1.1 : 0);
+  for (let z = 4; z < ZEND - 10; z += 16 + rr() * 14) {          // a few machines here and there: singles or groups of 2 to 3
+    const sd = rr() < .5 ? -1 : 1, x0 = sd * (20 + rr() * 26), n = 1 + (rr() * 3 | 0), hR = 2.2 + (rr() < .3 ? 1.1 : 0);
     for (let r = 0; r < n; r++) box([x0, hR / 2, z + r * .82], [1.1, hR, .78], C.panel, 8);
-    if (rr() < .5) for (let r = 0; r < n; r++) box([x0 + sd * 2.2, hR / 2, z + r * .82], [1.1, hR, .78], C.panel, 8);
   }
   label('v-path', [-CW - .02, CH + 2.2, -4], 1.0, [1, 0, 0], [0, 1, 0], C.ink2);
   /* the spark, the original rebuilt in cells: a cloud of square stars (white and the four accents), a shell of square dots
@@ -292,12 +290,12 @@ const BUILD = {
     const H = [13, 17, 11, 15, 12];
     H.forEach((h, i) => {
       const z = -15 + i * 7.4, x = 6 + (i % 2) * .8;
-      box([x, h / 2, z], [.16, h, 7], C.ink2, 2, ['nx']);       // the face toward the causeway: windows
-      box([x, h / 2, z], [.16, h, 7], C.panel, 0, ['px', 'pz', 'nz', 'py']);
-      for (let s = -1; s <= 1; s += 2) { beam([x + .1, 0, z + s * 3], [x + 2.6, 0, z + s * 3], .18, C.mid); beam([x + .1, h * .7, z + s * 3], [x + 2.6, 0, z + s * 3], .18, C.mid); }
+      const d = 6 + (i % 3) * 1.5;                              // real buildings: windows (each a cube-mapped room) on the street side
+      box([x + d / 2, h / 2, z], [d, h, 7], C.ink2, 2, ['nx', 'nz']);
+      box([x + d / 2, h / 2, z], [d, h, 7], C.slate, 9, ['px', 'pz', 'py']);
+      box([x + d * .55, h + .7, z + 1], [d * .4, 1.4, 2.6], C.mid);   // a rooftop unit
     });
-    box([9, 7, 20], [6, 14, .16], C.ink2, 2, ['nz']); box([9, 7, 20], [6, 14, .16], C.panel, 0, ['px', 'nx', 'pz', 'py']);
-    beam([6.2, 0, 20.1], [6.2, 9, 22.6], .18, C.mid); beam([11.8, 0, 20.1], [11.8, 9, 22.6], .18, C.mid);
+    box([9, 7, 23], [6, 14, 6], C.ink2, 2, ['nz', 'nx']); box([9, 7, 23], [6, 14, 6], C.slate, 9, ['px', 'pz', 'py']);
     [[1.2, 0, -6], [2.3, 0, -6], [1.7, 1, -6], [1.4, 0, 1.5], [1.4, 1, 1.5], [2.6, 0, 9]].forEach(([x, y, z], i) => {
       box([x, y + .5, z], [1, 1, 1], i % 2 ? C.mid : C.bone);
       beam([x, y + 1.02, z], [x + .5, y + 1.02, z], .05, C.red); beam([x, y + 1.02, z], [x, y + 1.5, z], .05, C.lime); beam([x, y + 1.02, z], [x, y + 1.02, z - .5], .05, C.blue);
@@ -305,7 +303,7 @@ const BUILD = {
     box([3.9, 9, -26], [.25, 2.6, 6.4], C.panel); label('logo-mc', [3.76, 9, -26], 5.6, [-1, 0, 0], [0, 1, 0], C.ink);
     vsign('v-mc', 4.6, -19.5, 6.5);
     [-12, -4.6, 2.8, 10.2].forEach((z, i) => { box([5.4, 3.2 + i % 2, z], [.9, 3.4, .2], C.panel); label('k-' + '街灯門学'[i], [5.4, 3.2 + i % 2, z - .11], .8, [0, 0, -1], [0, 1, 0], C.ink); });
-    label('k-街', [9, 9, 20 - .1], 4.4, [0, 0, -1], [0, 1, 0], C.ink);
+    label('k-街', [9, 9, 20 - .04], 4.4, [0, 0, -1], [0, 1, 0], C.ink);
   },
   /* 03 · the turntable yard: plinths with turning reference balls, a 24-step grey chart wall, a light gantry, the rename sign */
   zag(S) {
