@@ -337,6 +337,16 @@ function world() {
     F = RF(z, x0, sd);
     for (let r = 0; r < n; r++) box([0, hR / 2, r * .82], [1.1, hR, .78], C.panel, 8);
   }
+  /* the spark's room, after concept 10: two banks of server racks lining the last stretch, a bank behind the spark, cable
+     trays overhead. The breathing hole (in the shader) dissolves them into cells around the core. */
+  const ZC = cfg.core[2];
+  [-1, 1].forEach(sd => {
+    for (let z = ZC - 34; z < ZC + 12; z += .82) {
+      F = RF(z, 5.2, sd); const hR = 2.4 + (Math.floor((z - ZC) / 6) % 3 === 0 ? .9 : 0);
+      box([0, hR / 2, 0], [1.1, hR, .8], C.panel, 8);
+    }
+  });
+  for (let x = -9; x <= 9; x += 1.15) { F = RF(ZC + 14, x, 1); box([0, 1.6, 0], [1.1, 3.2, .8], C.panel, 8); }
   F = RF(-4, CW + .02, -1); label('v-path', [0, CH + 2.2, 0], 1.0, [-1, 0, 0], [0, 1, 0], C.ink2);
 }
 
@@ -359,7 +369,7 @@ const FS = `
 #extension GL_OES_standard_derivatives : enable
 precision highp float;
 varying vec3 vW, vO, vN, vC; varying vec2 vUV, vFS; varying float vK; varying vec4 vRect;
-uniform vec3 uE, uAcc, uL, uGround; uniform float uCamZ, uT, uAhead, uBehind, uFog;
+uniform vec3 uE, uAcc, uL, uGround, uCore; uniform float uCamZ, uT, uAhead, uBehind, uFog, uAheadPath, uCellPx, uHole;
 uniform sampler2D uTex;
 const vec3 GROUND = vec3(.055,.063,.078), INK = vec3(.914,.922,.941), INK2 = vec3(.604,.631,.69), PANEL = vec3(.086,.098,.125),
   GHOST = vec3(.114,.125,.161), LINE = vec3(.204,.224,.271), SLATE = vec3(.169,.184,.22);
@@ -382,14 +392,19 @@ vec3 room(vec2 f, vec3 d, float lit){
 void main(){
   vec3 n = normalize(vN);
   /* the cell front: world cells (fixed to the object, so turning parts keep their cells) */
-  vec3 cid = floor((vO - n * .01) / CELL);
-  float rnd = hash(cid + 7.3);
-  float dz = (cid.z + .5) * CELL - uCamZ;
-  float vA = dz / uAhead + abs(cid.x * CELL) * .004 + rnd * .45;   // ahead: resolved inside uAhead (plus noise)
-  float vB = -dz / uBehind + rnd * .7;                               // behind: gone past uBehind
-  if (vA > 1. || vB > 1.) discard;
-  float band = step(1. - .1, vA) + step(1. - .22, vB);
+  /* the cell front works on the silhouette: its cells are squares on the screen (facing the camera), not on the surfaces */
+  vec2 sc = floor(gl_FragCoord.xy / uCellPx);
+  float rnd = hash(vec3(sc, 7.3));
   float k = vK;
+  float dz = vW.z - uCamZ, ahead = k > .5 && k < 1.5 ? uAheadPath : uAhead;   // the causeway builds itself just ahead of you
+  float vA = dz / ahead + rnd * .45;                                   // ahead: resolved inside 'ahead' (plus noise)
+  float vB = -dz / uBehind + rnd * .35;                                 // behind: gone past uBehind
+  if (vA > 1. || vB > 1.) discard;
+  float band = step(1. - .1, vA) + step(1. - .08, vB);
+  /* the spark's breathing hole: around the core everything is computed away, the edge opening and closing, never shut */
+  float hv = (uHole - length(vW - uCore)) / 2.5 + (rnd - .5) * .6;
+  if (hv > 0.) discard;
+  band += step(-.06, hv) * step(.86, hash(vec3(sc, 2.1)));          // a few lit cells on the hole's edge
   vec3 col = vC;
   float L = dot(n, uL), lit = step(0., L);
   float top = step(.7, n.y);
@@ -506,7 +521,9 @@ return {
     if (nV) {
       gl.useProgram(SP.p); uni(SP.u, cam, o);
       gl.uniform3fv(SP.u.uAcc, o.acc); gl.uniform3fv(SP.u.uL, unit([-.45, .78, -.42])); gl.uniform1f(SP.u.uCamZ, cam.E[2]); gl.uniform1f(SP.u.uT, o.time);
-      gl.uniform1f(SP.u.uAhead, o.ahead); gl.uniform1f(SP.u.uBehind, 18);
+      gl.uniform1f(SP.u.uAhead, o.ahead); gl.uniform1f(SP.u.uBehind, 18); gl.uniform1f(SP.u.uAheadPath, o.aheadPath);
+      gl.uniform1f(SP.u.uCellPx, o.cellPx); gl.uniform3fv(SP.u.uCore, cfg.core);
+      gl.uniform1f(SP.u.uHole, 6.5 + 1.6 * Math.sin(o.time * .7));       // breathing: 4.9 m to 8.1 m, never closed
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(SP.u.uTex, 0);
       gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
       const A = ATTS.map(([n, s, off]) => { const l = gl.getAttribLocation(SP.p, n); if (l < 0) return -1; gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, s, gl.FLOAT, false, 84, off * 4); return l; });

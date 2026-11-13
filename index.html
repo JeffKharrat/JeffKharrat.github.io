@@ -975,7 +975,7 @@ body[data-view="page"] .lore--bg{display:none}
 
 <script src="js/flower-gl.js"></script>
 <script src="js/lookdev-ball.js?v=2"></script>
-<script src="js/about-cells.js?v=5"></script>
+<script src="js/about-cells.js?v=6"></script>
 <script src="js/node-editor.js?v=8" defer></script>
 <script src="js/graphs-fiffy.js?v=3" defer></script>
 <script src="js/flower-wave.js?v=3" defer></script>
@@ -4665,7 +4665,7 @@ const run = (() => {
   }
   const BP = buf(PT), BL = buf(LN);
   let CELLS = null;
-  if (CELLS_ON) try { CELLS = window.AboutCells(gl, { xs, road: ROAD, zEnd: ZEND, stops: STOP.map((S, k) => ({ id: ORDER[k], code: S.code, z: S.z, s: S.s, Tb: S.Tb, ext: S.ext, Fb: S.Fb, Fe: S.Fe, roof: S.roof })) }); CELLS.ready = () => kick(); }
+  if (CELLS_ON) try { CELLS = window.AboutCells(gl, { xs, road: ROAD, zEnd: ZEND, core: [SPARK[0], SPARK[1] + 4, SPARK[2]], stops: STOP.map((S, k) => ({ id: ORDER[k], code: S.code, z: S.z, s: S.s, Tb: S.Tb, ext: S.ext, Fb: S.Fb, Fe: S.Fe, roof: S.roof })) }); CELLS.ready = () => kick(); }
     catch (e) { CELLS = null; console.warn('about cells', e); }
   PT.length = 0; LN.length = 0;
   const ATT = [['aPos', 3, 0], ['aOff', 3, 3], ['aCol', 4, 6], ['aMisc', 4, 10], ['aX', 2, 14]].map(([n, s2, o]) => [A(n), s2, o]);
@@ -5140,7 +5140,7 @@ const run = (() => {
     gl.clearColor(G[0], G[1], G[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     if (CELLS) {
       const ov = 1 - eio(sm(0, 1.05, tNow));                                // the opening overview sees the whole road
-      CELLS.draw(cam, { W, H, time, acc: v3(C.acc), ground: G, line: v3(C.line), ahead: 110 + ov * 400, fog: 170 + ov * 300 });
+      CELLS.draw(cam, { W, H, time, acc: v3(C.acc), ground: G, line: v3(C.line), ahead: 110 + ov * 400, aheadPath: 26 + ov * 400, cellPx: Math.max(6, Math.round(14 * RS)), fog: 170 + ov * 300 });
       gl.useProgram(prog);
     }
     gl.enable(gl.BLEND); if (dark) gl.blendFunc(gl.ONE, gl.ONE); else gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
