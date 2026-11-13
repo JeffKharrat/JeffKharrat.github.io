@@ -975,7 +975,7 @@ body[data-view="page"] .lore--bg{display:none}
 
 <script src="js/flower-gl.js"></script>
 <script src="js/lookdev-ball.js?v=2"></script>
-<script src="js/about-cells.js?v=1"></script>
+<script src="js/about-cells.js?v=3"></script>
 <script src="js/node-editor.js?v=8" defer></script>
 <script src="js/graphs-fiffy.js?v=3" defer></script>
 <script src="js/flower-wave.js?v=3" defer></script>
@@ -4665,7 +4665,7 @@ const run = (() => {
   }
   const BP = buf(PT), BL = buf(LN);
   let CELLS = null;
-  if (CELLS_ON) try { CELLS = window.AboutCells(gl, { xs, road: ROAD, zEnd: ZEND, stops: STOP.map((S, k) => ({ id: ORDER[k], code: S.code, z: S.z, s: S.s })) }); CELLS.ready = () => kick(); }
+  if (CELLS_ON) try { CELLS = window.AboutCells(gl, { xs, road: ROAD, zEnd: ZEND, stops: STOP.map((S, k) => ({ id: ORDER[k], code: S.code, z: S.z, s: S.s, Tb: S.Tb, ext: S.ext, Fb: S.Fb, Fe: S.Fe, roof: S.roof })) }); CELLS.ready = () => kick(); }
     catch (e) { CELLS = null; console.warn('about cells', e); }
   PT.length = 0; LN.length = 0;
   const ATT = [['aPos', 3, 0], ['aOff', 3, 3], ['aCol', 4, 6], ['aMisc', 4, 10], ['aX', 2, 14]].map(([n, s2, o]) => [A(n), s2, o]);

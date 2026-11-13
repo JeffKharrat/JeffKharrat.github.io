@@ -13,7 +13,7 @@ const C = { ground: hex('#0E1014'), tile: hex('#050608'), panel: hex('#161920'),
   slate: hex('#2B2F38'), mid: hex('#5A6172'), ink2: hex('#9AA1B0'), bone: hex('#CDD0D8'), ink: hex('#E9EBF0'),
   red: hex('#FF5A3D'), lime: hex('#B4F000'), blue: hex('#4A5BFF'), yellow: hex('#FFC400') };
 const NAMES = { tut: 'Bone gantry', mc: 'Facade street', zag: 'Turntable yard', mth: 'Layout stage', isd: 'Amphitheatre' };
-const STOPS = cfg.stops.map((S, k) => ({ id: S.id, code: S.code, abt: 'ABT-0' + (k + 1), name: NAMES[S.id] || S.id, z: S.z, side: S.s }));
+const STOPS = cfg.stops.map((S, k) => ({ id: S.id, code: S.code, abt: 'ABT-0' + (k + 1), name: NAMES[S.id] || S.id, z: S.z, side: S.s, s: S.s, Tb: S.Tb, ext: S.ext }));
 
 /* ---------- geometry: pos3 nrm3 col3 uv2 fsz2 kind1 rot3 rect4 = 21 floats ---------- */
 const V = [];
@@ -24,11 +24,25 @@ const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a
 const unit = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 /* the road frame: local x is the distance from the road's centre (mirrored by side s, offset off), z runs along the road from
    z0, so everything authored straight follows the road's curve; directions turn with the road's tangent at that point */
+/* two frames. The road frame: local x is the distance from the road's centre (mirrored by side s, offset off), z runs along the
+   road from z0, so anything authored straight follows the road's curve. The hero frame: each place is authored facing the camera
+   that parks at its stop: origin on the ground under the old building's centre, +z toward the parked camera, +x to its right
+   on screen, so the composition is built for that one view. */
 let F = { z0: 0, off: 0, s: 1 };
 const RF = (z0, off, s) => ({ z0, off, s });
-const P = p => { const z = F.z0 + p[2]; return [xs(z) + F.s * (F.off + p[0]), p[1], z]; };
-const N = (n, zl = 0) => { const d = dxs(F.z0 + zl), X = unit([1, 0, -d]), Z = unit([d, 0, 1]), v = [n[0] * F.s, n[1], n[2]];
-  return [v[0] * X[0] + v[2] * Z[0], v[1], v[0] * X[2] + v[2] * Z[2]]; };
+function HF(S) {
+  const d = unit([S.s * .6, 0, .78]);                                     // the parked camera's heading (see parked() in index.html)
+  return { hero: true, o: [S.Tb[0], 0, S.Tb[2]], X: [d[2], 0, -d[0]], Z: [-d[0], 0, -d[2]] };
+}
+const P = p => {
+  if (F.hero) return [F.o[0] + F.X[0] * p[0] + F.Z[0] * p[2], p[1], F.o[2] + F.X[2] * p[0] + F.Z[2] * p[2]];
+  const z = F.z0 + p[2]; return [xs(z) + F.s * (F.off + p[0]), p[1], z];
+};
+const N = (n, zl = 0) => {
+  if (F.hero) return [F.X[0] * n[0] + F.Z[0] * n[2], n[1], F.X[2] * n[0] + F.Z[2] * n[2]];
+  const d = dxs(F.z0 + zl), X = unit([1, 0, -d]), Z = unit([d, 0, 1]), v = [n[0] * F.s, n[1], n[2]];
+  return [v[0] * X[0] + v[2] * Z[0], v[1], v[0] * X[2] + v[2] * Z[2]];
+};
 function quad(a, b, c, d, n, col, kind = 0, uvs) {           // a, b, c, d counter-clockwise seen from the front (world points)
   const w = Math.hypot(...sub(b, a)), h = Math.hypot(...sub(d, a));
   const U = uvs || [[0, 0], [1, 0], [1, 1], [0, 1]], pts = [a, b, c, d];
@@ -75,7 +89,7 @@ function sphere(c, r, col, kind = 0, nl = 10, nm = 16) {       // faceted sphere
 /* a flat textured plate (atlas item), standing or lying: centre, width, height, facing normal n, up vector */
 function label(item, c, w, n, up = [0, 1, 0], col = C.ink, kind = 3) {
   const A = ATLAS[item]; if (!A) return;
-  const h = w * A.h / A.w, Nw = N(n, c[2]), Up = N(up, c[2]), Rt = unit(cross(Up, Nw)), C0 = P(c);
+  const h = w * A.h / A.w, Nw = N(n, c[2]), Up = N(up, c[2]), Rt = unit(cross(Nw, Up)), C0 = P(c);
   const p = (x, y) => add(C0, add(mul(Rt, x * w / 2), mul(Up, y * h / 2)));
   const keep = RECT; RECT = [A.x, A.y, A.w, A.h];
   quad(p(-1, -1), p(1, -1), p(1, 1), p(-1, 1), Nw, col, kind);
@@ -125,139 +139,140 @@ function buildAtlas() {
   ['骨', '街', '灯', '舞', '筋', '火', '門', '学'].forEach(ch => solidK('k-' + ch, ch, J, 220));
 }
 
-function vsign(item, x, z, h, col = C.ink) {
+
+/* ---------- the places: hero frame, +z toward the parked camera, +x screen right ---------- */
+const front = [0, 0, 1];
+function vsign(item, x, z, h, col = C.ink) {                              // a vertical kanji sign facing the camera, on a post
   const A = ATLAS[item]; if (!A) return;
   const w = h * A.w / A.h;
-  box([x, h / 2 + 1.4, z], [.25, h + .6, w + .5], C.panel); box([x + .1, .7, z], [.2, 1.4, .3], C.mid);
-  label(item, [x - .14, h / 2 + 1.4, z], w, [-1, 0, 0], [0, 1, 0], col);
+  box([x, h / 2 + 1.2, z], [w + .5, h + .6, .25], C.panel); box([x, .6, z - .1], [.3, 1.2, .2], C.mid);
+  label(item, [x, h / 2 + 1.2, z + .14], w, front, [0, 1, 0], col);
 }
-/* a hall in the manner of the made-moon data center: blunt block, a band of cells near the top, cooling stacks, a lattice mast,
-   a building-scale numeral and a solid kanji painted on the wall that faces the causeway */
-function hall(x, z, w, d, h, num, kanji) {
-  box([x + w / 2, h / 2, z], [w, h, d], C.slate, 9);
-  box([x + w / 2 + w * .1, h + .6, z - d * .2], [w * .5, 1.2, d * .35], C.mid);
-  [-.3, 0, .3].forEach((f, i) => prism([x + w * .7, h, z + d * f], .9 + i * .1, 3.5 + i * 1.2, 10, C.mid));
-  const mx = x + w * .25, mz = z + d * .38, mh = h + 9;
-  [[-.6, -.6], [.6, -.6], [.6, .6], [-.6, .6]].forEach(([a, b]) => beam([mx + a, h, mz + b], [mx + a * .3, mh, mz + b * .3], .1, C.ink2));
-  for (let y = h + 1.5; y < mh - .5; y += 1.6) beam([mx - .6 + (y - h) / 9 * .42, y, mz - .6 + (y - h) / 9 * .42], [mx + .6 - (y - h) / 9 * .42, y + 1.6, mz + .6 - (y - h) / 9 * .42], .06, C.ink2);
-  if (num) label(num, [x - .03, h * .48, z - d * .18], Math.min(d * .42, h * .9), [-1, 0, 0], [0, 1, 0], C.ink2);
-  if (kanji) label(kanji, [x - .03, h * .52, z + d * .26], Math.min(d * .3, h * .6), [-1, 0, 0], [0, 1, 0], C.ink);
+/* a hall in the made-moon manner: blunt block, a band of cells near the top, stacks and a lattice mast on the roof, and on its
+   front (facing the camera) a building-scale numeral and a solid kanji */
+function hall(cx, cz, w, d, h, num, kanji, mastSide = 1) {
+  box([cx, h / 2, cz], [w, h, d], C.slate, 9);
+  box([cx - w * .18, h + .55, cz - d * .1], [w * .42, 1.1, d * .5], C.mid);
+  [-.32, 0, .32].forEach((f, i) => prism([cx + w * .28 + f * 2.4, h, cz - d * .25], .7 + i * .08, 2.6 + i * .9, 10, C.mid));
+  const mx = cx + mastSide * w * .38, mz = cz - d * .3, mh = h + 7.5;
+  [[-.5, -.5], [.5, -.5], [.5, .5], [-.5, .5]].forEach(([a, b]) => beam([mx + a, h, mz + b], [mx + a * .3, mh, mz + b * .3], .09, C.ink2));
+  for (let y = h + 1.2; y < mh - .6; y += 1.4) { const k = (y - h) / 7.5 * .35; beam([mx - .5 + k, y, mz + .5 - k], [mx + .5 - k, y + 1.4, mz - .5 + k], .05, C.ink2); }
+  if (num) label(num, [cx - w * .24, h * .46, cz + d / 2 + .03], Math.min(w * .36, h * .8), front, [0, 1, 0], C.ink2);
+  if (kanji) label(kanji, [cx + w * .26, h * .5, cz + d / 2 + .03], Math.min(w * .26, h * .5), front, [0, 1, 0], C.ink);
+}
+function joint(p, size, live) {                                           // a joint block with its three axis stubs
+  box(p, [size, size, size], live ? C.ink : C.mid, live ? 6 : 0);
+  const a = size * .5, b = size * 1.1;
+  beam(add(p, [a, 0, 0]), add(p, [b, 0, 0]), size * .12, C.red); beam(add(p, [0, a, 0]), add(p, [0, b, 0]), size * .12, C.lime); beam(add(p, [0, 0, a]), add(p, [0, 0, b]), size * .12, C.blue);
 }
 const BUILD = {
-  /* 01 · the bone gantry: a joint chain as a stepped arch over the causeway, four gates before it */
+  /* 01 · the research institute: a blunt hall wearing the bone gantry over its door, and a path of four torii gates leading
+     to it from the camera, one per pipeline step (TAG, EXPORT, IMPORT, BUILD), read front to back */
   tut(S) {
-    F = RF(S.z, 0, 1);
-    const J = [[-6.5, 0, 4], [-6.5, 6.5, 4], [-3.2, 9.6, 4], [3, 10.6, 4], [8.5, 7.4, 4], [8.5, 0, 4]];
-    for (let i = 0; i < J.length - 1; i++) beam(J[i], J[i + 1], .7, C.bone);
-    J.forEach((j, i) => { if (!i || i === J.length - 1) { box(add(j, [0, .4, 0]), [1.6, .8, 1.6], C.slate); return; }
-      box(j, [1.3, 1.3, 1.3], i === 3 ? C.ink : C.mid, i === 3 ? 6 : 0);
-      beam(add(j, [.65, 0, 0]), add(j, [1.4, 0, 0]), .14, C.red); beam(add(j, [0, .65, 0]), add(j, [0, 1.4, 0]), .14, C.lime); beam(add(j, [0, 0, -.65]), add(j, [0, 0, -1.4]), .14, C.blue); });
-    [-14, -10.5, -7, -3.5].forEach((z, i) => {                // gates with torii proportions: posts, a kasagi on top, a nuki below it
-      box([-2.6, 2.6, z], [.4, 5.2, .4], C.mid); box([2.6, 2.6, z], [.4, 5.2, .4], C.mid);
-      box([0, 5.45, z], [7.4, .5, .55], C.bone); box([0, 5.85, z], [8.2, .3, .7], C.ink2);
-      box([0, 4.3, z], [6.2, .32, .3], C.mid);
-      box([0, 4.85, z], [.5, .9, .32], C.panel);
-      label('g' + i, [-1.6, 4.3, z - .17], 1.5, [0, 0, -1], [0, 1, 0], C.ink); label('gj' + i, [1.6, 4.3, z - .17], 1.0, [0, 0, -1], [0, 1, 0], C.ink2);
+    hall(0, -3.4, 13, 9.6, 11.6, 'n01', null, -1);
+    box([0, 2.4, 1.45], [3.2, 4.8, .4], C.tile);                           // the door
+    const J = [[-5.4, 0, 2.4], [-5.4, 8.2, 2.4], [-3, 11.4, 2.4], [1.4, 12.8, 2.4], [5.4, 10.2, 2.4], [5.4, 0, 2.4]];
+    for (let i = 0; i < J.length - 1; i++) beam(J[i], J[i + 1], .75, C.bone);
+    J.forEach((j, i) => { if (!i || i === J.length - 1) box(add(j, [0, .35, 0]), [1.4, .7, 1.4], C.slate); else joint(j, 1.1, i === 3); });
+    label('k-骨', [0, 6.3, 2.62], 2.2, front, [0, 1, 0], C.ink);
+    [['g3', 'gj3', 3.6], ['g2', 'gj2', 6.2], ['g1', 'gj1', 8.8], ['g0', 'gj0', 11.4]].forEach(([g, gj, z], i) => {
+      const hw = 1.7, hh = 3.3 - i * .1;
+      box([-hw, hh / 2, z], [.3, hh, .3], C.mid); box([hw, hh / 2, z], [.3, hh, .3], C.mid);
+      box([0, hh + .2, z], [hw * 2 + .9, .34, .4], C.bone); box([0, hh + .48, z], [hw * 2 + 1.5, .2, .5], C.ink2);
+      box([0, hh - .7, z], [hw * 2 + .2, .24, .22], C.mid);
+      label(g, [-.75, hh - .7, z + .13], 1.15, front, [0, 1, 0], C.ink); label(gj, [.95, hh - .7, z + .13], .72, front, [0, 1, 0], C.ink2);
     });
-    label('k-骨', [0, 10.6, 4 - .66], 1.25, [0, 0, -1], [0, 1, 0], C.ink);
-    F = RF(S.z, CW + 2, S.side);
-    box([2.2, 1.1, -15], [.2, 2.2, 3.2], C.panel); label('manifest', [2.08, 1.6, -15], 2.6, [-1, 0, 0], [0, 1, 0], C.ink2);
-    vsign('v-tut', 4.5, -20, 4.2);
+    box([0, .06, 7.6], [3, .12, 12.4], C.panel, 1);                         // the path
+    vsign('v-tut', 6.6, 2.2, 4.2);
+    label('manifest', [-3.4, 1.1, 11.6], 2.2, front, [0, 1, 0], C.ink2); box([-3.4, 1.1, 11.45], [2.5, .7, .2], C.panel);
   },
-  /* 02 · facade street: card-thin facades on struts, each window an interior-mapped room; one card turned side-on; prop crates */
+  /* 02 · facade street: a real street receding from the camera, two rows of buildings with cube-mapped window rooms on their
+     street sides and fronts, shop signs, and a gate building at the end with a passage under a solid 街 */
   mc(S) {
-    const H = [13, 17, 11, 15, 12];
-    H.forEach((h, i) => {
-      const z = -15 + i * 7.4, x = 6 + (i % 2) * .8;
-      const d = 6 + (i % 3) * 1.5;                              // real buildings: windows (each a cube-mapped room) on the street side
-      box([x + d / 2, h / 2, z], [d, h, 7], C.ink2, 2, ['nx', 'nz']);
-      box([x + d / 2, h / 2, z], [d, h, 7], C.slate, 9, ['px', 'pz', 'py']);
-      box([x + d * .55, h + .7, z + 1], [d * .4, 1.4, 2.6], C.mid);   // a rooftop unit
-    });
-    box([9, 7, 23], [6, 14, 6], C.ink2, 2, ['nz', 'nx']); box([9, 7, 23], [6, 14, 6], C.slate, 9, ['px', 'pz', 'py']);
-    [[1.2, 0, -6], [2.3, 0, -6], [1.7, 1, -6], [1.4, 0, 1.5], [1.4, 1, 1.5], [2.6, 0, 9]].forEach(([x, y, z], i) => {
-      box([x, y + .5, z], [1, 1, 1], i % 2 ? C.mid : C.bone);
-      beam([x, y + 1.02, z], [x + .5, y + 1.02, z], .05, C.red); beam([x, y + 1.02, z], [x, y + 1.5, z], .05, C.lime); beam([x, y + 1.02, z], [x, y + 1.02, z - .5], .05, C.blue);
-    });
-    vsign('v-mc', 4.6, -19.5, 6.5);
-    [-12, -4.6, 2.8, 10.2].forEach((z, i) => { box([5.4, 3.2 + i % 2, z], [.9, 3.4, .2], C.panel); label('k-' + '街灯門学'[i], [5.4, 3.2 + i % 2, z - .11], .8, [0, 0, -1], [0, 1, 0], C.ink); });
-    label('k-街', [9, 9, 20 - .04], 4.4, [0, 0, -1], [0, 1, 0], C.ink);
+    const st = 2.6, rows = [[5, 7.5], [-1.5, 9], [-8, 6.6]];
+    [-1, 1].forEach(sd => rows.forEach(([z, h], i) => {
+      const d = 6, w = 5.4 + (i % 2) * .8, x = sd * (st + w / 2), hh = h + (sd > 0 ? .8 : 0) * (i === 1 ? 1 : 0);
+      box([x, hh / 2, z], [w, hh, d - .2], C.ink2, 2, [sd > 0 ? 'nx' : 'px', 'pz']);
+      box([x, hh / 2, z], [w, hh, d - .2], C.slate, 9, [sd > 0 ? 'px' : 'nx', 'nz', 'py']);
+      box([x + sd * .6, hh + .6, z - .8], [w * .4, 1.2, 1.8], C.mid);
+      if (i === 0) { box([x + sd * 1.2, hh + 1.6, z + 1.2], [1, 1, 1], C.bone); prism([x + sd * 1.2, hh + 1.2, z + 1.2], .5, .4, 8, C.mid); }
+      box([sd * (st + .35), 2.8, z + 1.6], [.5, 3, .18], C.panel);           // a vertical shop sign hanging off the wall
+      label(['k-街', 'k-灯', 'k-門'][i], [sd * (st + .35), 2.8, z + 1.71], .42, front, [0, 1, 0], C.ink);
+    }));
+    box([0, 4, -12.6], [st * 2 + 11, 8, 5], C.ink2, 2, ['pz']); box([0, 4, -12.6], [st * 2 + 11, 8, 5], C.slate, 9, ['nz', 'py', 'px', 'nx']);
+    box([0, 1.6, -10.05], [st * 2 - .4, 3.2, .2], C.tile);                // the passage
+    label('k-街', [0, 5.4, -10.05], 2.4, front, [0, 1, 0], C.ink);
+    vsign('v-mc', st + .6, 6.3, 4.8);
+    [[-1.2, 0, 4.5], [-.6, 0, 3.2], [-1.0, 1, 4.0]].forEach(([x, y, z], i) => box([x, y + .45, z], [.9, .9, .9], i % 2 ? C.mid : C.bone));
+    box([0, .04, -2], [st * 2, .08, 22], C.panel, 1);
   },
-  /* 03 · the turntable yard: plinths with turning reference balls, a 24-step grey chart wall, a light gantry, the rename sign */
+  /* 03 · the turntable yard: three plinths with turning reference balls in front of a lookdev hall, a light gantry over them,
+     a grey chart on the right, the rename sign on the hall */
   zag(S) {
-    [[4.5, -6, 0], [9.5, -1, 5], [5.5, 5.5, 7]].forEach(([x, z, k], i) => {
-      prism([x, 0, z], 2.3, .9, 10, C.slate);
-      ROT = [P([x, 0, z])[0], P([x, 0, z])[2], .35 + i * .12];
-      prism([x, .9, z], 2.0, .14, 10, C.mid);
-      sphere([x, 2.6, z], 1.55, i === 1 ? C.ink : C.ink2, k, 10, 16);
+    hall(0, -6, 12, 7, 9.4, 'n03', 'k-灯', 1);
+    label('rename', [0, 7.9, -2.45], 5.4, front, [0, 1, 0], C.ink);
+    [[-3.6, 2.2, 0], [0, 3.4, 5], [3.6, 2.2, 7]].forEach(([x, z, k], i) => {
+      prism([x, 0, z], 1.5, .8, 10, C.slate);
+      ROT = [P([x, 0, z])[0], P([x, 0, z])[2], .3 + i * .1];
+      prism([x, .8, z], 1.3, .12, 10, C.mid); sphere([x, 2.1, z], 1.05, i === 1 ? C.ink : C.ink2, k, 10, 16);
       ROT = [0, 0, 0];
     });
-    for (let r = 0; r < 4; r++) for (let c = 0; c < 6; c++) {
-      const g = (r * 6 + c) / 23, col = [0, 1, 2].map(i => C.tile[i] + (C.ink[i] - C.tile[i]) * g);
-      box([15, 1.2 + r * 1.25, -6 + c * 1.25], [.3, 1.15, 1.15], col);
-    }
-    box([15.05, 6.4, -2.9], [.3, .6, 7.5], C.panel); label('chart', [14.88, 6.4, -2.9], 3.6, [-1, 0, 0], [0, 1, 0], C.ink2);
-    [[1.5, -9], [12, -9], [1.5, 9], [12, 9]].forEach(([x, z]) => box([x, 4.5, z], [.3, 9, .3], C.mid));
-    beam([1.5, 9, -9], [12, 9, -9], .3, C.mid); beam([1.5, 9, 9], [12, 9, 9], .3, C.mid); beam([1.5, 9, -9], [1.5, 9, 9], .3, C.mid); beam([12, 9, -9], [12, 9, 9], .3, C.mid);
-    [[4.5, -6], [9.5, -1], [5.5, 5.5]].forEach(([x, z]) => { box([x, 8.6, z], [.8, .5, .8], C.bone); });
-    box([3, 4.2, -15], [.25, 2.2, 8.4], C.panel); label('rename', [2.86, 4.2, -15], 7.4, [-1, 0, 0], [0, 1, 0], C.ink);
-    hall(19, -2, 10, 22, 9, 'n03', 'k-灯'); hall(16, 22, 14, 12, 6.5, null, null);
-    vsign('v-zag', 2.4, -7, 3.6);
+    [[-5.6, -.4], [5.6, -.4], [-5.6, 6], [5.6, 6]].forEach(([x, z]) => box([x, 3.6, z], [.25, 7.2, .25], C.mid));
+    beam([-5.6, 7.2, -.4], [5.6, 7.2, -.4], .25, C.mid); beam([-5.6, 7.2, 6], [5.6, 7.2, 6], .25, C.mid);
+    beam([-5.6, 7.2, -.4], [-5.6, 7.2, 6], .25, C.mid); beam([5.6, 7.2, -.4], [5.6, 7.2, 6], .25, C.mid);
+    [[-3.6, 2.2], [0, 3.4], [3.6, 2.2]].forEach(([x, z]) => box([x, 6.9, z], [.6, .4, .6], C.bone));
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) { const g = (r * 4 + c) / 15, col = [0, 1, 2].map(i => C.tile[i] + (C.ink[i] - C.tile[i]) * g); box([7.4 + c * .8, .9 + r * .8, 2], [.75, .75, .2], col); }
+    label('chart', [8.6, 4.4, 2.12], 2.6, front, [0, 1, 0], C.ink2);
+    vsign('v-zag', -7.6, 3, 3.4);
   },
-  /* 04 · the layout stage: grey-box blocking on a stage, cameras on tripods with frustums, a giant 2.39:1 gate over the causeway */
+  /* 04 · the layout stage: a sound-stage hall behind, a stage of grey-box blocking in front of it, a 2.39:1 film gate on the
+     stage's front edge, cameras on tripods aimed at the stage */
   mth(S) {
-    box([9, .3, 0], [14, .6, 18], C.panel);
-    [[6, 1.6, -4, 2, 2, 2], [9, 2.1, -5, 2.6, 3, 2.6], [12, 1.3, 2, 3.4, 1.4, 4], [7, 1.1, 4, 1.6, 1, 1.6]].forEach(([x, y, z, a, b, c]) => box([x, y, z], [a, b, c], C.mid));
-    prism([12, .6, -3], 1.1, 3, 8, C.ink2);
-    obox([5.6, 1.4, 1], [1.8, .08, 1.4], [unit([1, .45, 0]), unit([-.45, 1, 0]), [0, 0, 1]], C.mid);
-    label('SH010', [6, 2.62, -4], 1.6, [0, 1, 0], [-1, 0, 0], C.ink);
-    label('SH020', [9, 3.62, -5], 1.6, [0, 1, 0], [-1, 0, 0], C.ink);
-    label('SH030', [12, 2.02, 2], 1.6, [0, 1, 0], [-1, 0, 0], C.ink);
-    [[3, -8, .5], [3.2, 7, -.4]].forEach(([x, z, yaw]) => {
-      const top = [x, 1.6, z];
-      [0, 1, 2].forEach(i => { const a = i / 3 * TAU; beam([x + Math.cos(a) * .6, 0, z + Math.sin(a) * .6], top, .06, C.ink2); });
-      box(add(top, [0, .25, 0]), [.5, .4, .7], C.bone);
-      const f = unit([Math.cos(yaw), 0, Math.sin(yaw)]), r = cross([0, 1, 0], f), far = add(add(top, [0, .25, 0]), mul(f, 6));
-      [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([u, v], i, A) => { const p = add(far, add(mul(r, u * 1.8), [0, v * .75, 0])), q = add(far, add(mul(r, A[(i + 1) % 4][0] * 1.8), [0, A[(i + 1) % 4][1] * .75, 0]));
-        beam(add(top, [0, .25, 0]), p, .03, C.ink2); beam(p, q, .03, C.ink2); });
+    hall(0, -7, 14, 8, 9.2, 'n04', 'k-舞', -1);
+    box([0, .3, 0], [13, .6, 7.5], C.panel);
+    [[-3.4, 1.6, -1.2, 2, 2, 2, 'SH010'], [0, 2.1, -2, 2.4, 3, 2.4, 'SH020'], [3.6, 1.3, .4, 3, 1.4, 3, 'SH030']].forEach(([x, y, z, a, b, c, t]) => {
+      box([x, y, z], [a, b, c], C.mid); label(t, [x, y + b / 2 + .02, z], a * .8, [0, 1, 0], [0, 0, -1], C.ink);
     });
-    F = RF(S.z, 0, 1);
-    const gw = 16, gh = gw / 2.39, gz = 10;
-    beam([-gw / 2, .6, gz], [-gw / 2, .6 + gh, gz], .45, C.bone); beam([gw / 2, .6, gz], [gw / 2, .6 + gh, gz], .45, C.bone);
-    beam([-gw / 2, .6 + gh, gz], [gw / 2, .6 + gh, gz], .45, C.bone); beam([-gw / 2, .6, gz], [-CW - .4, .6, gz], .45, C.bone); beam([CW + .4, .6, gz], [gw / 2, .6, gz], .45, C.bone);
-    label('gate', [-gw / 2 + 1.6, .6 + gh + .55, gz - .23], 2.4, [0, 0, -1], [0, 1, 0], C.ink2);
-    F = RF(S.z, CW + 2, S.side);
-    hall(20, 2, 14, 30, 12, 'n04', 'k-舞'); hall(14, 26, 10, 10, 5, null, null);
-    vsign('v-mth', 2.4, -12, 4.6);
+    prism([5.6, .6, -2.4], .8, 2.6, 8, C.ink2);
+    const gw = 9, gh = gw / 2.39, gz = 3.6;
+    beam([-gw / 2, .6, gz], [-gw / 2, .6 + gh, gz], .32, C.bone); beam([gw / 2, .6, gz], [gw / 2, .6 + gh, gz], .32, C.bone);
+    beam([-gw / 2, .6 + gh, gz], [gw / 2, .6 + gh, gz], .32, C.bone); beam([-gw / 2, .6, gz], [gw / 2, .6, gz], .32, C.bone);
+    label('gate', [-gw / 2 + 1.3, .6 + gh + .45, gz + .17], 1.8, front, [0, 1, 0], C.ink2);
+    [[-6.4, 7.4], [6.6, 6.6]].forEach(([x, z]) => {
+      const top = [x, 1.7, z]; [0, 1, 2].forEach(i => { const a = i / 3 * TAU; beam([x + Math.cos(a) * .5, 0, z + Math.sin(a) * .5], top, .05, C.ink2); });
+      const cam = add(top, [0, .25, 0]); box(cam, [.45, .38, .6], C.bone);
+      const aim = unit(sub([0, 2, -1], cam)), r = unit(cross([0, 1, 0], aim)), u = cross(aim, r), far = add(cam, mul(aim, 5));
+      const cnr = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => add(far, add(mul(r, a * 1.6), mul(u, b * .67))));
+      cnr.forEach((p, i) => { beam(cam, p, .03, C.ink2); beam(p, cnr[(i + 1) % 4], .03, C.ink2); });
+    });
+    vsign('v-mth', 7.8, 1.4, 4.2);
   },
-  /* 05 · the amphitheatre: stepped half-ring tiers facing a muscle arch of layered fibres between two bone ends */
+  /* 05 · the amphitheatre: stepped tiers in a half ring opening toward the camera, a muscle arch of layered fibres between two
+     bones in the middle, eight plinths for the team of eight, the school's halls behind */
   isd(S) {
-    const cx = 11, cz = 0;
+    hall(-3, -14, 12, 7, 8, 'n05', 'k-学', 1); hall(9, -12, 8, 6, 6, null, 'k-筋', -1);
     for (let t = 0; t < 5; t++) {
-      const R = 6.8 + t * 1.6, n = 12 + t * 2, h = (t + 1) * .3;
+      const R = 4.6 + t * 1.3, n = 10 + t * 2, h = (t + 1) * .32;
       for (let i = 0; i < n; i++) {
-        const a = -Math.PI / 2 + (i + .5) / n * Math.PI, w = R * Math.PI / n * .96;
+        const a = Math.PI + (i + .5) / n * Math.PI, w = R * Math.PI / n * .95;
         const Rr = [Math.cos(a), 0, Math.sin(a)], Tg = [-Math.sin(a), 0, Math.cos(a)];
-        obox([cx + Rr[0] * R, h / 2, cz + Rr[2] * R], [.8, h / 2, w / 2], [Rr, [0, 1, 0], Tg], t % 2 ? C.slate : C.mid);
+        obox([Rr[0] * R, h / 2, -1 + Rr[2] * R], [.65, h / 2, w / 2], [Rr, [0, 1, 0], Tg], t % 2 ? C.slate : C.mid);
       }
     }
-    for (let i = 0; i < 8; i++) { const a = -Math.PI / 2 + (i + .5) / 8 * Math.PI, R = 6.8 + 3 * 1.6; box([cx + Math.cos(a) * R, 1.2 + .9, cz + Math.sin(a) * R], [.45, 1.8, .45], C.bone); }
-    const A = [cx - 3, 0, cz - 4.5], B = [cx - 3, 0, cz + 4.5];
-    box(add(A, [0, 3.5, 0]), [1.2, 7, 1.2], C.bone); box(add(B, [0, 3.5, 0]), [1.2, 7, 1.2], C.bone);
-    box(add(A, [0, 7.5, 0]), [1.8, 1.8, 1.8], C.ink); box(add(B, [0, 7.5, 0]), [1.8, 1.8, 1.8], C.ink);
+    for (let i = 0; i < 8; i++) { const a = Math.PI + (i + .5) / 8 * Math.PI, R = 4.6 + 3 * 1.3; box([Math.cos(a) * R, 1.28 + .8, -1 + Math.sin(a) * R], [.4, 1.6, .4], C.bone); }
+    const A = [-3.6, 0, 0], B = [3.6, 0, 0];
+    [A, B].forEach(p => { box(add(p, [0, 3, 0]), [1, 6, 1], C.bone); box(add(p, [0, 6.6, 0]), [1.6, 1.6, 1.6], C.ink); label('k-骨', add(p, [0, 6.6, .82]), 1.2, front, [0, 1, 0], C.ink); });
     for (let l = 0; l < 6; l++) {
-      const seg = 12, rad = 4.5, y0 = 7.5 + l * .28, ofs = (l - 2.5) * .34;
+      const seg = 12, y0 = 6.6 + l * .22, ofs = (l - 2.5) * .26;
       for (let i = 0; i < seg; i++) {
-        const t0 = i / seg, t1 = (i + 1) / seg, p = t => [cx - 3 + ofs, y0 + Math.sin(t * Math.PI) * (2.6 + l * .25), cz - rad + t * 2 * rad];
-        beam(p(t0), p(t1), .26, l === 3 ? C.ink : (l % 2 ? C.ink2 : C.bone), l === 3 ? 6 : 0);
+        const p = t => [-3.6 + t * 7.2, y0 + Math.sin(t * Math.PI) * (2.2 + l * .2), ofs];
+        beam(p(i / seg), p((i + 1) / seg), .22, l === 3 ? C.ink : (l % 2 ? C.ink2 : C.bone), l === 3 ? 6 : 0);
       }
     }
-    box([cx + 9.5, 1, -12], [.25, 2, 1], C.panel);
-    label('tiers', [cx - 9, .02 + 1.8, cz - 12.2], 3.2, [0, 0, -1], [0, 1, 0], C.ink2);
-    hall(cx + 16, -10, 12, 16, 10, 'n05', 'k-学'); hall(cx + 14, 12, 10, 14, 7, null, 'k-筋');
-    vsign('v-isd', 2.4, -18, 4.6);
+    vsign('v-isd', -8.4, 3.6, 4.2);
   }
 };
+
 
 /* ---------- the world ---------- */
 function world() {
@@ -274,7 +289,7 @@ function world() {
     label('c-' + S.id, [0, 2.0, -.08], 1.3, [0, 0, -1], [0, 1, 0], C.ink);
     label('a-' + S.id, [0, 1.62, -.08], 1.5, [0, 0, -1], [0, 1, 0], C.ink2);
   });
-  STOPS.forEach((S, k) => { F = RF(S.z, CW + 2, S.side); if (BUILD[S.id]) BUILD[S.id](S, k); });
+  STOPS.forEach((S, k) => { F = HF(S); if (BUILD[S.id]) BUILD[S.id](S, k); F = RF(0, 0, 1); });
   let rs = 11; const rr = () => { rs = (rs * 16807) % 2147483647; return rs / 2147483647; };
   for (let z = 4; z < ZEND - 30; z += 16 + rr() * 14) {                  // a few data-center machines here and there
     const sd = rr() < .5 ? -1 : 1, x0 = 20 + rr() * 26, n = 1 + (rr() * 3 | 0), hR = 2.2 + (rr() < .3 ? 1.1 : 0);
