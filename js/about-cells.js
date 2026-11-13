@@ -89,7 +89,7 @@ function sphere(c, r, col, kind = 0, nl = 10, nm = 16) {       // faceted sphere
 /* a flat textured plate (atlas item), standing or lying: centre, width, height, facing normal n, up vector */
 function label(item, c, w, n, up = [0, 1, 0], col = C.ink, kind = 3) {
   const A = ATLAS[item]; if (!A) return;
-  const h = w * A.h / A.w, Nw = N(n, c[2]), Up = N(up, c[2]), Rt = unit(cross(Nw, Up)), C0 = P(c);
+  const h = w * A.ph / A.pw, Nw = N(n, c[2]), Up = N(up, c[2]), Rt = unit(cross(Nw, Up)), C0 = P(c);
   const p = (x, y) => add(C0, add(mul(Rt, x * w / 2), mul(Up, y * h / 2)));
   const keep = RECT; RECT = [A.x, A.y, A.w, A.h];
   quad(p(-1, -1), p(1, -1), p(1, 1), p(-1, 1), Nw, col, kind);
@@ -98,11 +98,11 @@ function label(item, c, w, n, up = [0, 1, 0], col = C.ink, kind = 3) {
 
 /* ---------- the text atlas ---------- */
 /* ---------- the text atlas (labels, codes, numerals, logos) ---------- */
-const atl = document.createElement('canvas'); atl.width = 2048; atl.height = 2048;
+const atl = document.createElement('canvas'); atl.width = 2048; atl.height = 4096;
 const ax = atl.getContext('2d');
 const ATLAS = {};
 let ax0 = 0, ay0 = 0, rowH = 0;
-function slot(name, w, h) { if (ax0 + w > 2048) { ax0 = 0; ay0 += rowH + 4; rowH = 0; } ATLAS[name] = { x: ax0 / 2048, y: ay0 / 2048, w: w / 2048, h: h / 2048, px: ax0, py: ay0, pw: w, ph: h }; ax0 += w + 4; rowH = Math.max(rowH, h); return ATLAS[name]; }
+function slot(name, w, h) { if (ax0 + w > 2048) { ax0 = 0; ay0 += rowH + 4; rowH = 0; } ATLAS[name] = { x: ax0 / 2048, y: ay0 / 4096, w: w / 2048, h: h / 4096, px: ax0, py: ay0, pw: w, ph: h }; ax0 += w + 4; rowH = Math.max(rowH, h); return ATLAS[name]; }
 function text(name, str, font, size, opt = {}) {
   ax.font = `${opt.weight || 800} ${size}px ${font}`;
   const w = Math.ceil(ax.measureText(str).width + size * .3), h = Math.ceil(size * 1.25), s = slot(name, w, h);
@@ -121,7 +121,7 @@ function solidK(name, ch, font, size) {
   ax.fillText(ch, s.px + c / 2, s.py + c / 2 + size * .04); ax.restore();
 }
 function buildAtlas() {
-  ax.clearRect(0, 0, 2048, 2048); ax0 = ay0 = rowH = 0;
+  ax.clearRect(0, 0, 2048, 4096); ax0 = ay0 = rowH = 0;
   const D = "'Tektur'", M = "'M PLUS 1 Code'", J = "'Dela Gothic One'";
   ['01', '02', '03', '04', '05'].forEach(n => text('n' + n, n, D, 220));
   STOPS.forEach(S => { text('c-' + S.id, S.code, D, 96); text('a-' + S.id, S.abt + ' · ' + S.name.toUpperCase(), M, 44, { weight: 500 }); });
@@ -134,6 +134,7 @@ function buildAtlas() {
   text('spark', 'FRAME 0', D, 80);
   text('tiers', 'TEAM OF 8', M, 44, { weight: 700 });
   text('cell', '1 CELL = 0.5 M', M, 36, { weight: 500 });
+  for (let n = 1; n <= 24; n++) [n, n + 40].forEach(m => text('rk' + m, '06-R' + String(m).padStart(2, '0'), D, 56));
   /* Japanese: vertical signs (one character per cell) and solid blocks (an ink square with the kanji knocked out) */
   [['v-tut', '研究室'], ['v-mc', '書割りの街'], ['v-zag', '回転台'], ['v-mth', '撮影舞台'], ['v-isd', '階段教室'], ['v-path', '経路'], ['v-spark', '火花']].forEach(([n, str]) => vtext(n, str, J, 120));
   ['骨', '街', '灯', '舞', '筋', '火', '門', '学'].forEach(ch => solidK('k-' + ch, ch, J, 220));
@@ -144,7 +145,7 @@ function buildAtlas() {
 const front = [0, 0, 1];
 function vsign(item, x, z, h, col = C.ink) {                              // a vertical kanji sign facing the camera, on a post
   const A = ATLAS[item]; if (!A) return;
-  const w = h * A.w / A.h;
+  const w = h * A.pw / A.ph;
   box([x, h / 2 + 1.2, z], [w + .5, h + .6, .25], C.panel); box([x, .6, z - .1], [.3, 1.2, .2], C.mid);
   label(item, [x, h / 2 + 1.2, z + .14], w, front, [0, 1, 0], col);
 }
@@ -278,10 +279,11 @@ const BUILD = {
 function world() {
   V.length = 0; ROT = [0, 0, 0]; RECT = [0, 0, 0, 0];
   F = RF(0, 0, 1);
-  for (let z = -14; z < ZEND - 26; z += 1.5) box([0, CH / 2, z], [CW * 2, CH, 1.62], C.slate, 1);   // the causeway along the road
-  for (let z = ZEND - 26; z < ZEND - 16; z += 1.5) {                       // its end breaks into cells before the spark's field
-    for (let x = -CW + .25; x < CW; x += .5) if (Math.sin(x * 12.9 + z * 78.2) * .5 + .5 > (z - (ZEND - 26)) / 10) box([x, CH / 2, z], [.48, CH, .48], C.slate, 1);
-  }
+  /* the causeway: planks on a 1.5 m pitch, each placed on its own as the camera comes (see the vertex shader); it ends at the
+     mouth of the spark's aisle */
+  const ZPE = cfg.aisle ? cfg.aisle[1] - 6 : ZEND - 26;
+  NPL = 0;
+  for (let z = -14; z < ZPE && NPL < 192; z += 1.5) { box([0, CH / 2, z], [CW * 2, CH, 1.3], C.slate, 1); NPL++; }
   STOPS.forEach((S, k) => {
     F = RF(S.z - 9, 0, 1); label('n0' + (k + 1), [0, CH + .012, 0], 2.6, [0, 1, 0], [0, 0, 1], C.ink2);
     F = RF(S.z - 24, CW + .35, S.side);
@@ -297,6 +299,7 @@ function world() {
   const segD = (p, a, b) => { const ab = [b[0] - a[0], b[1] - a[1]], t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / (ab[0] ** 2 + ab[1] ** 2))); return Math.hypot(p[0] - a[0] - ab[0] * t, p[1] - a[1] - ab[1] * t); };
   const free = (x, z, r) => {
     for (let zz = z - r - 6; zz <= z + r + 6; zz += 3) if (Math.abs(xs(zz) - x) < r + 9) return false;          // the road and the camera on it
+    if (cfg.aisle && z > cfg.aisle[1] - 8 && Math.abs(x - cfg.aisle[0]) < r + 8 + .45 * (z - cfg.aisle[1])) return false;   // the spark's view down the aisle
     return STOPS.every(S => Math.hypot(S.Tb[0] - x, S.Tb[2] - z) > r + 15) && VIEWS.every(V => segD([x, z], V.a, V.b) > r + 6);
   };
   const KJ = ['k-骨', 'k-街', 'k-灯', 'k-舞', 'k-筋', 'k-門', 'k-学'];
@@ -337,17 +340,52 @@ function world() {
     F = RF(z, x0, sd);
     for (let r = 0; r < n; r++) box([0, hR / 2, r * .82], [1.1, hR, .78], C.panel, 8);
   }
-  /* the spark's room, after concept 10: two banks of server racks lining the last stretch, a bank behind the spark, cable
-     trays overhead. The breathing hole (in the shader) dissolves them into cells around the core. */
-  const ZC = cfg.core[2];
-  [-1, 1].forEach(sd => {
-    for (let z = ZC - 34; z < ZC + 12; z += .82) {
-      F = RF(z, 5.2, sd); const hR = 2.4 + (Math.floor((z - ZC) / 6) % 3 === 0 ? .9 : 0);
-      box([0, hR / 2, 0], [1.1, hR, .8], C.panel, 8);
+  if (cfg.aisle) aisle();
+  F = RF(-4, CW + .02, -1); label('v-path', [0, CH + 2.2, 0], 1.0, [-1, 0, 0], [0, 1, 0], C.ink2);
+}
+
+/* ---------- the spark's aisle, after concept 10 (env_02): built for the camera that locks on the spark. Origin on the floor
+   under that camera, +z straight ahead, eye 1.5 m, aisle 3.00 m, racks 0.75 x 2.25 m, trays at 2.75 m, ceiling 3.25 m.
+   The racks run 18 m; past about 8 m the aisle comes apart into cells (in the shader), so the far end opens on the field
+   and the spark sits where the concept's figure stands, 24 m ahead. ---------- */
+const NUM = { '0': ['.#####', '######', '##..##', '##..##', '##.###', '###.##', '##..##', '##..##', '######', '#####.'],
+  '6': ['.#####', '######', '##....', '##....', '#####.', '######', '##..##', '##..##', '######', '#####.'] };
+function aisle() {
+  const [ax0, az0] = cfg.aisle, HALF = 1.5, RH = 2.25, TRAY = 2.75, CEIL = 3.25, ZF = 18, ZB = -7;
+  F = { hero: true, o: [ax0, 0, az0], X: [1, 0, 0], Z: [0, 0, 1] };
+  const L = ZF - ZB, zc = (ZF + ZB) / 2;
+  box([0, -.02, zc], [HALF * 2, .04, L], C.ground);                                   // floor, 0.5 m tiles, lines along it
+  for (let z = ZB; z <= ZF; z += .5) box([0, .004, z], [HALF * 2, .008, .016], C.line);
+  [-1, -.5, 0, .5, 1].forEach(x => box([x, .005, zc], [.016, .01, L], C.line));
+  let gi = 0;                                                                           // the stop's number, 06, stencilled 2:1 along the floor
+  [...'06'].forEach((ch, k) => NUM[ch].forEach((row, j) => [...row].forEach((c, i) => {
+    if (c !== '#') return;
+    const x = -.4375 + k * .5 + i * .0625 + .03125, z = 4.125 - (j + .5) * .125;
+    box([x, .007, z], [.0625, .012, .125], C.ink2); gi++;
+  })));
+  box([0, CEIL + .05, zc], [HALF * 2 + 2, .1, L], C.tile);                           // ceiling, seams, two light strips
+  for (let z = ZB; z <= ZF; z += .5) box([0, CEIL - .005, z], [HALF * 2, .01, .02], C.panel);
+  for (let z = ZB + .75; z < ZF; z += 1.5) [-.5, .5].forEach(x => box([x, CEIL - .012, z + .5], [.25, .012, 1], C.ink, 4));
+  [-1, 1].forEach(s => {
+    box([s * (HALF + .5), (CEIL + RH) / 2, zc], [1, CEIL - RH, L], C.panel);            // containment above the racks
+    box([s * (HALF - .01), TRAY - .125, zc], [.02, .25, L], C.tile);                    // the hard shadow under the tray
+    box([s * (HALF - .25), TRAY + .125, zc], [.5, .25, L], C.line);                     // cable tray
+    for (let z = ZB + 1.5; z < ZF; z += 1.5) box([s * (HALF - .5), (CEIL + TRAY + .25) / 2, z], [.03, CEIL - TRAY - .25, .03], C.line);
+    let z = ZB, i = 0, n = 1;
+    while (z < ZF) {
+      if (i % 7 === 6) { box([s * (HALF + .5), CEIL / 2, z + .25], [1, CEIL, .5], C.slate); z += .5; }
+      else {
+        box([s * (HALF + .5), RH / 2, z + .375], [1, RH, .72], C.panel, 8);
+        if (z > .3 && z < 3.2) {                                                         // the near racks carry their plates
+          const it = 'rk' + (s < 0 ? n : n + 40);                                  // numbered from the aisle's start, like the concept's
+          box([s * (HALF - .02), 2.12, z + .375], [.04, .2, .62], C.ink2);
+          label(it, [s * (HALF - .05), 2.12, z + .375], .54, [-s, 0, 0], [0, 1, 0], C.tile);
+        }
+        z += .75; n++;
+      }
+      i++;
     }
   });
-  for (let x = -9; x <= 9; x += 1.15) { F = RF(ZC + 14, x, 1); box([0, 1.6, 0], [1.1, 3.2, .8], C.panel, 8); }
-  F = RF(-4, CW + .02, -1); label('v-path', [0, CH + 2.2, 0], 1.0, [-1, 0, 0], [0, 1, 0], C.ink2);
 }
 
 /* ---------- shaders: the original walkway's camera projection, so both passes line up ---------- */
@@ -357,10 +395,18 @@ vec4 proj(vec3 p){ vec3 dd = p - uE, c = vec3(dot(dd, uR), dot(dd, uU), dot(dd, 
   return vec4((uFoc * c.x + uC.x * c.z) / uHalf.x, (uFoc * c.y - uC.y * c.z) / uHalf.y, (c.z * 1000.1 - 200.) / 999.9, c.z); }`;
 const VS = `
 attribute vec3 aP, aN, aC; attribute vec2 aUV, aFS; attribute float aK; attribute vec3 aR; attribute vec4 aRect;
-uniform float uT;` + PROJ + `
-varying vec3 vW, vO, vN, vC; varying vec2 vUV, vFS; varying float vK; varying vec4 vRect;
+uniform float uT; uniform vec4 uPl[48];` + PROJ + `
+varying vec3 vW, vO, vN, vC; varying vec2 vUV, vFS; varying float vK; varying vec4 vRect; varying float vPlank;
 void main(){
   vec3 p = aP, n = aN;
+  vPlank = 1.;
+  if (aK > .5 && aK < 1.5) {                                          // a causeway plank: placed whole, one at a time, as you come
+    float i = floor((aP.z + 14.75) / 1.5), q = floor(i / 4.); vec4 v = vec4(0.);
+    for (int j = 0; j < 48; j++) if (float(j) == q) v = uPl[j];
+    float c = i - q * 4.;
+    vPlank = c < .5 ? v.x : c < 1.5 ? v.y : c < 2.5 ? v.z : v.w;        // its progress, kept per plank on the CPU (see draw)
+    float e = 1. - vPlank; p.y += e * e * 2.2;                         // it drops into place from above
+  }
   if (aR.z != 0.) { float a = uT * aR.z, c = cos(a), s = sin(a); vec2 d = p.xz - aR.xy; p.xz = aR.xy + vec2(c*d.x - s*d.y, s*d.x + c*d.y); n.xz = vec2(c*n.x - s*n.z, s*n.x + c*n.z); }
   vO = aP; vW = p; vN = n; vC = aC; vUV = aUV; vFS = aFS; vK = aK; vRect = aRect;
   gl_Position = proj(p);
@@ -368,8 +414,8 @@ void main(){
 const FS = `
 #extension GL_OES_standard_derivatives : enable
 precision highp float;
-varying vec3 vW, vO, vN, vC; varying vec2 vUV, vFS; varying float vK; varying vec4 vRect;
-uniform vec3 uE, uAcc, uL, uGround, uCore; uniform float uCamZ, uT, uAhead, uBehind, uFog, uAheadPath, uCellPx, uHole;
+varying vec3 vW, vO, vN, vC; varying vec2 vUV, vFS; varying float vK; varying vec4 vRect; varying float vPlank;
+uniform vec3 uE, uAcc, uL, uGround; uniform float uCamZ, uT, uAhead, uBehind, uFog; uniform vec3 uAisle;
 uniform sampler2D uTex;
 const vec3 GROUND = vec3(.055,.063,.078), INK = vec3(.914,.922,.941), INK2 = vec3(.604,.631,.69), PANEL = vec3(.086,.098,.125),
   GHOST = vec3(.114,.125,.161), LINE = vec3(.204,.224,.271), SLATE = vec3(.169,.184,.22);
@@ -392,20 +438,29 @@ vec3 room(vec2 f, vec3 d, float lit){
 void main(){
   vec3 n = normalize(vN);
   /* the cell front: world cells (fixed to the object, so turning parts keep their cells) */
-  /* the cell front works on the silhouette: its cells are squares on the screen (facing the camera), not on the surfaces */
-  vec2 sc = floor(gl_FragCoord.xy / uCellPx);
-  float rnd = hash(vec3(sc, 7.3));
-  float k = vK;
-  float dz = vW.z - uCamZ, ahead = k > .5 && k < 1.5 ? uAheadPath : uAhead;   // the causeway builds itself just ahead of you
-  float vA = dz / ahead + rnd * .45;                                   // ahead: resolved inside 'ahead' (plus noise)
-  float vB = -dz / uBehind + rnd * .35;                                 // behind: gone past uBehind
+  vec3 cid = floor((vO - n * .01) / CELL);
+  float rnd = hash(cid + 7.3);
+  float dz = (cid.z + .5) * CELL - uCamZ;
+  float vA = dz / uAhead + abs(cid.x * CELL) * .004 + rnd * .45;   // ahead: resolved inside uAhead (plus noise)
+  float vB = -dz / uBehind + rnd * .7;                               // behind: gone past uBehind
   if (vA > 1. || vB > 1.) discard;
-  float band = step(1. - .1, vA) + step(1. - .08, vB);
-  /* the spark's breathing hole: around the core everything is computed away, the edge opening and closing, never shut */
-  float hv = (uHole - length(vW - uCore)) / 2.5 + (rnd - .5) * .6;
-  if (hv > 0.) discard;
-  band += step(-.06, hv) * step(.86, hash(vec3(sc, 2.1)));          // a few lit cells on the hole's edge
+  float band = step(1. - .1, vA) + step(1. - .22, vB);
+  float k = vK;
+  if (vPlank <= 0.) discard;
+  band += step(vPlank, .999);                                          // the plank being placed carries the accent
   vec3 col = vC;
+  /* the spark's aisle comes apart into cells toward its far end: the upper parts first, no accent, the cells left over at the
+     edge go to plain greys */
+  float grey = 0.;
+  if (uAisle.z > .5) {
+    vec3 a = vW - vec3(uAisle.x, 0., uAisle.y);
+    if (abs(a.x) < 4. && a.z > 2.5 && a.z < 19. && a.y > .03) {
+      float h2 = hash(cid + 3.1);
+      float open = smoothstep(4., 9.5, (cid.z + .5) * CELL - uAisle.y) * 1.25 + (cid.y * CELL / 3.25 - .45) * .45;
+      if (h2 < open) discard;
+      grey = step(h2, open + .14);
+    }
+  }
   float L = dot(n, uL), lit = step(0., L);
   float top = step(.7, n.y);
   vec3 shade = col * mix(.42, 1., lit) * mix(1., 1.06, top);
@@ -468,6 +523,7 @@ void main(){
     shade = mix(uAcc, INK, step(x, .1)); edge = 0.;
   }
   if ((k < 2.5 && k != 2.) || (k > 8.5 && k < 9.5)) shade = mix(shade, INK * .85, edge * .55);
+  if (grey > .5) shade = mix(GHOST, INK2, hash(cid + 5.7) * hash(cid + 1.3));
   shade = mix(shade, uAcc, min(1., band));                            // the front band
   float dist = length(vW - uE);
   shade = mix(shade, uGround, smoothstep(uFog * .35, uFog, dist));
@@ -496,6 +552,17 @@ const SP = prog(VS, FS), FP = prog(FVS, FFS);
 const vbo = gl.createBuffer(), fb = gl.createBuffer(), tex = gl.createTexture();
 gl.bindBuffer(gl.ARRAY_BUFFER, fb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-500, -200, 500, -200, 500, 700, -500, -200, 500, 700, -500, 700]), gl.STATIC_DRAW);
 let nV = 0, onReady = null;
+/* the planks: each one is placed when the camera comes within 'aheadPath' of it and takes its own 0.45 s to drop in, so they
+   land one by one and none hangs half-placed when the camera stops; one that falls well out of reach again is taken away */
+let NPL = 0, PLT = 0; const PL0 = new Float32Array(192), PLP = new Float32Array(192);
+function planks(camZ, reach, now) {
+  for (let i = 0; i < NPL; i++) {
+    const d = -14 + i * 1.5 - camZ;
+    if (!PL0[i] && d < reach) { PL0[i] = Math.max(now, PLT + .05); PLT = PL0[i]; }   // several at once still land in turn
+    else if (PL0[i] && d > reach + 4) PL0[i] = 0;
+    PLP[i] = PL0[i] ? Math.min(1, Math.max(0, (now - PL0[i]) / .45)) : 0;
+  }
+}
 function upload() {
   buildAtlas(); world();
   gl.bindTexture(gl.TEXTURE_2D, tex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atl);
@@ -521,9 +588,8 @@ return {
     if (nV) {
       gl.useProgram(SP.p); uni(SP.u, cam, o);
       gl.uniform3fv(SP.u.uAcc, o.acc); gl.uniform3fv(SP.u.uL, unit([-.45, .78, -.42])); gl.uniform1f(SP.u.uCamZ, cam.E[2]); gl.uniform1f(SP.u.uT, o.time);
-      gl.uniform1f(SP.u.uAhead, o.ahead); gl.uniform1f(SP.u.uBehind, 18); gl.uniform1f(SP.u.uAheadPath, o.aheadPath);
-      gl.uniform1f(SP.u.uCellPx, o.cellPx); gl.uniform3fv(SP.u.uCore, cfg.core);
-      gl.uniform1f(SP.u.uHole, 6.5 + 1.6 * Math.sin(o.time * .7));       // breathing: 4.9 m to 8.1 m, never closed
+      gl.uniform1f(SP.u.uAhead, o.ahead); gl.uniform1f(SP.u.uBehind, 18); planks(cam.E[2], o.aheadPath || 1e4, performance.now() / 1000); gl.uniform4fv(SP.u['uPl[0]'], PLP);
+      gl.uniform3f(SP.u.uAisle, cfg.aisle ? cfg.aisle[0] : 0, cfg.aisle ? cfg.aisle[1] : 0, cfg.aisle ? 1 : 0);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(SP.u.uTex, 0);
       gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
       const A = ATTS.map(([n, s, off]) => { const l = gl.getAttribLocation(SP.p, n); if (l < 0) return -1; gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, s, gl.FLOAT, false, 84, off * 4); return l; });

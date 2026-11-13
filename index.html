@@ -975,7 +975,7 @@ body[data-view="page"] .lore--bg{display:none}
 
 <script src="js/flower-gl.js"></script>
 <script src="js/lookdev-ball.js?v=2"></script>
-<script src="js/about-cells.js?v=6"></script>
+<script src="js/about-cells.js?v=7"></script>
 <script src="js/node-editor.js?v=8" defer></script>
 <script src="js/graphs-fiffy.js?v=3" defer></script>
 <script src="js/flower-wave.js?v=3" defer></script>
@@ -4209,7 +4209,9 @@ const run = (() => {
   const LIME = '#C6FF1A';
 
   /* ----- the road: x(z) wanders left and right ----- */
-  const xs = z => 7 * Math.sin(z * .045) + 3.2 * Math.sin(z * .11 + 1);
+  const xs0 = z => 7 * Math.sin(z * .045) + 3.2 * Math.sin(z * .11 + 1);
+  /* its last stretch straightens into the spark's aisle (from z 220 to 242 it eases onto the line x = xs0(264), 264 being ZSP) */
+  const xs = z => { const t = Math.min(1, Math.max(0, (z - 220) / 22)), e = t * t * (3 - 2 * t); return xs0(z) + (xs0(264) - xs0(z)) * e; };
   const ROAD = 1.9, Z0 = 34, DZ = 46, ZS = Array.from({ length: N }, (_, k) => Z0 + k * DZ), ZSP = ZS[N - 1] + 46, ZEND = ZSP + 24;
   /* newest first: the stops run back in time, and the road ends at the spark */
   const ORDER = ['tut', 'mc', 'zag', 'mth', 'isd'], CODES = { tut: 'TUT-25', mc: 'MC-23', zag: 'ZAG-23', mth: 'MTH-22', isd: 'ARK-20' };
@@ -4658,14 +4660,10 @@ const run = (() => {
   const A = n => gl.getAttribLocation(prog, n), Uf = {};
   ['uE', 'uR', 'uU', 'uF', 'uAcc', 'uGlB', 'uInk', 'uLine', 'uC', 'uHalf', 'uFoc', 'uT', 'uScale', 'uFar', 'uGB', 'uDark', 'uSpark', 'uTear0', 'uTear1', 'uTear2', 'uYoP', 'uYoA', 'uYoB', 'uYoN', 'uYoS', 'uYoAl'].forEach(n => { Uf[n] = gl.getUniformLocation(prog, n); });
   const buf = arr => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), gl.STATIC_DRAW); return { b, n: arr.length / STRIDE }; };
-  if (CELLS_ON) {                                                          // keep only the spark's own points (its stars and shell, bid -2): the
-    const keep = [];                                                       // rest of the scene comes from the cell world
-    for (let i = 0; i < PT.length; i += STRIDE) if (PT[i + 11] < -1.5) for (let j = 0; j < STRIDE; j++) keep.push(PT[i + j]);
-    PT.length = 0; keep.forEach(v => PT.push(v)); LN.length = 0;
-  }
+  if (CELLS_ON) { PT.length = 0; LN.length = 0; }                        // the cell world is the scene; the spark is its light (coreLight) alone
   const BP = buf(PT), BL = buf(LN);
   let CELLS = null;
-  if (CELLS_ON) try { CELLS = window.AboutCells(gl, { xs, road: ROAD, zEnd: ZEND, core: [SPARK[0], SPARK[1] + 4, SPARK[2]], stops: STOP.map((S, k) => ({ id: ORDER[k], code: S.code, z: S.z, s: S.s, Tb: S.Tb, ext: S.ext, Fb: S.Fb, Fe: S.Fe, roof: S.roof })) }); CELLS.ready = () => kick(); }
+  if (CELLS_ON) try { CELLS = window.AboutCells(gl, { xs, road: ROAD, zEnd: ZEND, aisle: [SPARK[0], ZSP - 24], stops: STOP.map((S, k) => ({ id: ORDER[k], code: S.code, z: S.z, s: S.s, Tb: S.Tb, ext: S.ext, Fb: S.Fb, Fe: S.Fe, roof: S.roof })) }); CELLS.ready = () => kick(); }
     catch (e) { CELLS = null; console.warn('about cells', e); }
   PT.length = 0; LN.length = 0;
   const ATT = [['aPos', 3, 0], ['aOff', 3, 3], ['aCol', 4, 6], ['aMisc', 4, 10], ['aX', 2, 14]].map(([n, s2, o]) => [A(n), s2, o]);
@@ -4730,7 +4728,7 @@ const run = (() => {
   function keys() {
     UK = [[0, -6], [1, 4]];
     STOP.forEach((S, k) => { const z = parked(k)[0][2]; UK.push([TK[k] - .65, z - 4], [TK[k] + .65, z + 3]); });
-    UK.push([TSP - .7, ZSP - 18], [TSP, ZSP - 9.5], [T, ZSP - 9]);
+    UK.push([TSP - .7, ZSP - 36], [TSP, ZSP - 24.6], [T, ZSP - 24]);
   }
   /* where the yoyo and its string sit, set from the Miraculous parked view so the composition holds on any window. Each key is an
      offset from the building on screen (in screen heights) and a depth (times the building's depth). YPOS: the yoyo;
@@ -4775,12 +4773,15 @@ const run = (() => {
   const sm2 = (a, b, v) => { const t = cl((v - a) / (b - a)); return t * t * t * (t * (6 * t - 15) + 10); };
   const pull = (k, t) => sm2(TK[k] - 1.15, TK[k] - .22, t) * (1 - sm2(TK[k] + .22, TK[k] + 1.15, t));
   const sparkW = t => sm(TSP - 1, TSP - .15, t);
-  const CORE = add(SPARK, [0, 4, 0]);
+  const CORE = [SPARK[0], 1.05, ZSP];                                      // where concept 10's figure stands: 24 m down the aisle, at its middle
+  /* the locked view is concept 10's camera: eye 1.5 m, looking straight down the aisle, focal 0.95 of the height (the concept's
+     0.957), pitched a touch down so the horizon sits where the concept's does (0.478 of the frame, against this camera's 0.52) */
+  const LOCK_E = [SPARK[0], 1.5, ZSP - 24], LOCK_T = [SPARK[0], 1.5 - 24 * (.52 - .478) / .95, ZSP];
   const roadCam = u => [[xs(u) - (xs(u + 12) - xs(u)) * .25, 2.6, u], [xs(u + 14), 1.1, u + 14]];   // riding the road at u: [eye, target]
   function camAt(t, only) {                                                // [eye, target]; only: a function giving each stop's weight instead
     let [E, Tg] = roadCam(ukey(t));
     STOP.forEach((S, k) => { const w = only ? only(k) : pull(k, t); if (w > 0) { const [Ep, Tp] = parked(k); E = mixV(E, Ep, w); Tg = mixV(Tg, Tp, w); } });
-    const sw = eio(sparkW(t)); if (sw > 0) { E = mixV(E, [CORE[0] - .6, CORE[1] - .4, ZSP - 9], sw); Tg = mixV(Tg, CORE, sw); }
+    const sw = eio(sparkW(t)); if (sw > 0) { E = mixV(E, LOCK_E, sw); Tg = mixV(Tg, LOCK_T, sw); }
     const o = 1 - eio(sm(0, 1.05, t));
     if (o > 0) { const mid = ZEND * .42; E = mixV(E, [xs(mid) + 52, 74, mid - 70], o); Tg = mixV(Tg, [xs(mid), 0, mid + 6], o); }
     return [E, Tg];
@@ -4806,15 +4807,10 @@ const run = (() => {
     fx.globalCompositeOperation = dark ? 'lighter' : 'source-over';
     const blob = (x2, y2, r, c0, a) => { const g2 = fx.createRadialGradient(x2, y2, 0, x2, y2, r); g2.addColorStop(0, c0); g2.addColorStop(1, 'rgba(0,0,0,0)'); fx.globalAlpha = a; fx.fillStyle = g2; fx.fillRect(x2 - r, y2 - r, r * 2, r * 2); };
     const s2 = Math.min(3, 40 / p[2]), Rn = Math.min(W, H) * .9 * Math.min(1.4, s2);
-    blob(p[0] - Rn * .32, p[1] - Rn * .12, Rn * .85, '#4A5BFF', A0 * .26);               // the haze: the site's four accents
-    blob(p[0] + Rn * .34, p[1] - Rn * .08, Rn * .75, '#FF5A3D', A0 * .2);
-    blob(p[0] - Rn * .2, p[1] + Rn * .25, Rn * .7, '#B4F000', A0 * .14);
-    blob(p[0] + Rn * .25, p[1] + Rn * .28, Rn * .7, '#FFC400', A0 * .16);
     blob(p[0], p[1], Rn * .45, C.acc, A0 * .22);
     blob(p[0], p[1], 90 * s2, '#ffffff', A0 * (.55 + .2 * pu));                            // the core
     blob(p[0], p[1], 26 * s2, '#ffffff', A0);
     fx.save(); fx.translate(p[0], p[1]); fx.scale(1, .025); blob(0, 0, W * .45, C.acc, A0 * .85); fx.restore();   // the lens streak
-    const y = pj(add(CORE, [5.5, -6.5, 2])); if (y) { blob(y[0], y[1], 30 * s2, 'rgba(255,200,80,1)', A0 * .8); blob(y[0], y[1], 7 * s2, '#fff6d0', A0); }
     fx.globalCompositeOperation = 'source-over'; fx.globalAlpha = 1;
     const cap = $('#run-sp'), sw = sparkW(t);
     cap.style.opacity = (sw * A0).toFixed(3); cap.style.transform = 'translate(' + Math.round(p[0]) + 'px,' + Math.round(p[1] + 120 * Math.min(1, s2) + 18) + 'px) translateX(-50%)';
@@ -5140,7 +5136,7 @@ const run = (() => {
     gl.clearColor(G[0], G[1], G[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     if (CELLS) {
       const ov = 1 - eio(sm(0, 1.05, tNow));                                // the opening overview sees the whole road
-      CELLS.draw(cam, { W, H, time, acc: v3(C.acc), ground: G, line: v3(C.line), ahead: 110 + ov * 400, aheadPath: 26 + ov * 400, cellPx: Math.max(6, Math.round(14 * RS)), fog: 170 + ov * 300 });
+      CELLS.draw(cam, { W, H, time, acc: v3(C.acc), ground: G, line: v3(C.line), ahead: 110 + ov * 400, aheadPath: 22 + ov * 400, fog: 170 + ov * 300 });
       gl.useProgram(prog);
     }
     gl.enable(gl.BLEND); if (dark) gl.blendFunc(gl.ONE, gl.ONE); else gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
