@@ -163,6 +163,18 @@ function text(name, str, font, size, opt = {}) {
   const w = Math.ceil(ax.measureText(str).width + size * .3), h = Math.ceil(size * 1.25), s = slot(name, w, h);
   ax.fillStyle = '#fff'; ax.textBaseline = 'middle'; ax.fillText(str, s.px + size * .15, s.py + h / 2);
 }
+function vtext(name, str, font, size) {
+  const ch = [...str], c = Math.round(size * 1.15), s = slot(name, c, c * ch.length);
+  ax.font = `400 ${size}px ${font}`; ax.fillStyle = '#fff'; ax.textAlign = 'center'; ax.textBaseline = 'middle';
+  ch.forEach((g, i) => ax.fillText(g, s.px + c / 2, s.py + c * i + c / 2 + size * .04));
+  ax.textAlign = 'start';
+}
+function solidK(name, ch, font, size) {
+  const c = Math.round(size * 1.2), s = slot(name, c, c);
+  ax.fillStyle = '#fff'; ax.fillRect(s.px, s.py, c, c);
+  ax.save(); ax.globalCompositeOperation = 'destination-out'; ax.font = `400 ${size}px ${font}`; ax.textAlign = 'center'; ax.textBaseline = 'middle';
+  ax.fillText(ch, s.px + c / 2, s.py + c / 2 + size * .04); ax.restore();
+}
 function buildAtlas() {
   ax.clearRect(0, 0, 2048, 2048); ax0 = ay0 = rowH = 0;
   const D = "'Tektur'", M = "'M PLUS 1 Code'", J = "'Dela Gothic One'";
@@ -177,6 +189,9 @@ function buildAtlas() {
   text('spark', 'FRAME 0', D, 80);
   text('tiers', 'TEAM OF 8', M, 44, { weight: 700 });
   text('cell', '1 CELL = 0.5 M', M, 36, { weight: 500 });
+  /* Japanese: vertical signs (one character per cell) and solid blocks (an ink square with the kanji knocked out) */
+  [['v-tut', '研究室'], ['v-mc', '書割りの街'], ['v-zag', '回転台'], ['v-mth', '撮影舞台'], ['v-isd', '階段教室'], ['v-path', '経路'], ['v-spark', '火花']].forEach(([n, str]) => vtext(n, str, J, 120));
+  ['骨', '街', '灯', '舞', '筋', '火', '門', '学'].forEach(ch => solidK('k-' + ch, ch, J, 220));
   LOGO_IDS.forEach(id => { const im = LOGOS[id]; if (!im || !im.naturalWidth) return; const k = Math.min(420 / im.naturalWidth, 180 / im.naturalHeight), w = Math.round(im.naturalWidth * k), h = Math.round(im.naturalHeight * k), s = slot('logo-' + id, w, h);
     ax.drawImage(im, s.px, s.py, w, h); });
 }
@@ -197,12 +212,58 @@ function world() {
     label('a-' + S.id, [0, 1.62, -.08], 1.5, [0, 0, -1], [0, 1, 0], C.ink2);
   });
   STOPS.forEach((S, k) => { F = { o: [-S.side * (CW + 2), 0, S.z], s: -S.side }; BUILD[S.id](S, k); });
-  /* the spark: on the open field past the causeway's end */
+  /* data-center machines in the background: rack rows set back in the field on both sides, facing the causeway */
+  let rs = 11; const rr = () => { rs = (rs * 16807) % 2147483647; return rs / 2147483647; };
+  F = { o: [0, 0, 0], s: 1 };
+  for (let z = -4; z < ZEND - 10; z += 13 + rr() * 9) for (const sd of [-1, 1]) {
+    if (rr() < .25) continue;
+    const x0 = sd * (24 + rr() * 16), n = 4 + (rr() * 6 | 0), hR = 2.2 + (rr() < .3 ? 1.1 : 0);
+    for (let r = 0; r < n; r++) box([x0, hR / 2, z + r * .82], [1.1, hR, .78], C.panel, 8);
+    if (rr() < .5) for (let r = 0; r < n; r++) box([x0 + sd * 2.2, hR / 2, z + r * .82], [1.1, hR, .78], C.panel, 8);
+  }
+  label('v-path', [-CW - .02, CH + 2.2, -4], 1.0, [1, 0, 0], [0, 1, 0], C.ink2);
+  /* the spark, the original rebuilt in cells: a cloud of square stars (white and the four accents), a shell of square dots
+     whose rim reads as a ring, a stepped white core, dithered rings for the haze, a one-row lens streak, a yellow companion */
   F = { o: [0, 0, ZSP], s: 1 };
   for (let r of [1.1, 1.8]) for (let i = 0; i < 20; i++) { const a = i / 20 * TAU; box([Math.cos(a) * r, .02, Math.sin(a) * r], [.28, .04, .28], i % 5 ? C.line : C.ink2); }
-  ROT = [0, 0, 0];
-  sphere([0, 1.55, 0], .34, C.ink, 4, 8, 12);
-  label('spark', [0, 2.4, 0], 1.3, [0, 0, -1], [0, 1, 0], C.ink2);
+  const CORE = [0, 4.6, 6], ACC4 = [C.blue, C.red, C.lime, C.yellow];
+  let ss = 7; const sr = () => { ss = (ss * 16807) % 2147483647; return ss / 2147483647; };
+  for (let i = 0; i < 1400; i++) {
+    const th = TAU * sr(), ph = Math.acos(2 * sr() - 1), r = .9 + Math.pow(sr(), 1.8) * 9;
+    const p = [CORE[0] + r * Math.sin(ph) * Math.cos(th), CORE[1] + r * Math.cos(ph) * .7, CORE[2] + r * Math.sin(ph) * Math.sin(th)].map(v => Math.round(v / .125) * .125);
+    const q = .035 + sr() * .045; box(p, [q, q, q], sr() < .3 ? C.ink : ACC4[sr() * 4 | 0], 4);
+  }
+  for (let i = 0; i < 900; i++) {
+    const th = TAU * sr(), ph = Math.acos(2 * sr() - 1), R = 10;
+    box([CORE[0] + R * Math.sin(ph) * Math.cos(th), CORE[1] + R * Math.cos(ph), CORE[2] + R * Math.sin(ph) * Math.sin(th)], [.04, .04, .04], ACC4[i % 4], 4);
+  }
+  { const keep = RECT; RECT = [0, 0, 0, 0];                 // the haze and the streak: camera-facing plates, drawn by the shader in cells
+    const q = (c, w, h, kind) => quad(add(c, [w / 2, -h / 2, 0]), add(c, [-w / 2, -h / 2, 0]), add(c, [-w / 2, h / 2, 0]), add(c, [w / 2, h / 2, 0]), [0, 0, -1], C.ink, kind);
+    q(add(CORE, [0, 0, .5]), 14, 14, 10); q(add(CORE, [0, 0, -.3]), 30, .5, 11); RECT = keep; }
+  sphere(CORE, .55, C.ink, 4, 8, 12);
+  box(add(CORE, [2.6, -3, -1]), [.32, .32, .32], C.yellow, 4);
+  label('spark', [0, 1.1, 2.4], 1.6, [0, 0, -1], [0, 1, 0], C.ink2);
+  label('k-火', [-3.2, 1.0, 2.6], .9, [0, 0, -1], [0, 1, 0], C.ink);
+  label('v-spark', [3.2, 1.6, 2.6], .45, [0, 0, -1], [0, 1, 0], C.ink2);
+}
+/* a vertical sign: a dark plate on a post, the kanji stacked one per cell, facing the causeway (local -x) */
+function vsign(item, x, z, h, col = C.ink) {
+  const A = ATLAS[item]; if (!A) return;
+  const w = h * A.w / A.h;
+  box([x, h / 2 + 1.4, z], [.25, h + .6, w + .5], C.panel); box([x + .1, .7, z], [.2, 1.4, .3], C.mid);
+  label(item, [x - .14, h / 2 + 1.4, z], w, [-1, 0, 0], [0, 1, 0], col);
+}
+/* a hall in the manner of the made-moon data center: blunt block, a band of cells near the top, cooling stacks, a lattice mast,
+   a building-scale numeral and a solid kanji painted on the wall that faces the causeway */
+function hall(x, z, w, d, h, num, kanji) {
+  box([x + w / 2, h / 2, z], [w, h, d], C.slate, 9);
+  box([x + w / 2 + w * .1, h + .6, z - d * .2], [w * .5, 1.2, d * .35], C.mid);
+  [-.3, 0, .3].forEach((f, i) => prism([x + w * .7, h, z + d * f], .9 + i * .1, 3.5 + i * 1.2, 10, C.mid));
+  const mx = x + w * .25, mz = z + d * .38, mh = h + 9;
+  [[-.6, -.6], [.6, -.6], [.6, .6], [-.6, .6]].forEach(([a, b]) => beam([mx + a, h, mz + b], [mx + a * .3, mh, mz + b * .3], .1, C.ink2));
+  for (let y = h + 1.5; y < mh - .5; y += 1.6) beam([mx - .6 + (y - h) / 9 * .42, y, mz - .6 + (y - h) / 9 * .42], [mx + .6 - (y - h) / 9 * .42, y + 1.6, mz + .6 - (y - h) / 9 * .42], .06, C.ink2);
+  if (num) label(num, [x - .03, h * .48, z - d * .18], Math.min(d * .42, h * .9), [-1, 0, 0], [0, 1, 0], C.ink2);
+  if (kanji) label(kanji, [x - .03, h * .52, z + d * .26], Math.min(d * .3, h * .6), [-1, 0, 0], [0, 1, 0], C.ink);
 }
 const BUILD = {
   /* 01 · the bone gantry: a joint chain as a stepped arch over the causeway, four gates before it */
@@ -213,13 +274,18 @@ const BUILD = {
     J.forEach((j, i) => { if (!i || i === J.length - 1) { box(add(j, [0, .4, 0]), [1.6, .8, 1.6], C.slate); return; }
       box(j, [1.3, 1.3, 1.3], i === 3 ? C.ink : C.mid, i === 3 ? 6 : 0);
       beam(add(j, [.65, 0, 0]), add(j, [1.4, 0, 0]), .14, C.red); beam(add(j, [0, .65, 0]), add(j, [0, 1.4, 0]), .14, C.lime); beam(add(j, [0, 0, -.65]), add(j, [0, 0, -1.4]), .14, C.blue); });
-    [-14, -10.5, -7, -3.5].forEach((z, i) => {
-      box([-2.6, 2.2, z], [.35, 4.4, .35], C.mid); box([2.6, 2.2, z], [.35, 4.4, .35], C.mid); box([0, 4.6, z], [5.6, .5, .35], C.panel);
-      label('g' + i, [-.9, 4.6, z - .19], 1.6, [0, 0, -1], [0, 1, 0], C.ink); label('gj' + i, [1.5, 4.6, z - .19], 1.05, [0, 0, -1], [0, 1, 0], C.ink2);
+    [-14, -10.5, -7, -3.5].forEach((z, i) => {                // gates with torii proportions: posts, a kasagi on top, a nuki below it
+      box([-2.6, 2.6, z], [.4, 5.2, .4], C.mid); box([2.6, 2.6, z], [.4, 5.2, .4], C.mid);
+      box([0, 5.45, z], [7.4, .5, .55], C.bone); box([0, 5.85, z], [8.2, .3, .7], C.ink2);
+      box([0, 4.3, z], [6.2, .32, .3], C.mid);
+      box([0, 4.85, z], [.5, .9, .32], C.panel);
+      label('g' + i, [-1.6, 4.3, z - .17], 1.5, [0, 0, -1], [0, 1, 0], C.ink); label('gj' + i, [1.6, 4.3, z - .17], 1.0, [0, 0, -1], [0, 1, 0], C.ink2);
     });
+    label('k-骨', [0, 10.6, 4 - .66], 1.25, [0, 0, -1], [0, 1, 0], C.ink);
     F = { o: [-S.side * (CW + 2), 0, S.z], s: -S.side };
     box([2.2, 1.1, -15], [.2, 2.2, 3.2], C.panel); label('manifest', [2.08, 1.6, -15], 2.6, [-1, 0, 0], [0, 1, 0], C.ink2);
     box([6, 3.2, -1], [.25, 2.4, 5.6], C.panel); label('logo-tut', [5.86, 3.2, -1], 4.6, [-1, 0, 0], [0, 1, 0], C.ink);
+    vsign('v-tut', 4.5, -20, 4.2);
   },
   /* 02 · facade street: card-thin facades on struts, each window an interior-mapped room; one card turned side-on; prop crates */
   mc(S) {
@@ -237,6 +303,9 @@ const BUILD = {
       beam([x, y + 1.02, z], [x + .5, y + 1.02, z], .05, C.red); beam([x, y + 1.02, z], [x, y + 1.5, z], .05, C.lime); beam([x, y + 1.02, z], [x, y + 1.02, z - .5], .05, C.blue);
     });
     box([3.9, 9, -26], [.25, 2.6, 6.4], C.panel); label('logo-mc', [3.76, 9, -26], 5.6, [-1, 0, 0], [0, 1, 0], C.ink);
+    vsign('v-mc', 4.6, -19.5, 6.5);
+    [-12, -4.6, 2.8, 10.2].forEach((z, i) => { box([5.4, 3.2 + i % 2, z], [.9, 3.4, .2], C.panel); label('k-' + '街灯門学'[i], [5.4, 3.2 + i % 2, z - .11], .8, [0, 0, -1], [0, 1, 0], C.ink); });
+    label('k-街', [9, 9, 20 - .1], 4.4, [0, 0, -1], [0, 1, 0], C.ink);
   },
   /* 03 · the turntable yard: plinths with turning reference balls, a 24-step grey chart wall, a light gantry, the rename sign */
   zag(S) {
@@ -257,6 +326,8 @@ const BUILD = {
     [[4.5, -6], [9.5, -1], [5.5, 5.5]].forEach(([x, z]) => { box([x, 8.6, z], [.8, .5, .8], C.bone); });
     box([3, 4.2, -15], [.25, 2.2, 8.4], C.panel); label('rename', [2.86, 4.2, -15], 7.4, [-1, 0, 0], [0, 1, 0], C.ink);
     box([3, 1.4, -15], [.25, 2.2, 5], C.panel); label('logo-zag', [2.86, 1.4, -15], 4.2, [-1, 0, 0], [0, 1, 0], C.ink);
+    hall(19, -2, 10, 22, 9, 'n03', 'k-灯'); hall(16, 22, 14, 12, 6.5, null, null);
+    vsign('v-zag', 2.4, -7, 3.6);
   },
   /* 04 · the layout stage: grey-box blocking on a stage, cameras on tripods with frustums, a giant 2.39:1 gate over the causeway */
   mth(S) {
@@ -282,6 +353,8 @@ const BUILD = {
     label('gate', [-gw / 2 + 1.6, .6 + gh + .55, gz - .23], 2.4, [0, 0, -1], [0, 1, 0], C.ink2);
     F = { o: [-S.side * (CW + 2), 0, S.z], s: -S.side };
     box([17, 3.4, -4], [.25, 2.6, 2.6], C.panel); label('logo-mth', [16.86, 3.4, -4], 2.3, [-1, 0, 0], [0, 1, 0], C.ink);
+    hall(20, 2, 14, 30, 12, 'n04', 'k-舞'); hall(14, 26, 10, 10, 5, null, null);
+    vsign('v-mth', 2.4, -12, 4.6);
   },
   /* 05 · the amphitheatre: stepped half-ring tiers facing a muscle arch of layered fibres between two bone ends */
   isd(S) {
@@ -306,8 +379,10 @@ const BUILD = {
       }
     }
     box([cx + 9.5, 1, -12], [.25, 2, 1], C.panel);
-    box([2.2, 2.3, -14], [.25, 2.2, 7.2], C.panel); label('logo-isd', [2.06, 2.3, -14], 6.2, [-1, 0, 0], [0, 1, 0], C.ink);
+    box([2.2, 2.3, 14], [.25, 2.2, 7.2], C.panel); label('logo-isd', [2.06, 2.3, 14], 6.2, [-1, 0, 0], [0, 1, 0], C.ink);
     label('tiers', [cx - 9, .02 + 1.8, cz - 12.2], 3.2, [0, 0, -1], [0, 1, 0], C.ink2);
+    hall(cx + 16, -10, 12, 16, 10, 'n05', 'k-学'); hall(cx + 14, 12, 10, 14, 7, null, 'k-筋');
+    vsign('v-isd', 2.4, -18, 4.6);
   }
 };
 
@@ -384,18 +459,42 @@ void main(){
     if (a < .35) discard;
     shade = col; edge = 0.;
   } else if (k > 3.5 && k < 4.5) {                                    // the spark: unlit
-    shade = INK; edge = 0.;
+    shade = col; edge = 0.;
   } else if (k > 4.5 && k < 5.5) {                                    // dithered ball
     float lam = clamp(L * .5 + .5, 0., 1.);
     shade = mix(PANEL, INK, step(bayer(gl_FragCoord.xy / 2.), lam * lam * 1.1)); edge = 0.;
   } else if (k > 5.5 && k < 6.5) {                                    // the evaluating part: the accent pulses through it as a front
     float ph = fract(uT * .35 - (vO.y + vO.z) * .05);
     shade = mix(shade, uAcc, step(ph, .08));
-  } else if (k > 6.5) {                                               // chrome ball drawn flat: bands of the reflected sky
+  } else if (k > 6.5 && k < 7.5) {                                    // chrome ball drawn flat: bands of the reflected sky
     vec3 rv = reflect(normalize(vW - uE), n);
     shade = mix(LINE, INK, step(.15, rv.y)) * mix(.5, 1., step(-.25, rv.y)); edge = 0.;
+  } else if (k > 7.5 && k < 8.5) {                                    // a rack face: rack units, each with a square status light
+    float side = step(.5, abs(n.x)) + step(.5, abs(n.z));
+    vec2 u = vec2(m.x, m.y); float un = floor(u.y / .2);
+    float slot = step(.03, fract(u.y / .2)) * step(.08, u.x) * step(u.x, vFS.x - .08) * step(.2, u.y) * step(u.y, vFS.y - .15);
+    vec3 face = mix(PANEL, GHOST, slot * .8);
+    float led = step(abs(u.x - .2), .03) * step(abs(fract(u.y / .2) - .5), .15) * step(.2, u.y) * step(u.y, vFS.y - .15);
+    float on = step(.45, hash(vec3(un, floor(vO.z * 2.), floor(vO.x) + floor(uT * .7 + hash(vec3(un, 1., floor(vO.z * 2.))) * 3.))));
+    shade = mix(face * mix(.5, 1., lit), mix(LINE, INK2, on), led * step(.5, top < .5 ? 1. : 0.));
+  } else if (k > 8.5 && k < 9.5) {                                    // a hall wall: a band of cells near the top, like the made moon's halls
+    float wall = 1. - top;
+    float bandY = step(vFS.y - 2.6, m.y) * step(m.y, vFS.y - 1.4) * wall;
+    float ck = mod(floor(m.x / CELL) + floor(m.y / CELL), 2.);
+    shade = mix(shade, mix(GHOST, INK2, ck) * mix(.55, 1., lit), bandY);
+  } else if (k > 9.5 && k < 10.5) {                                   // the spark's haze: concentric rings in the four accents, dithered
+    vec2 q = (vUV - .5) * 2.; float r = length(q);
+    if (r > 1.) discard;
+    float ring = floor(r * 7.); float dens = (1. - r) * .55;
+    if (bayer(gl_FragCoord.xy / 3.) > dens) discard;
+    vec3 c4 = mod(ring, 4.) < .5 ? vec3(.29,.36,1.) : mod(ring, 4.) < 1.5 ? vec3(1.,.35,.24) : mod(ring, 4.) < 2.5 ? vec3(.71,.94,0.) : vec3(1.,.77,0.);
+    shade = mix(c4, INK, step(r, .16)); edge = 0.;
+  } else if (k > 10.5) {                                              // the lens streak: one row of cells, thinning out
+    float x = abs(vUV.x - .5) * 2.;
+    if (bayer(gl_FragCoord.xy / 3.) > (1. - x) * (1. - x)) discard;
+    shade = mix(uAcc, INK, step(x, .1)); edge = 0.;
   }
-  if (k < 2.5 && k != 2.) shade = mix(shade, INK * .85, edge * .55);
+  if ((k < 2.5 && k != 2.) || (k > 8.5 && k < 9.5)) shade = mix(shade, INK * .85, edge * .55);
   shade = mix(shade, uAcc, min(1., band));                            // the front band
   float dist = length(vW - uE);
   shade = mix(shade, GROUND, smoothstep(30., 95., dist));
@@ -467,7 +566,7 @@ const KEYS = [];                                              // [u, camZ, yaw, 
     const over = S.id === 'tut' || S.id === 'mth', zp = S.z - (over ? 19 : S.id === 'isd' ? 15 : 9), yaw = -S.side * (over ? .1 : S.id === 'isd' ? .62 : .5), pit = S.id === 'tut' ? .14 : .04;
     KEYS.push([k + .55, zp, yaw * .3, -.02, 0]); KEYS.push([k + .8, zp + 1.5, yaw, pit, 0]); KEYS.push([k + 1, zp + 2.2, yaw, pit, 0]);
   });
-  KEYS.push([5.6, ZEND - 2, 0, -.06, 0]); KEYS.push([6, ZSP - 5.2, 0, -.1, 0]);
+  KEYS.push([5.6, ZEND - 4, 0, .02, 0]); KEYS.push([6, ZSP - 9, 0, .12, 0]);
 })();
 const ease = t => t * t * (3 - 2 * t);
 function camAt(u) {
