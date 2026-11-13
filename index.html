@@ -975,6 +975,7 @@ body[data-view="page"] .lore--bg{display:none}
 
 <script src="js/flower-gl.js"></script>
 <script src="js/lookdev-ball.js?v=2"></script>
+<script src="js/about-cells.js?v=1"></script>
 <script src="js/node-editor.js?v=8" defer></script>
 <script src="js/graphs-fiffy.js?v=3" defer></script>
 <script src="js/flower-wave.js?v=3" defer></script>
@@ -4192,7 +4193,8 @@ const run = (() => {
   const sec = $('#run'), box = $('#run-st'), glc = $('#run-cv'), panels = $$('.run-p'), ticks = $$('#run-tl button');
   const hudN = $('#run-n'), hudT = $('#run-t');
   if (!sec) return null;
-  const gl = glc.getContext('webgl', { antialias: false, alpha: false, depth: false, powerPreference: 'high-performance' });
+  const gl = glc.getContext('webgl', { antialias: false, alpha: false, depth: true, powerPreference: 'high-performance' });
+  const CELLS_ON = !!window.AboutCells;                                   // the PROPAGATE world (js/about-cells.js) replaces the hologram scene
   if (!gl) { sec.classList.add('run--flat'); return null; }                // no WebGL: the panels simply stack, no scene
   const fxc = mk('canvas', 'run-fx'), uic = mk('canvas', 'run-ui'), fx = fxc.getContext('2d'), x = uic.getContext('2d');
   fxc.setAttribute('aria-hidden', 'true'); uic.setAttribute('aria-hidden', 'true'); glc.after(fxc, uic);
@@ -4656,7 +4658,15 @@ const run = (() => {
   const A = n => gl.getAttribLocation(prog, n), Uf = {};
   ['uE', 'uR', 'uU', 'uF', 'uAcc', 'uGlB', 'uInk', 'uLine', 'uC', 'uHalf', 'uFoc', 'uT', 'uScale', 'uFar', 'uGB', 'uDark', 'uSpark', 'uTear0', 'uTear1', 'uTear2', 'uYoP', 'uYoA', 'uYoB', 'uYoN', 'uYoS', 'uYoAl'].forEach(n => { Uf[n] = gl.getUniformLocation(prog, n); });
   const buf = arr => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), gl.STATIC_DRAW); return { b, n: arr.length / STRIDE }; };
+  if (CELLS_ON) {                                                          // keep only the spark's own points (its stars and shell, bid -2): the
+    const keep = [];                                                       // rest of the scene comes from the cell world
+    for (let i = 0; i < PT.length; i += STRIDE) if (PT[i + 11] < -1.5) for (let j = 0; j < STRIDE; j++) keep.push(PT[i + j]);
+    PT.length = 0; keep.forEach(v => PT.push(v)); LN.length = 0;
+  }
   const BP = buf(PT), BL = buf(LN);
+  let CELLS = null;
+  if (CELLS_ON) try { CELLS = window.AboutCells(gl, { xs, road: ROAD, zEnd: ZEND, stops: STOP.map((S, k) => ({ id: ORDER[k], code: S.code, z: S.z, s: S.s })) }); CELLS.ready = () => kick(); }
+    catch (e) { CELLS = null; console.warn('about cells', e); }
   PT.length = 0; LN.length = 0;
   const ATT = [['aPos', 3, 0], ['aOff', 3, 3], ['aCol', 4, 6], ['aMisc', 4, 10], ['aX', 2, 14]].map(([n, s2, o]) => [A(n), s2, o]);
   function bind(B) { gl.bindBuffer(gl.ARRAY_BUFFER, B.b); ATT.forEach(([l, s2, o]) => { gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, s2, gl.FLOAT, false, STRIDE * 4, o * 4); }); }
@@ -4684,7 +4694,7 @@ const run = (() => {
      a little like a splash art; its string runs up the building's left side, over the top and away behind it. The mesh is a unit
      yoyo (two domed halves, black spots, a dark groove) placed in the shader (kind 7); the string is rebuilt every frame in a small
      buffer of its own, since its near end floats with the yoyo. ----- */
-  const MCI = ORDER.indexOf('mc'), YO = [];
+  const MCI = CELLS_ON ? -1 : ORDER.indexOf('mc'), YO = [];   // the ladybug yoyo is retired in the cell world
   const SPOTS = [[0, 0, .25], ...[0, 1, 2, 3].map(i => [Math.cos(i * TAU / 4 + .5) * .63, Math.sin(i * TAU / 4 + .5) * .63, .17])];
   [-1, 1].forEach(sd => {
     const NF = 4400;
@@ -5127,7 +5137,12 @@ const run = (() => {
     cam = look(camE, camT);
     const time = still.matches ? 0 : now / 1000, dark = rgb(C.ground)[0] < 128, G = v3(C.ground);
     /* the scene */
-    gl.clearColor(G[0], G[1], G[2], 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.clearColor(G[0], G[1], G[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    if (CELLS) {
+      const ov = 1 - eio(sm(0, 1.05, tNow));                                // the opening overview sees the whole road
+      CELLS.draw(cam, { W, H, time, acc: v3(C.acc), ground: G, line: v3(C.line), ahead: 70 + ov * 400, fog: 95 + ov * 300 });
+      gl.useProgram(prog);
+    }
     gl.enable(gl.BLEND); if (dark) gl.blendFunc(gl.ONE, gl.ONE); else gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.uniform3fv(Uf.uE, cam.E); gl.uniform3fv(Uf.uR, cam.r); gl.uniform3fv(Uf.uU, cam.u); gl.uniform3fv(Uf.uF, cam.f);
     gl.uniform3fv(Uf.uAcc, v3(C.acc)); gl.uniform3fv(Uf.uGlB, v3(C.glB)); gl.uniform3fv(Uf.uInk, v3(C.ink)); gl.uniform3fv(Uf.uLine, v3(C.line));
