@@ -494,7 +494,7 @@ a.gtile:hover b{text-decoration:underline;text-decoration-color:var(--accent);te
 .run{position:relative;height:calc((100vh - var(--hdr)) * 8);height:calc((100svh - var(--hdr)) * 8);border-top:1px solid var(--line)}
 .run-st{position:sticky;top:var(--hdr);height:calc(100vh - var(--hdr));height:calc(100svh - var(--hdr));overflow:hidden;background:var(--ground)}
 #run-cv,.run-fx,.run-ui{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
-#run-cv,.run-fx{image-rendering:pixelated;image-rendering:crisp-edges}
+
 .run-ui{background:repeating-linear-gradient(to bottom,transparent 0 2px,color-mix(in srgb,var(--ink) 5%,transparent) 2px 3px)}   /* scan lines */
 .run--flat{height:auto}.run--flat .run-st{position:static;height:auto;display:grid;gap:1rem;padding:var(--pad)}
 .run--flat #run-cv,.run--flat .run-hud,.run--flat .run-tl,.run--flat .run-sp{display:none}.run--flat .run-p{position:static;visibility:visible;opacity:1;transform:none;width:auto}
@@ -975,7 +975,7 @@ body[data-view="page"] .lore--bg{display:none}
 
 <script src="js/flower-gl.js"></script>
 <script src="js/lookdev-ball.js?v=2"></script>
-<script src="js/about-cells.js?v=4"></script>
+<script src="js/about-cells.js?v=5"></script>
 <script src="js/node-editor.js?v=8" defer></script>
 <script src="js/graphs-fiffy.js?v=3" defer></script>
 <script src="js/flower-wave.js?v=3" defer></script>
@@ -4193,7 +4193,7 @@ const run = (() => {
   const sec = $('#run'), box = $('#run-st'), glc = $('#run-cv'), panels = $$('.run-p'), ticks = $$('#run-tl button');
   const hudN = $('#run-n'), hudT = $('#run-t');
   if (!sec) return null;
-  const gl = glc.getContext('webgl', { antialias: false, alpha: false, depth: true, powerPreference: 'high-performance' });
+  const gl = glc.getContext('webgl', { antialias: true, alpha: false, depth: true, powerPreference: 'high-performance' });
   const CELLS_ON = !!window.AboutCells;                                   // the PROPAGATE world (js/about-cells.js) replaces the hologram scene
   if (!gl) { sec.classList.add('run--flat'); return null; }                // no WebGL: the panels simply stack, no scene
   const fxc = mk('canvas', 'run-fx'), uic = mk('canvas', 'run-ui'), fx = fxc.getContext('2d'), x = uic.getContext('2d');
@@ -4898,7 +4898,7 @@ const run = (() => {
   const hsh = (a, b) => { let h = (Math.imul(a | 0, 374761393) + Math.imul(b | 0, 668265263)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
   function size() {
     dpr = Math.min(2, devicePixelRatio || 1); W = box.clientWidth; H = box.clientHeight;
-    RS = Math.min(.62, Math.sqrt(650000 / Math.max(1, W * H)));                // the scene's resolution: chunky on purpose, and capped
+    RS = Math.min(dpr, Math.sqrt(3200000 / Math.max(1, W * H)));                // the scene's resolution: sharp (device pixels, antialiased), capped for big screens
     glc.width = Math.round(W * RS); glc.height = Math.round(H * RS); fxc.width = glc.width; fxc.height = glc.height;
     uic.width = Math.round(W * dpr); uic.height = Math.round(H * dpr);
     gl.viewport(0, 0, glc.width, glc.height);
