@@ -291,6 +291,47 @@ function world() {
   });
   STOPS.forEach((S, k) => { F = HF(S); if (BUILD[S.id]) BUILD[S.id](S, k); F = RF(0, 0, 1); });
   let rs = 11; const rr = () => { rs = (rs * 16807) % 2147483647; return rs / 2147483647; };
+  /* the made moon's industry between and behind the places (after concept 09): low blunt halls with cell bands, stacks,
+     lattice masts, tank farms, terraces; kept off the road and out of every parked camera's line of sight */
+  const VIEWS = STOPS.map(S => { const d = unit([S.s * .6, 0, .78]); return { a: [S.Tb[0] - d[0] * 30, S.Tb[2] - d[2] * 30], b: [S.Tb[0], S.Tb[2]] }; });
+  const segD = (p, a, b) => { const ab = [b[0] - a[0], b[1] - a[1]], t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / (ab[0] ** 2 + ab[1] ** 2))); return Math.hypot(p[0] - a[0] - ab[0] * t, p[1] - a[1] - ab[1] * t); };
+  const free = (x, z, r) => {
+    for (let zz = z - r - 6; zz <= z + r + 6; zz += 3) if (Math.abs(xs(zz) - x) < r + 9) return false;          // the road and the camera on it
+    return STOPS.every(S => Math.hypot(S.Tb[0] - x, S.Tb[2] - z) > r + 15) && VIEWS.every(V => segD([x, z], V.a, V.b) > r + 6);
+  };
+  const KJ = ['k-骨', 'k-街', 'k-灯', 'k-舞', 'k-筋', 'k-門', 'k-学'];
+  let placed = 0;
+  for (let i = 0; i < 260 && placed < 70; i++) {
+    const z = -20 + rr() * (ZEND - 10), sd = rr() < .5 ? -1 : 1, far = rr(), dist = 18 + far * far * 80, x = xs(z) + sd * dist;
+    const kind = rr(), r = kind < .5 ? 7 : kind < .75 ? 4 : 3;
+    if (!free(x, z, r)) continue;
+    placed++;
+    const toRoad = unit([xs(z) - x, 0, 0 - 0 + .35]), yaw = Math.round(Math.atan2(toRoad[0], toRoad[2]) / (Math.PI / 8)) * (Math.PI / 8);
+    F = { hero: true, o: [x, 0, z], X: [Math.cos(yaw), 0, -Math.sin(yaw)], Z: [Math.sin(yaw), 0, Math.cos(yaw)] };
+    if (kind < .5) {                                                        // a hall, sometimes with a wing and a painted kanji
+      const w = 8 + rr() * 10, d = 6 + rr() * 8, h = 4 + rr() * 7;
+      hall(0, 0, w, d, h, null, rr() < .35 ? KJ[rr() * KJ.length | 0] : null, rr() < .5 ? 1 : -1);
+      if (rr() < .5) box([w * .5 + 2, h * .3, d * .1], [4, h * .6, d * .7], C.slate, 9);
+    } else if (kind < .75) {                                                // a tank farm: squat cylinders on a plinth, pipes between
+      box([0, .3, 0], [8, .6, 6], C.panel);
+      for (let t = 0; t < 3; t++) { const tx = -2.6 + t * 2.6, th = 2 + rr() * 2.5; prism([tx, .6, 0], 1.05, th, 10, t % 2 ? C.mid : C.slate); if (t) beam([tx - 2.6 + 1, 1.6, 0], [tx - 1, 1.6, 0], .18, C.ink2); }
+    } else if (kind < .9) {                                                 // a lone lattice mast with a lamp box
+      const mh = 10 + rr() * 12;
+      [[-.6, -.6], [.6, -.6], [.6, .6], [-.6, .6]].forEach(([a, b]) => beam([a, 0, b], [a * .25, mh, b * .25], .08, C.ink2));
+      for (let y = 1.4; y < mh - 1; y += 1.6) { const k = y / mh * .45; beam([-.6 + k, y, .6 - k], [.6 - k, y + 1.6, -.6 + k], .04, C.ink2); }
+      box([0, mh + .3, 0], [.6, .6, .6], C.bone);
+    } else {                                                                // a stepped terrace of cells
+      for (let t = 0; t < 4; t++) box([0, .5 + t, -t * 1.2], [6 - t, 1, 2.4], t % 2 ? C.slate : C.mid, 9);
+    }
+  }
+  F = RF(0, 0, 1);
+  /* the horizon: a far ring of long, low blocks so the field never just stops */
+  for (let z = -60; z < ZEND + 60; z += 14 + rr() * 10) [-1, 1].forEach(sd => {
+    const x = xs(z) + sd * (110 + rr() * 30), w = 10 + rr() * 22, h = 3 + rr() * 9;
+    F = { hero: true, o: [x, 0, z], X: [1, 0, 0], Z: [0, 0, 1] }; box([0, h / 2, 0], [8, h, w], C.panel, 9);
+    if (rr() < .3) prism([0, h, w * .2], 1, 3 + rr() * 4, 8, C.slate);
+  });
+  F = RF(0, 0, 1);
   for (let z = 4; z < ZEND - 30; z += 16 + rr() * 14) {                  // a few data-center machines here and there
     const sd = rr() < .5 ? -1 : 1, x0 = 20 + rr() * 26, n = 1 + (rr() * 3 | 0), hR = 2.2 + (rr() < .3 ? 1.1 : 0);
     F = RF(z, x0, sd);
@@ -344,10 +385,10 @@ void main(){
   vec3 cid = floor((vO - n * .01) / CELL);
   float rnd = hash(cid + 7.3);
   float dz = (cid.z + .5) * CELL - uCamZ;
-  float vA = dz / uAhead + abs(cid.x * CELL) * .006 + rnd * .22;   // ahead: resolved inside uAhead (plus noise)
-  float vB = -dz / uBehind + rnd * .4;                               // behind: gone past uBehind
+  float vA = dz / uAhead + abs(cid.x * CELL) * .004 + rnd * .45;   // ahead: resolved inside uAhead (plus noise)
+  float vB = -dz / uBehind + rnd * .7;                               // behind: gone past uBehind
   if (vA > 1. || vB > 1.) discard;
-  float band = step(1. - .04, vA) + step(1. - .12, vB);
+  float band = step(1. - .1, vA) + step(1. - .22, vB);
   float k = vK;
   vec3 col = vC;
   float L = dot(n, uL), lit = step(0., L);
@@ -465,7 +506,7 @@ return {
     if (nV) {
       gl.useProgram(SP.p); uni(SP.u, cam, o);
       gl.uniform3fv(SP.u.uAcc, o.acc); gl.uniform3fv(SP.u.uL, unit([-.45, .78, -.42])); gl.uniform1f(SP.u.uCamZ, cam.E[2]); gl.uniform1f(SP.u.uT, o.time);
-      gl.uniform1f(SP.u.uAhead, o.ahead); gl.uniform1f(SP.u.uBehind, 14);
+      gl.uniform1f(SP.u.uAhead, o.ahead); gl.uniform1f(SP.u.uBehind, 18);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(SP.u.uTex, 0);
       gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
       const A = ATTS.map(([n, s, off]) => { const l = gl.getAttribLocation(SP.p, n); if (l < 0) return -1; gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, s, gl.FLOAT, false, 84, off * 4); return l; });

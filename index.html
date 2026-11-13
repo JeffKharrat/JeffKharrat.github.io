@@ -975,7 +975,7 @@ body[data-view="page"] .lore--bg{display:none}
 
 <script src="js/flower-gl.js"></script>
 <script src="js/lookdev-ball.js?v=2"></script>
-<script src="js/about-cells.js?v=3"></script>
+<script src="js/about-cells.js?v=4"></script>
 <script src="js/node-editor.js?v=8" defer></script>
 <script src="js/graphs-fiffy.js?v=3" defer></script>
 <script src="js/flower-wave.js?v=3" defer></script>
@@ -5140,7 +5140,7 @@ const run = (() => {
     gl.clearColor(G[0], G[1], G[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     if (CELLS) {
       const ov = 1 - eio(sm(0, 1.05, tNow));                                // the opening overview sees the whole road
-      CELLS.draw(cam, { W, H, time, acc: v3(C.acc), ground: G, line: v3(C.line), ahead: 70 + ov * 400, fog: 95 + ov * 300 });
+      CELLS.draw(cam, { W, H, time, acc: v3(C.acc), ground: G, line: v3(C.line), ahead: 110 + ov * 400, fog: 170 + ov * 300 });
       gl.useProgram(prog);
     }
     gl.enable(gl.BLEND); if (dark) gl.blendFunc(gl.ONE, gl.ONE); else gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
