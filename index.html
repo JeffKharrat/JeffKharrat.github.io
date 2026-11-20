@@ -5348,8 +5348,10 @@ if (lore) lore.wake();
     once('click/' + p + '/' + f, 'clicked-' + p + '-' + f, 'Clicked video: ' + f + ' (' + p + ')');
   }, true);
 
-  /* 3. Language each visit is read in (once per visit). */
-  event('lang-' + (document.documentElement.lang === 'ja' ? 'ja' : 'en'), 'Visit read in ' + (document.documentElement.lang === 'ja' ? 'Japanese' : 'English'));
+  /* 3. One event per visit = the visitor count (GoatCounter has no site-wide unique total),
+        split by the language the visit starts in. */
+  const ja = document.documentElement.lang === 'ja';
+  event(ja ? 'visit-ja' : 'visit-en', ja ? 'New visit (read in Japanese)' : 'New visit (read in English)');
 })();
 </script>
 <script data-goatcounter="https://jifo.goatcounter.com/count" data-goatcounter-settings='{"no_onload": true}' async src="https://gc.zgo.at/count.js"></script>
