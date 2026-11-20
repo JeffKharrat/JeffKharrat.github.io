@@ -442,6 +442,10 @@ a.gtile:hover b{text-decoration:underline;text-decoration-color:var(--accent);te
 .pj-st-n{padding-top:.45rem;border-top:1px dashed var(--line);color:var(--ink-2);font-size:.75rem}
 @media (prefers-reduced-motion:reduce){.pj-st-live i{animation:none}}
 .proj-media{display:grid;gap:var(--pad);align-content:start;padding:var(--pad);background:var(--ground)}
+.pj-part{display:grid;gap:.6rem;padding-top:1.2rem;border-top:1px solid var(--line)}
+.pj-part:first-child{padding-top:0;border-top:0}
+.pj-part h2{font-size:clamp(1.5rem,2.6vw,2.4rem);line-height:1.05}
+.pj-part p{max-width:62ch;color:var(--ink-2)}
 .shot{display:grid;gap:.5rem}
 .shot .fill{aspect-ratio:auto;object-fit:contain}
 .shot video.fill{aspect-ratio:16/9}   /* reserve the frame before the clip loads */
@@ -1013,9 +1017,10 @@ const SITE = {
 
 /* One entry per project, newest first. The first two also show on the home page.
    cat: one of CATS below, or a list of them to show the project in several sections.
-   thumb and media src: an image, an .mp4 / .webm clip, or (media only) a YouTube link. */
+   thumb and media src: an image, an .mp4 / .webm clip, or (media only) a YouTube link.
+   A media entry with part: { en, ja } (and optional text) is a heading that starts a new part of the page. */
 /* Work page sections, in filter order. A section with no projects yet shows empty slots. */
-const CATS = ['rigs', 'animation', 'research', 'tools'];
+const CATS = ['rigs', 'animation', 'drawing', 'research', 'tools'];
 
 const ALL_PROJECTS = [
   { id: 'fiffy-flower', cat: 'rigs', year: '2026.11', thumb: 'media/fiffy-flower/thumb.jpg',
@@ -1114,7 +1119,33 @@ const ALL_PROJECTS = [
       ja: 'リチャード・ウィリアムズの『アニメーターズ・サバイバルキット』でアニメーションの基礎を学んでいた頃、ストレート・アヘッド方式が実際にどう機能するのかを確かめたくて制作したテストです。キーポーズを先に決めるのではなく、最初のフレームから最後まで順番に動きをつけていきました。制作期間は2日。' },
     media: [
       { label: { en: 'Three-quarter view', ja: '斜めからのビュー' }, src: 'media/quick-cat/quick-cat-3-4.mp4' },
-      { label: { en: 'Side view', ja: '側面ビュー' }, src: 'media/quick-cat/quick-cat-side.mp4' }] }
+      { label: { en: 'Side view', ja: '側面ビュー' }, src: 'media/quick-cat/quick-cat-side.mp4' }] },
+  { id: 'isart-drawing', cat: 'drawing', year: '2020–2021', thumb: 'media/drawing/thumb.jpg',
+    title: { en: 'Environment Drawing: Miniature World & 1962', ja: '背景ドローイング：ミニチュアの世界と1962' },
+    kind: { en: 'ISART Digital, first year: environment design', ja: 'ISART Digital 1年次：背景デザイン' },
+    role: { en: 'Environment design, drawing, 3D blocking', ja: '背景デザイン・ドローイング・3Dブロッキング' },
+    software: ['Photoshop', 'Maya'],
+    summary: { en: 'Drawing work from my first year at ISART Digital. Two environment design projects with the same brief structure and the same pipeline: pencil research, a simple 3D blocking in Maya to find the camera, then an immersive perspective drawing overdrawn on top of it, taken from line to values and colour.',
+      ja: 'ISART Digital 1年次のドローイング作品です。同じ構成の課題、同じ制作工程で取り組んだ2つの背景デザイン。鉛筆でのリサーチ、Mayaでの簡単な3Dブロッキングによるカメラ探し、その上に重ねて描くパース画（オーバードロー）を、線画から明暗、カラーまで仕上げました。' },
+    media: [
+      { part: { en: 'Miniature World', ja: 'ミニチュアの世界' },
+        text: { en: 'Same course and brief structure as 1962, on a miniature world theme. A frog warrior pulls on a rope in a cluttered room where everyday things take on another scale: a hanging fish and bird, a turtle shell, a cauldron over the fire. Here: the value pass, the line drawing, flat colours, the 3D blocking used to set the camera, and the character turnaround.',
+          ja: '1962と同じ授業・同じ課題構成で、テーマは「ミニチュアの世界」。カエルの戦士がロープを引く、物があふれた部屋。吊るされた魚と鳥、カメの甲羅、火にかけた大鍋など、身の回りの物のスケール感を変えて描いています。明暗、線画、フラットカラー、カメラを決めるための3Dブロッキング、キャラクターのターンアラウンドを掲載。' } },
+      { label: { en: 'Final value pass', ja: '明暗の仕上げ' }, src: 'media/drawing/haha.jpg' },
+      { label: { en: 'Perspective line drawing', ja: 'パースの線画' }, src: 'media/drawing/line.jpg' },
+      { label: { en: 'Flat colours', ja: 'フラットカラー' }, src: 'media/drawing/flat.jpg' },
+      { label: { en: '3D blocking in Maya, camera search', ja: 'Mayaでの3Dブロッキング・カメラ検討' }, src: 'media/drawing/layout.jpg' },
+      { label: { en: 'Character turnaround', ja: 'キャラクターのターンアラウンド' }, src: 'media/drawing/turn.jpg' },
+      { label: { en: 'Turnaround, body', ja: 'ターンアラウンド（素体）' }, src: 'media/drawing/preturn.jpg' },
+      { part: { en: '1962: a family like any other?', ja: '1962：普通の家族？' },
+        text: { en: 'The brief: early 1960s, a middle-class suburb on a sunny US coast. A family that blends into the street, except for one unusual detail that has to show, subtly, inside and outside the house. Mine hides something out of this world: a flying saucer over the neighbourhood, a robot, a ray gun and green slime in the bedroom. Here: the bedroom in colour and in line with its Maya blocking, then the street: the final perspective, the pencil axonometric studies of the neighbourhood, and the 3D blocking cameras.',
+          ja: '課題：1960年代初頭、アメリカの陽光あふれる海岸沿いの住宅街。周りに溶け込む普通の家族だが、一つだけ普通ではない特徴があり、それを家の内と外にさりげなく表現する。私の家族が隠しているのは地球外の秘密。街の上空の空飛ぶ円盤、寝室のロボット、光線銃、緑のスライム。寝室のカラーと線画、そのMayaブロッキング、続いて街並みのパース画、鉛筆による街のアクソメ検討、3Dブロッキングのカメラを掲載。' } },
+      { label: { en: 'Bedroom, colour', ja: '寝室（カラー）' }, src: 'media/drawing/int-colour.jpg' },
+      { label: { en: 'Bedroom, line drawing', ja: '寝室（線画）' }, src: 'media/drawing/int-line.jpg' },
+      { label: { en: 'Bedroom 3D blocking in Maya', ja: 'Mayaでの寝室3Dブロッキング' }, src: 'media/drawing/int-blocking.jpg' },
+      { label: { en: 'Street, final perspective drawing', ja: '街並み：パース画の仕上げ' }, src: 'media/drawing/ext-final.jpg' },
+      { label: { en: 'Neighbourhood axonometric studies, pencil', ja: '街並みのアクソメ検討（鉛筆）' }, src: 'media/drawing/ext-axo.jpg' },
+      { label: { en: 'Street 3D blocking cameras and line overdraw', ja: '街並みの3Dブロッキングのカメラと線画' }, src: 'media/drawing/ext-blocking.jpg' }] }
 ];
 
 const T = {
@@ -1145,7 +1176,7 @@ const T = {
     'rw.s1': 'Tag', 'rw.s1d': 'Joint chains labelled as modules in Maya', 'rw.s2': 'Export', 'rw.s2d': 'A manifest saved inside the FBX',
     'rw.s3': 'Import', 'rw.s3d': 'The skeleton arrives in Unreal Engine 5.6', 'rw.s4': 'Build', 'rw.s4d': 'A Control Rig rebuilt automatically',
     'latest.title': 'Latest additions', 'latest.all': 'See all work', 'slot.todo': 'add file',
-    'wk.all': 'All', 'wk.empty': 'Empty slot', 'cat.rigs': 'Rigs', 'cat.tools': 'Tools', 'cat.animation': 'Animation', 'cat.research': 'Research',
+    'wk.all': 'All', 'wk.empty': 'Empty slot', 'cat.rigs': 'Rigs', 'cat.tools': 'Tools', 'cat.animation': 'Animation', 'cat.drawing': 'Drawing', 'cat.research': 'Research',
     'pj.back': 'All work', 'pj.prev': 'Previous', 'pj.next': 'Next', 'pj.nodes': 'Node graph',
     'st.live': 'Work in progress', 'st.last': 'Last milestone', 'st.next': 'Next', 'pj.type': 'Type', 'pj.year': 'Date', 'pj.time': 'Time spent', 'pj.role': 'Role', 'pj.rig': 'Rig by', 'pj.soft': 'Software',
     'ab.bio1': 'I am a rigging artist and technical animator. Through research on 3D animation and rigging, I work on improving the workflow between Maya and Unreal Engine.',
@@ -1194,7 +1225,7 @@ const T = {
     'rw.s1': 'タグ付け', 'rw.s1d': 'Mayaでジョイントチェーンをモジュールとして設定', 'rw.s2': '書き出し', 'rw.s2d': 'マニフェストをFBXに埋め込み',
     'rw.s3': '読み込み', 'rw.s3d': 'スケルトンをUnreal Engine 5.6へ', 'rw.s4': '構築', 'rw.s4d': 'Control Rigを自動で再構築',
     'latest.title': '最新の追加', 'latest.all': 'すべての作品を見る', 'slot.todo': 'ファイル未設定',
-    'wk.all': 'すべて', 'wk.empty': '空き枠', 'cat.rigs': 'リグ', 'cat.tools': 'ツール', 'cat.animation': 'アニメーション', 'cat.research': '研究',
+    'wk.all': 'すべて', 'wk.empty': '空き枠', 'cat.rigs': 'リグ', 'cat.tools': 'ツール', 'cat.animation': 'アニメーション', 'cat.drawing': 'ドローイング', 'cat.research': '研究',
     'pj.back': '作品一覧', 'pj.prev': '前へ', 'pj.next': '次へ', 'pj.nodes': 'ノードグラフ',
     'st.live': '制作中', 'st.last': '直近の到達点', 'st.next': '次の目標', 'pj.type': '種別', 'pj.year': '制作日', 'pj.time': '制作期間', 'pj.role': '担当', 'pj.rig': 'リグ提供', 'pj.soft': '使用ソフト',
     'ab.bio1': '3Dアニメーションとリギングの研究を通して、MayaとUnreal Engineのワークフローを改善することを目指しています。',
@@ -1487,6 +1518,11 @@ function renderProject(p) {
   $('#pj-sum').textContent = L(p.summary);
   const box = $('#pj-media'); box.textContent = '';
   p.media.forEach(m => {
+    if (m.part) {                                                           // a heading that opens a new part of the page
+      const h = mk('div', 'pj-part'); h.append(mk('h2', 'disp', L(m.part)));
+      if (m.text) h.append(mk('p', '', L(m.text)));
+      box.append(h); return;
+    }
     const f = mk('figure', 'shot'), fr = frame(m.src, 'wide', false, L(m.label));
     if (m.nodes) {                                                          // a node graph for this clip: the tab that opens it
       const w = mk('div', 'shot-v'), b = mk('button', 'ne-tab');
