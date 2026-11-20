@@ -5285,18 +5285,71 @@ if (lore) lore.wake();
      (#work, #p-amari, ...) is counted as its own page view; dashboard at https://jifo.goatcounter.com -->
 <script>
 (function () {
+  /* GoatCounter calls wait here until its script has loaded (or give up after ~10 s). */
+  const queue = []; let tries = 0;
+  function flush() {
+    if (window.goatcounter && goatcounter.count) { while (queue.length) goatcounter.count(queue.shift()); return; }
+    if (tries++ < 40) setTimeout(flush, 250);
+  }
+  const send = o => { queue.push(o); flush(); };
+  const event = (path, title) => send({ path, title: title || path, event: true });
+
+  /* 1. Page views: each page of this one-page site counts on its own (/work, /p-amari, ...). */
   const pathOf = () => { const h = location.hash.slice(1); return '/' + (h && h !== 'home' ? h : ''); };
   const titleOf = () => { const h = location.hash.slice(1) || 'home'; return h.startsWith('p-') ? 'Project: ' + h.slice(2) : h.charAt(0).toUpperCase() + h.slice(1); };
   let last = null;
-  function count(tries) {
-    const path = pathOf();
-    if (path === last) return;
-    if (!(window.goatcounter && goatcounter.count)) { if ((tries || 0) < 40) setTimeout(() => count((tries || 0) + 1), 250); return; }
-    last = path;
-    goatcounter.count({ path, title: titleOf() });
-  }
-  count();
-  document.addEventListener('viewchange', () => count());
+  function view() { const path = pathOf(); if (path === last) return; last = path; send({ path, title: titleOf() }); }
+  view();
+  document.addEventListener('viewchange', view);
+
+  /* 2. Actions (shown as events in the dashboard). */
+  const page = () => (location.hash.slice(1) || 'home');
+  document.addEventListener('click', e => {
+    const t = e.target.closest('a, button'); if (!t) return;
+    if (t.matches('[data-open="dlg-reel"]')) return event('reel-open', 'Reel opened (from ' + page() + ')');
+    if (t.matches('[data-open="dlg-contact"]')) return event('contact-open', 'Contact opened (from ' + page() + ')');
+    if (t.id === 'copy') return event('email-copy', 'Email copied');
+    if (t.matches('[data-lang]')) {
+      const to = t.dataset.lang;
+      if (to !== document.documentElement.lang) event('lang-switch-' + to, 'Switched language to ' + (to === 'ja' ? 'Japanese' : 'English'));
+      return;
+    }
+    const href = t.getAttribute('href') || '';
+    if (href.startsWith('mailto:')) return event('email-click', 'Email link clicked');
+    if (href.startsWith('tel:')) return event('phone-click', 'Phone link clicked');
+    if (/^https?:/.test(href)) {
+      let host = ''; try { host = new URL(href).hostname.replace(/^www\./, ''); } catch (err) { return; }
+      if (host && host !== location.hostname) event('out-' + host, 'Link out: ' + host + ' (from ' + page() + ')');
+    }
+  }, true);
+
+  /* Project media: a clip or image counts as "seen" after 2 s at least half on screen, and a click
+     on a clip (scrub, unmute, fullscreen) counts as "clicked". Once per item per visit. */
+  const done = new Set();
+  const once = (key, path, title) => { if (done.has(key)) return; done.add(key); event(path, title); };
+  const fileOf = el => ((el.currentSrc || el.src || el.getAttribute('src') || '').split('/').pop().split('?')[0]).replace(/\.[a-z0-9]+$/i, '') || 'media';
+  const proj = () => page().replace(/^p-/, '');
+  const timers = new Map();
+  const io = 'IntersectionObserver' in window ? new IntersectionObserver(list => list.forEach(en => {
+    const el = en.target;
+    if (en.isIntersecting) {
+      if (!timers.has(el)) timers.set(el, setTimeout(() => {
+        const p = proj(), f = fileOf(el);
+        once('seen/' + p + '/' + f, 'seen-' + p + '-' + f, 'Seen: ' + f + ' (' + p + ')');
+      }, 2000));
+    } else { clearTimeout(timers.get(el)); timers.delete(el); }
+  }), { threshold: 0.5 }) : null;
+  const box = document.getElementById('pj-media');
+  const watch = () => { timers.forEach(clearTimeout); timers.clear(); io.disconnect(); box.querySelectorAll('video, img').forEach(el => io.observe(el)); };
+  if (box && io) { watch(); new MutationObserver(watch).observe(box, { childList: true }); }
+  document.addEventListener('pointerdown', e => {
+    const v = e.target.closest && e.target.closest('#pj-media video'); if (!v) return;
+    const p = proj(), f = fileOf(v);
+    once('click/' + p + '/' + f, 'clicked-' + p + '-' + f, 'Clicked video: ' + f + ' (' + p + ')');
+  }, true);
+
+  /* 3. Language each visit is read in (once per visit). */
+  event('lang-' + (document.documentElement.lang === 'ja' ? 'ja' : 'en'), 'Visit read in ' + (document.documentElement.lang === 'ja' ? 'Japanese' : 'English'));
 })();
 </script>
 <script data-goatcounter="https://jifo.goatcounter.com/count" data-goatcounter-settings='{"no_onload": true}' async src="https://gc.zgo.at/count.js"></script>
