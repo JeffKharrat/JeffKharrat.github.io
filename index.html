@@ -5352,6 +5352,15 @@ if (lore) lore.wake();
         split by the language the visit starts in. */
   const ja = document.documentElement.lang === 'ja';
   event(ja ? 'visit-ja' : 'visit-en', ja ? 'New visit (read in Japanese)' : 'New visit (read in English)');
+
+  /* 4. Different people: the first time this browser ever opens the site, count one "new-person".
+        Only a "seen" mark is stored on the visitor's device; nothing about them is sent. */
+  try {
+    if (!localStorage.getItem('jk-seen')) {
+      localStorage.setItem('jk-seen', '1');
+      event('new-person', 'New person (first visit from this browser)');
+    } else event('returning-person', 'Returning person (came before)');
+  } catch (e) { /* storage blocked (private mode etc.): skip */ }
 })();
 </script>
 <script data-goatcounter="https://jifo.goatcounter.com/count" data-goatcounter-settings='{"no_onload": true}' async src="https://gc.zgo.at/count.js"></script>
