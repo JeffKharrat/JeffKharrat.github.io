@@ -679,6 +679,13 @@ body[data-view="page"] .lore--bg{display:none}
   .reel{width:calc(100% - 1rem)}
   .dlg-h .sq{width:3rem;height:3rem}
 }
+
+/* software strip: one row that scrolls sideways and loops (items are doubled in JS; hover pauses it) */
+.strip{display:block;overflow:hidden}
+.strip .strip-t{display:flex;width:max-content;animation:mq 34s linear infinite}
+.strip:hover .strip-t,.strip:focus-within .strip-t{animation-play-state:paused}
+.strip .strip-t li,.strip .strip-t li:nth-of-type(n),.strip .strip-t li:nth-of-type(n):last-child{flex:none;width:clamp(12rem,25vw,27rem);min-height:6.5rem;border-bottom:0;border-right:1px solid var(--line)}
+@media (min-width:1000px){.strip .strip-t li:nth-of-type(n){min-height:8.5rem}}
 </style>
 
 <header class="hdr" id="hdr">
@@ -779,8 +786,8 @@ body[data-view="page"] .lore--bg{display:none}
         </div>
 
         <div class="strip">
-          <ul role="list" aria-label="Works in" style="display:contents">
-            <li class="disp" data-soft="Maya">Maya</li><li class="disp" data-soft="Unreal Engine 5">Unreal Engine 5</li><li class="disp">Control Rig</li><li class="disp" data-soft="Blender">Blender</li>
+          <ul role="list" aria-label="Works in" class="strip-t">
+            <li class="disp" data-soft="Maya">Maya</li><li class="disp" data-soft="Unreal Engine 5">Unreal Engine 5</li><li class="disp">Control Rig</li><li class="disp" data-soft="Blender">Blender</li><li class="disp" data-soft="Photoshop">Photoshop</li>
           </ul>
         </div>
 
@@ -1449,7 +1456,7 @@ function renderWork() {
   }
 }
 /* Software names get their logo: official marks from the Simple Icons set, one PNG per theme ink. */
-const LOGO = { 'maya': 'maya', 'autodesk maya': 'maya', 'unreal engine': 'unreal', 'unreal engine 5': 'unreal', 'python': 'python', 'blender': 'blender' };
+const LOGO = { 'maya': 'maya', 'autodesk maya': 'maya', 'unreal engine': 'unreal', 'unreal engine 5': 'unreal', 'python': 'python', 'blender': 'blender', 'photoshop': 'photoshop', 'adobe photoshop': 'photoshop' };
 function softify(node, list) {
   node.textContent = ''; node.classList.add('soft');
   list.split(',').map(s => s.trim()).filter(Boolean).forEach(name => {
@@ -1459,6 +1466,7 @@ function softify(node, list) {
   });
 }
 $$('[data-soft]').forEach(n => softify(n, n.dataset.soft));
+{ const t = $('.strip-t'); if (t) [...t.children].forEach(li => { const c = li.cloneNode(true); c.setAttribute('aria-hidden', 'true'); t.append(c); }); }
 
 const NE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="2" width="5" height="4"/><rect x="10" y="10" width="5" height="4"/><path d="M6 4c4 0 0 8 4 8"/></svg>';
 function renderProject(p) {
