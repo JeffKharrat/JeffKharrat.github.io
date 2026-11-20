@@ -5281,5 +5281,24 @@ resize(); draw(performance.now()); kick();
 if (lore) lore.wake();
 })();
 </script>
+<!-- Visitor stats: GoatCounter (no cookies, no personal data). Each page of this one-page site
+     (#work, #p-amari, ...) is counted as its own page view; dashboard at https://jifo.goatcounter.com -->
+<script>
+(function () {
+  const pathOf = () => { const h = location.hash.slice(1); return '/' + (h && h !== 'home' ? h : ''); };
+  const titleOf = () => { const h = location.hash.slice(1) || 'home'; return h.startsWith('p-') ? 'Project: ' + h.slice(2) : h.charAt(0).toUpperCase() + h.slice(1); };
+  let last = null;
+  function count(tries) {
+    const path = pathOf();
+    if (path === last) return;
+    if (!(window.goatcounter && goatcounter.count)) { if ((tries || 0) < 40) setTimeout(() => count((tries || 0) + 1), 250); return; }
+    last = path;
+    goatcounter.count({ path, title: titleOf() });
+  }
+  count();
+  document.addEventListener('viewchange', () => count());
+})();
+</script>
+<script data-goatcounter="https://jifo.goatcounter.com/count" data-goatcounter-settings='{"no_onload": true}' async src="https://gc.zgo.at/count.js"></script>
 </body>
 </html>
