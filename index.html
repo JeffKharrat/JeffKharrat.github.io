@@ -534,6 +534,32 @@ a.gtile:hover b{text-decoration:underline;text-decoration-color:var(--accent);te
 .tl li[data-run] b::after{content:"";display:inline-block;width:.42em;height:.42em;margin-left:.55em;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent);transform:translateY(-.12em) rotate(-45deg);opacity:0;transition:opacity .15s}
 .tl li[data-run]:hover b::after,.tl li[data-run]:focus-visible b::after{opacity:1}
 @media (max-width:40rem){.run-tl{right:var(--pad)}}
+/* the planets (js/about-planets.js): seven stops of scroll (the map, five planets, the spark), always dark, the panel on the left third */
+.run[data-planets]{height:calc((100vh - var(--hdr)) * 7);height:calc((100svh - var(--hdr)) * 7)}
+.run[data-planets] .run-st{background:#050608;color:#E9EBF0}
+.run-gl,.run-fx2{position:absolute;inset:0;width:100%;height:100%;display:block}
+.run-fx2{pointer-events:none}
+.run-snap{position:absolute;left:0;width:1px;height:1px;scroll-snap-align:start;pointer-events:none}
+html.run-snap-on{scroll-snap-type:y proximity;scroll-padding-top:var(--hdr)}
+.run[data-planets]:not(.run--flat) .run-p{left:var(--pad);top:50%;width:clamp(19rem,29vw,28rem);transform:translateY(-50%);padding:1.4rem 1.5rem 1.25rem;
+  background:rgba(14,16,20,.9);border:1px solid #343945;color:#E9EBF0;text-shadow:none;opacity:1;visibility:hidden;will-change:auto;
+  clip-path:inset(0 100% 0 0);transition:clip-path .48s steps(8),visibility 0s .48s}
+.run[data-planets]:not(.run--flat) .run-p.on{visibility:visible;clip-path:inset(0);transition:clip-path .48s steps(8)}
+.run[data-planets] .run-p::before{content:"";position:absolute;left:-1px;top:-1px;width:.6rem;height:.6rem;background:var(--accent)}
+.run[data-planets] .run-p .label,.run[data-planets] .run-p .run-g,.run[data-planets] .run-hud .label{color:#9AA1B0}
+.run[data-planets] .run-p h3{font-size:clamp(1.5rem,2.1vw,2rem)}
+.run[data-planets] .run-p p:not(.label):not(.run-g){font-size:.875rem;line-height:1.55}
+.run[data-planets] .run-hud{color:#E9EBF0}
+.run[data-planets] .run-tl button{color:#9AA1B0;border-color:#343945;background:rgba(22,25,32,.85)}
+.run[data-planets] .run-tl button:hover{color:#E9EBF0}
+.run[data-planets] .run-tl button[aria-current]{color:#E9EBF0;border-color:var(--accent)}
+.run[data-planets] .run-sp{font-family:var(--display);font-weight:800;font-size:1.4rem;color:#E9EBF0;transition:opacity .4s steps(4)}
+.run[data-planets] .run-sp.on{opacity:1}
+@media (prefers-reduced-motion:reduce){.run[data-planets] .run-p,.run[data-planets] .run-p.on{transition:none}}
+@media (max-width:47.5rem){.run[data-planets]:not(.run--flat) .run-p{right:var(--pad);width:auto;top:auto;bottom:3.6rem;transform:none;max-height:44%;overflow:auto}
+  .run[data-planets] .run-tl{right:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-right:var(--pad)}
+  .run[data-planets] .run-tl::-webkit-scrollbar{display:none}
+  .run[data-planets] .run-tl button{flex:none}}
 
 /* Japanese headings fall back to the mono face, which sits taller: give them more line height. */
 /* Japanese for the two giant lines (role marquee, name at the foot): a heavy blocky face next to Tektur */
@@ -916,7 +942,7 @@ body[data-view="page"] .lore--bg{display:none}
           <div class="grp"><h2 class="label" data-i18n="ab.also">Outside work</h2><p data-i18n="ab.kendo">Kendo, bonsai, nature walks, Japanese history</p></div>
         </section>
       </div>
-      <section class="run" id="run" aria-labelledby="run-t">
+      <section class="run" id="run" aria-labelledby="run-t" data-planets>
         <div class="run-st" id="run-st">
           <canvas id="run-cv" aria-hidden="true"></canvas>
         <article class="run-p" tabindex="-1"><p class="label">2025.10 – · 01</p><h3 class="disp"><a href="https://www.teu.ac.jp/" target="_blank" rel="noopener" data-i18n="ab.tut2">Tokyo University of Technology</a></h3><p class="run-r label" data-i18n="run.rs">Research student, Kawashima Lab</p><p data-i18n="run.b4"></p><p class="run-g">Maya · Python · FBX · Unreal Engine 5.6 · Control Rig</p></article>
@@ -927,7 +953,7 @@ body[data-view="page"] .lore--bg{display:none}
           <p class="run-sp label" id="run-sp" data-i18n="run.sp">Frame 0</p>
           <button type="button" class="run-spb" id="run-spb" hidden><span class="vh" data-i18n="run.spb">Enter the spark</span></button>
           <div class="run-hud"><span class="label"><span data-i18n="run.k">The path</span> <span id="run-n">—</span></span><b id="run-t" data-i18n="run.hint">Scroll to follow the path</b></div>
-          <nav class="run-tl" id="run-tl" aria-label="Path stops"><button type="button" data-run="0">2025 TUT</button><button type="button" data-run="1">2023 Miraculous</button><button type="button" data-run="2">2023 Zag</button><button type="button" data-run="3">2022 Mathematic</button><button type="button" data-run="4">2020 Isart</button><button type="button" data-run="5">✦</button></nav>
+          <nav class="run-tl" id="run-tl" aria-label="Path stops"><button type="button" data-stop="0" data-i18n="run.map">Map</button><button type="button" data-run="0">2025 TUT</button><button type="button" data-run="1">2023 Miraculous</button><button type="button" data-run="2">2023 Zag</button><button type="button" data-run="3">2022 Mathematic</button><button type="button" data-run="4">2020 Isart</button><button type="button" data-run="5">✦</button></nav>
         </div>
       </section>
     </main>
@@ -986,7 +1012,8 @@ body[data-view="page"] .lore--bg{display:none}
 
 <script src="js/flower-gl.js"></script>
 <script src="js/lookdev-ball.js?v=2"></script>
-<script src="js/about-cells.js?v=8"></script>
+<script src="js/about-gen.js?v=1"></script>
+<script type="module" src="js/about-planets.js?v=1"></script>
 <script src="js/node-editor.js?v=8" defer></script>
 <script src="js/graphs-fiffy.js?v=3" defer></script>
 <script src="js/flower-wave.js?v=3" defer></script>
@@ -1187,7 +1214,7 @@ const T = {
     'ab.cv': 'Résumé (Japanese rirekisho), PDF', 'ft.status': 'Status', 'ft.avail': 'Available for work and interviews', 'ab.exp': 'Experience', 'ab.edu': 'Education', 'ab.soft': 'Software', 'ab.lang': 'Languages', 'ab.also': 'Outside work',
     'ab.gen': '3D generalist', 'ab.tut': 'Tokyo University of Technology, School of Media Science', 'ab.rs': 'Research student',
     'ab.isart': 'Isart Digital, Paris', 'ab.ms': "Master's, 3D cinema. RNCP level 7: expert in digital design, CGI animation and VFX",
-    'run.k': 'The path', 'run.hint': 'Scroll to follow the path', 'run.sp': 'Frame 0', 'run.spb': 'Enter the spark', 'ab.ms2': "Master's, 3D cinema · animation and rigging", 'run.rs': 'Research student, Kawashima Lab', 'ab.tut2': 'Tokyo University of Technology',
+    'run.k': 'The path', 'run.map': 'Map', 'run.hint': 'Scroll to follow the path', 'run.sp': 'Frame 0', 'run.spb': 'Enter the spark', 'ab.ms2': "Master's, 3D cinema · animation and rigging", 'run.rs': 'Research student, Kawashima Lab', 'ab.tut2': 'Tokyo University of Technology',
     'run.b0': "Five years in Paris, specialising in animation and rigging. Master's degree, RNCP level 7 (five years of higher education). Graduation project in a team of eight, ending in a short trailer: I built the team's animation and rigging pipeline and rigged the creature, with a joint-based muscle system.",
     'run.b1': 'Internship during my years at Isart. Modelling and layout in Maya for the Killer Klowns from Outer Space game trailer, rendered in Unreal Engine.',
     'run.b2': 'Internship in Paris, at the studio that became Miraculous Corp while I was there. Modelling, rigging, layout and lookdev in Maya, Unreal Engine and Photoshop. My first look at how a real-time engine fits into a professional animation pipeline, and the start of the two-year work-study that followed.',
@@ -1236,7 +1263,7 @@ const T = {
     'ab.cv': '履歴書（PDF）', 'ft.status': 'ステータス', 'ft.avail': '求職中・面接対応可', 'ab.exp': '職歴', 'ab.edu': '学歴', 'ab.soft': '使用ソフト', 'ab.lang': '言語', 'ab.also': '趣味',
     'ab.gen': '3Dジェネラリスト', 'ab.tut': '東京工科大学 メディア学部', 'ab.rs': '研究生',
     'ab.isart': 'Isart Digital Paris', 'ab.ms': '3Dシネマ専攻 修士課程。RNCPレベル7：デジタルデザイン、CGIアニメーション、VFXのエキスパート',
-    'run.k': '軌跡', 'run.hint': 'スクロールで軌跡をたどる', 'run.sp': 'フレーム0', 'run.spb': '光の中へ', 'ab.ms2': '3Dシネマ専攻 修士課程（アニメーション・リギング）', 'run.rs': '研究生（川島研究室）', 'ab.tut2': '東京工科大学',
+    'run.k': '軌跡', 'run.map': 'マップ', 'run.hint': 'スクロールで軌跡をたどる', 'run.sp': 'フレーム0', 'run.spb': '光の中へ', 'ab.ms2': '3Dシネマ専攻 修士課程（アニメーション・リギング）', 'run.rs': '研究生（川島研究室）', 'ab.tut2': '東京工科大学',
     'run.b0': 'パリで5年間、アニメーションとリギングを専攻。修士号（RNCPレベル7：フランス国家資格で、5年制の高等教育に相当）を取得。卒業制作は8人チームで短いトレーラーを完成させ、チームのアニメーション・リギングパイプラインを構築し、ジョイントベースのマッスルシステムを備えたクリーチャーリグを担当しました。',
     'run.b1': 'Isart在学中のインターンシップ。Unreal Engineでレンダリングされた『Killer Klowns from Outer Space』ゲームトレーラーで、Mayaによるモデリングとレイアウトを担当しました。',
     'run.b2': 'パリでのインターンシップ。在籍中にこのスタジオがMiraculous Corpへと移行しました。Maya、Unreal Engine、Photoshopでモデリング、リギング、レイアウト、ルックデヴを担当。リアルタイムエンジンがプロのアニメーションパイプラインにどう組み込まれるのかを初めて学んだ場であり、その後2年間のアルタナンスにつながりました。',
@@ -1275,6 +1302,7 @@ const store = {
 let lang = 'en';
 let current = 'home';
 const tr = k => { const v = (T[lang] && T[lang][k]) ?? T.en[k] ?? k; return typeof v === 'string' ? v.replace('{cast}', SITE.cast || 'Proto') : v; };
+window.__tr = tr;   // for js/about-planets.js (a module): the HUD text in the current language
 
 /* ---------- glitch: scramble the label, then settle ---------- */
 const POOL_L = 'ABCDEFGHKLMNPRSTUVXYZ0123456789/<>[]#';
@@ -4237,7 +4265,7 @@ const grav = (() => {
 const run = (() => {
   const sec = $('#run'), box = $('#run-st'), glc = $('#run-cv'), panels = $$('.run-p'), ticks = $$('#run-tl button');
   const hudN = $('#run-n'), hudT = $('#run-t');
-  if (!sec) return null;
+  if (!sec || sec.hasAttribute('data-planets')) return null;             // js/about-planets.js has the section
   const gl = glc.getContext('webgl', { antialias: true, alpha: false, depth: true, powerPreference: 'high-performance' });
   const CELLS_ON = !!window.AboutCells;                                   // the PROPAGATE world (js/about-cells.js) replaces the hologram scene
   if (!gl) { sec.classList.add('run--flat'); return null; }                // no WebGL: the panels simply stack, no scene
