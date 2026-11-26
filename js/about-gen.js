@@ -492,7 +492,9 @@ function tauDistricts(f, skip) {
     const ci = bi + BS / 2, cj = bj + BS / 2, d = gdir(f, ci, cj);
     if (skip(d)) continue;
     const on = onlineAt(d), lod = lodOf(d); DERELICT = !on;
-    const g = (on ? .75 : .55) + vnoise(d, 2.2) * .7 + Math.max(0, .5 - angTo(d, HDIR)) * .8;
+    /* low-rise round each landmark (it stands clear, the shots see over the roofs), taller between them */
+    const near = Math.min(...SITES.map(s => (angTo(d, siteD(s)) * R - s.r - 4) / 44)), low = .35 + .65 * Math.min(1, Math.max(0, near));
+    const g = ((on ? .75 : .55) + vnoise(d, 2.2) * .7 + Math.max(0, .5 - angTo(d, HDIR)) * .8) * low;
     const pal = on ? [COL.light, COL.steel, COL.bone, COL.mid] : [COL.mid, COL.slate, COL.dark, COL.mid, COL.rust];
     if (lod === 0) { if (r() < .85) gbox(f, bi + 1, bi + BS - 1, bj + 1, bj + BS - 1, -1, 1 + (r() * 4 * g | 0), pal[r() * 4 | 0]); DERELICT = false; continue; }
     const lots = r() < .45 ? [[0, 0, 6, 12], [6, 0, 12, 12]] : r() < .6 ? [[0, 0, 12, 6], [0, 6, 6, 12], [6, 6, 12, 12]] : r() < .5 ? [[0, 0, 6, 6], [6, 0, 12, 6], [0, 6, 6, 12], [6, 6, 12, 12]] : [[0, 0, 12, 12]];

@@ -611,6 +611,7 @@ function coreLight(atSpark, time) {
 const title = k => { const h = panelsEl[k] && panelsEl[k].querySelector('h3'); return h ? h.textContent.trim() : PLANETS[k].title.replace('<br>', ' '); };
 function screenRadius(P) {
   const c = proj(P.C); if (!c) return null;
+  if (P.Pl.secret && !P.group.visible) return [c[0], c[1], 6];          // hidden: only a faint light there
   const rgt = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion), e = proj(P.C.clone().addScaledVector(rgt, R)); return e ? [c[0], c[1], Math.hypot(e[0] - c[0], e[1] - c[1])] : null;
 }
 let hover = -1;
@@ -621,7 +622,11 @@ function mapLabels(a) {
   const text = (t, x, y) => { const w = fx.measureText(t).width; fx.fillText(t, Math.max(w / 2 + 8, Math.min(W - w / 2 - 8, x)), y); };   // kept inside the stage
   PLS.forEach((P, k) => {
     const c = screenRadius(P); if (!c) return;
-    if (P.Pl.secret && hover !== SEC) return;                          // the secret planet is named only under the cursor
+    if (P.Pl.secret && !P.group.visible) {                              // the secret planet: a faint, slow-breathing point of light, like a far star
+      const b = .35 + .25 * Math.sin(clock * .9) + (hover === SEC ? .4 : 0); fx.fillStyle = 'rgba(150,165,255,' + (b * .25).toFixed(3) + ')'; fx.fillRect(Math.round(c[0]) - 2, Math.round(c[1]) - 2, 4, 4);
+      fx.fillStyle = 'rgba(225,230,255,' + b.toFixed(3) + ')'; fx.fillRect(Math.round(c[0]) - 1, Math.round(c[1]) - 1, 2, 2);
+    }
+    if (P.Pl.secret && hover !== SEC) return;                          // named only under the cursor
     const on = hover === stopOf(k), y0 = c[1] - c[2] - (sm ? 22 : 30);
     fx.fillStyle = on ? ac : '#E9EBF0'; fx.font = sm ? '800 15px Tektur' : '800 18px Tektur'; text(P.Pl.num, c[0], y0 - (sm ? 8 : 10));
     fx.fillStyle = on ? '#E9EBF0' : '#9AA1B0'; fx.font = sm ? '400 9px "M PLUS 1 Code"' : '400 11px "M PLUS 1 Code"'; text(title(k), c[0], y0 + (sm ? 6 : 8));
@@ -635,7 +640,7 @@ function mapLabels(a) {
 }
 function pick(x, y) {
   let best = -1, bd = 1e9;
-  PLS.forEach((P, k) => { if (!P.ready) return; const c = screenRadius(P); if (!c) return; const d = Math.hypot(x - c[0], y - c[1]); if (d < Math.max(c[2] * 1.35, 30) && d < bd) { bd = d; best = stopOf(k); } });
+  PLS.forEach((P, k) => { if (!P.ready) return; const c = screenRadius(P); if (!c) return; const d = Math.hypot(x - c[0], y - c[1]); if (d < (P.Pl.secret && !P.group.visible ? 14 : Math.max(c[2] * 1.35, 30)) && d < bd) { bd = d; best = stopOf(k); } });
   const s = proj(CORE); if (s) { const d = Math.hypot(x - s[0], y - s[1]); if (d < 40 && d < bd) best = 6; }
   return best;
 }
@@ -771,6 +776,7 @@ function frame(now) {
   PLS.forEach(P => P.U.uCamL.value.copy(E).sub(P.C).applyQuaternion(P.Qi));
   /* detail: the planet we are at (or travelling from or to) up close, in chunks culled against the horizon; every other one its far mesh */
   const det = [cur, mv && mv.a, mv && mv.b];
+  const tauOn = det.includes(SEC); PLS[TAU].group.visible = tauOn; if (PLS[TAU].halo) PLS[TAU].halo.visible = tauOn;   // Tau Jeffy VI: only when going there
   PLS.forEach(P => { const near = !!P.full && det.includes(stopOf(P.k));
     if (P.far) P.far.visible = !near || !P.chunks;
     if (P.chunks) { const c = P.U.uCamL.value, Dc = c.length() || 1, hz = Dc > R ? Math.acos(R / Dc) : Math.PI;
@@ -920,7 +926,7 @@ void main(){ float p = fract(aS.x + uTime * (1.2 + uThr * 2.6)); vec3 q = positi
    appear once the planet's build has passed. Shown only with the planet's close-up. */
 const shipQ = (F, up) => lookQ(F, new THREE.Vector3(), up);
 const SHS = .24, FILL = { value: new THREE.Vector3(0, 1, 0) };
-const FLEET = PLS.map(P => [0, 1, 2, 3, 4, 5, 6, 7, 8].map(n => {
+const FLEET = PLS.map(P => (P.Pl.secret ? [] : [0, 1, 2, 3, 4, 5, 6, 7, 8]).map(n => {          // none at Tau Jeffy VI
   const m = SHIP.mesh.material.clone(); Object.assign(m.uniforms, { uTime: UT, uAcc: P.U.uAcc, uFill: FILL }); m.uniforms.uMat.value = 0; m.uniforms.uThr.value = .6; m.uniforms.uSpk.value = CORE;
   const e = SHIP.ex.material.clone(); Object.assign(e.uniforms, { uTime: UT, uFoc: CARU.uFoc, uPx: CARU.uPx, uThr: m.uniforms.uThr, uAcc: P.U.uAcc, uMat: m.uniforms.uMat }); e.uniforms.uSc.value = SHS;
   const g = new THREE.Group(), sm = new THREE.Mesh(SHIP.mesh.geometry, m), se = new THREE.Points(SHIP.ex.geometry, e);
@@ -971,6 +977,13 @@ function tauState() {
 const siteOpen = (st, s) => s.t <= st.tier + 1;
 const siteNeed = s => 'Opens when N' + [5, 4, 3, 2, 1][s.t - 1] + ' is held';
 const poseQ = p => ({ E: p.E, q: lookQ(p.E, p.T, p.up) });
+/* each landmark's shot: az (degrees round the site, 0 = toward +i, 90 = toward +j on its face), el (degrees above the ground),
+   dist, th (the height looked at). Each faces the building's name plate, the hero element against the sky, the horizon
+   in the upper third; the reading window already holds the subject right of the panel. */
+const SHOTS = {
+  core: { az: -62, el: 34, dist: 132, th: 16 }, factory: { az: -58, el: 22, dist: 104, th: 13 }, logistics: { az: -118, el: 17, dist: 112, th: 22 },
+  power: { az: 42, el: 21, dist: 118, th: 17 }, lab: { az: -52, el: 20, dist: 134, th: 16 }, broadcast: { az: 205, el: 12, dist: 230, th: 46 },
+  security: { az: -118, el: 20, dist: 144, th: 20 }, exchange: { az: -72, el: 18, dist: 144, th: 23 }, hq: { az: -96, el: 17, dist: 196, th: 34 } };
 function tauPose(v) {
   const P = PLS[TAU], L = a => new THREE.Vector3(a[0], a[1], a[2]).applyQuaternion(P.Q), W = a => L(a).add(P.C);
   if (v === 'globe') {                                                // the planet held right of the panel (above it on a phone)
@@ -978,36 +991,53 @@ function tauPose(v) {
     const f = P.C.clone().sub(E).normalize(), rt = new THREE.Vector3().crossVectors(f, up).normalize(), u = new THREE.Vector3().crossVectors(rt, f), wide = camera.aspect > 1.2;
     return { E, T: P.C.clone().addScaledVector(rt, wide ? -TV.dist * .13 : 0).addScaledVector(u, wide ? 0 : -TV.dist * .16), up }; }
   if (v === 'site') {
-    const s = SITES[TV.site], d = GEN.gdir(s.f, s.i, s.j), ref = Math.abs(d[1]) > .9 ? [0, 0, 1] : [0, 1, 0], e = GEN.unit(GEN.cross(ref, d)), b = GEN.cross(d, e), h = SH[s.id], k = s.r * 2.3 + 30 + h * .55;
-    return { E: W(GEN.add(GEN.mul(d, R + k * .72), GEN.add(GEN.mul(e, k * .45), GEN.mul(b, -k * .82)))), T: W(GEN.mul(d, R + h * .32)), up: L(d) };
+    const s = SITES[TV.site], sh = SHOTS[s.id], d = GEN.gdir(s.f, s.i, s.j);
+    const e = GEN.unit(GEN.sub(GEN.gdir(s.f, s.i + 1, s.j), d)), n = GEN.unit(GEN.sub(GEN.gdir(s.f, s.i, s.j + 1), d)), az = sh.az * D2R, el = sh.el * D2R;
+    const off = GEN.add(GEN.mul(GEN.add(GEN.mul(e, Math.cos(az)), GEN.mul(n, Math.sin(az))), Math.cos(el) * sh.dist), GEN.mul(d, Math.sin(el) * sh.dist)), T = GEN.mul(d, R + sh.th);
+    return { E: W(GEN.add(T, off)), T: W(T), up: L(d) };
   }
-  if (v === 'dive') { const d = GEN.HDIR, u = TV.diveT; return { E: W(GEN.mul(d, R + 92 - 150 * u * u)), T: W(GEN.mul(d, R - 400)), up: L([0, 1, 0]) }; }
-  return restPose(SEC);
+  if (v === 'dive') { const d = GEN.HDIR, u = TV.diveT; return { E: W(GEN.mul(d, R + 92 - 150 * u * u)), T: W(GEN.mul(d, R - 150)), up: L([0, 1, 0]) }; }
+  const rp = restPose(SEC); return { E: rp.E.clone(), T: rp.T.clone(), up: rp.up.clone() };
 }
-/* between two views: around the planet's centre when both are outside it (never through it), straight otherwise */
-function arcLerp(A, B, w) {
+/* moves between views: the camera's position and the point it looks at each travel round the planet's centre (never
+   through it), climbing on the way in proportion to the distance flown, so a long move rises over the planet and comes
+   back down; the up direction turns with them. Smooth from rest to rest, and from wherever a move was interrupted. */
+function arcPos(A, B, w, bump) {
   const C = PLS[TAU].C, a = A.clone().sub(C), b = B.clone().sub(C), ra = a.length(), rb = b.length();
-  if (ra < R * 1.05 || rb < R * 1.05) return A.clone().lerp(B, w);
-  const q = new THREE.Quaternion().setFromUnitVectors(a.clone().normalize(), b.clone().normalize()), qi = new THREE.Quaternion().slerp(q, w);
-  return a.normalize().applyQuaternion(qi).multiplyScalar(ra + (rb - ra) * w + Math.sin(w * Math.PI) * Math.min(ra, rb) * .12).add(C);
+  if (ra < 1 || rb < 1) return A.clone().lerp(B, w);
+  const q = new THREE.Quaternion().setFromUnitVectors(a.clone().divideScalar(ra), b.clone().divideScalar(rb)), qi = new THREE.Quaternion().slerp(q, w);
+  return a.divideScalar(ra).applyQuaternion(qi).multiplyScalar(ra + (rb - ra) * w + bump * Math.sin(w * Math.PI)).add(C);
+}
+const angAt = (A, B) => { const C = PLS[TAU].C, a = A.clone().sub(C), b = B.clone().sub(C); return a.lengthSq() < 1 || b.lengthSq() < 1 ? 0 : a.angleTo(b); };
+function tauBlend(F, Tp, w) {
+  const E = arcPos(F.E, Tp.E, w, TV.bump), T = arcPos(F.T, Tp.T, w, 0);
+  const up = F.up.clone().applyQuaternion(new THREE.Quaternion().slerp(new THREE.Quaternion().setFromUnitVectors(F.up.clone().normalize(), Tp.up.clone().normalize()), w));
+  return { E, T, up };
 }
 function setView(v, n) {
   if (!PLS[TAU].ready || (v === TV.view && (v !== 'site' || n === TV.site))) return;
-  TV.from = { E: camera.position.clone(), q: camera.quaternion.clone() }; TV.t = 0; TV.dur = v === 'dive' ? 1.8 : 1.6;
-  if (v === 'globe' && TV.view !== 'globe') { const dl = camera.position.clone().sub(PLS[TAU].C).applyQuaternion(PLS[TAU].Qi).normalize(); TV.yaw = Math.atan2(dl.x, dl.z); TV.pitch = cl(Math.asin(dl.y), -1.2, 1.2); TV.dist = R * 4.8; }
+  TV.from = TV.cur ? { E: TV.cur.E.clone(), T: TV.cur.T.clone(), up: TV.cur.up.clone() } : tauPose(TV.view);
+  if (v === 'globe' && TV.view !== 'globe') { const dl = TV.from.E.clone().sub(PLS[TAU].C).applyQuaternion(PLS[TAU].Qi).normalize(); TV.yaw = Math.atan2(dl.x, dl.z); TV.pitch = cl(Math.asin(dl.y), -1.2, 1.2); TV.dist = R * 4.8; }
   if (n !== undefined) TV.site = n;
   if (v === 'dive') { TV.diveT = 0; TV.opened = false; loadCore(); }
-  TV.view = v; TV.hov = -1; tauPanel(); kick();
+  TV.view = v; TV.hov = -1;
+  /* the length of the move: from the angle flown over the planet and the change of altitude */
+  const to = tauPose(v), th = Math.max(angAt(TV.from.T, to.T), angAt(TV.from.E, to.E)), alt = Math.abs(Math.log(TV.from.E.distanceTo(PLS[TAU].C) / to.E.distanceTo(PLS[TAU].C)));
+  TV.bump = R * th * .75; TV.dur = v === 'dive' ? 1.8 : 1.2 + th * 1.15 + alt * .9; TV.t = 0;
+  tauPanel(); kick();
 }
 function tauCam(E0, q0, dt) {
   dt *= window.__tauFast || 1;                                         // (still renders run the moves faster)
-  if (TV.view === 'read' && TV.t >= 1) return { E: E0, q: q0 };
   if (TV.view === 'dive' && TV.t >= 1) TV.diveT = Math.min(1, TV.diveT + dt / 2.4);
-  const p = TV.view === 'read' ? { E: E0, q: q0 } : poseQ(tauPose(TV.view));
   if (TV.view === 'dive' && TV.diveT > .5 && !TV.opened) { TV.opened = true; openCore(); }
-  if (TV.t < 1) { TV.t = Math.min(1, TV.t + dt / TV.dur); const w = sm5(TV.t); return { E: arcLerp(TV.from.E, p.E, w), q: TV.from.q.clone().slerp(p.q, w) }; }
-  return p;
+  let p;
+  if (TV.view === 'read') { const rp = restPose(SEC); p = { E: E0.clone(), T: rp.T.clone(), up: rp.up.clone() }; } else p = tauPose(TV.view);
+  if (TV.t < 1 && TV.from) { TV.t = Math.min(1, TV.t + dt / TV.dur); p = tauBlend(TV.from, p, ease(TV.t)); }
+  TV.cur = p;
+  if (TV.view === 'read' && TV.t >= 1) return { E: E0, q: q0 };
+  return { E: p.E, q: lookQ(p.E, p.T, p.up) };
 }
+const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;   // cubic in-out: a gentle start and landing
 /* a landmark's outline on screen: its footprint's corners at the ground and at its top; none on the far side */
 function siteBox(n) {
   const P = PLS[TAU], s = SITES[n], d = V3(GEN.gdir(s.f, s.i, s.j)).applyQuaternion(P.Q), C0 = P.C.clone().addScaledVector(d, R);
@@ -1089,7 +1119,7 @@ function openCore() { loadCore(); coreEl.classList.add('on'); document.documentE
 function closeCore() {
   if (!coreEl) return; const el = coreEl; coreEl = null; inCore = false;
   el.classList.remove('on', 'ready'); document.documentElement.classList.remove('tau-in'); setTimeout(() => el.remove(), 800);
-  TV.diveT = 1; TV.from = poseQ(tauPose('dive')); TV.view = 'site'; TV.site = 0; TV.t = 0; TV.dur = 2.6;            // back up the shaft
+  TV.diveT = 1; TV.from = tauPose('dive'); TV.view = 'site'; TV.site = 0; TV.t = 0; TV.dur = 2.8; TV.bump = 0;            // back up the shaft
   if (JSON.stringify(tauState()) !== TV.built) { dropFull(PLS[TAU]); wakeBuild(); }                                 // the city follows the memory
   tauPanel(); kick();
 }
@@ -1110,7 +1140,7 @@ window.__about = {
   uni: (k, name, a) => { PLS[k].U[name].value.fromArray(a); kick(); },
   state: () => ({ cur, want, frames: nF, mv: mv && { a: mv.a, b: mv.b, t: +mv.t.toFixed(2), total: +mv.total.toFixed(2) } }),
   tau: { view: (v, n, snap) => { setView(v, n); if (snap) TV.t = .999; }, state: () => ({ view: TV.view, site: TV.site, t: +TV.t.toFixed(2), dive: +TV.diveT.toFixed(2), full: !!PLS[TAU].full, building: !!PLS[TAU].building, inCore, hov: TV.hov }),
-    turn: (y, p, d) => { TV.yaw = y; TV.pitch = p; if (d) TV.dist = d; kick(); }, close: () => closeCore(), diveAt: u => { TV.view = 'dive'; TV.t = 1; TV.diveT = u; TV.opened = true; kick(); }, boxes: () => SITES.map((_, n) => { const B = siteBox(n); return B && B.map(Math.round); }) },
+    turn: (y, p, d) => { TV.yaw = y; TV.pitch = p; if (d) TV.dist = d; kick(); }, close: () => closeCore(), setT: v => { TV.t = v; kick(); }, diveAt: u => { TV.view = 'dive'; TV.t = 1; TV.diveT = u; TV.opened = true; kick(); }, boxes: () => SITES.map((_, n) => { const B = siteBox(n); return B && B.map(Math.round); }) },
   at: s => { const p = proj(isPl(s) ? PLS[pk(s)].C : CORE); return p && [Math.round(p[0]), Math.round(p[1])]; }
 };
 }
