@@ -480,7 +480,7 @@ void main(){ vec3 n = normalize(vN); float L = max(dot(n, vL), 0.);
       for (let i = 0; i < n; i++) {
         const s = .14 + rr2() * .74, p = bez(m, s), tg = bez(m, Math.min(1, s + .01)).sub(p).normalize();
         const a1 = new THREE.Vector3().crossVectors(tg, Y).normalize(), a2 = new THREE.Vector3().crossVectors(tg, a1);
-        const size = 3 + Math.pow(rr2(), 2.2) * 26, ang = rr2() * Math.PI * 2, d = 10 + size * 1.6 + Math.pow(rr2(), 1.3) * 260;
+        const size = 3 + Math.pow(rr2(), 2.2) * 26, ang = rr2() * Math.PI * 2, d = 24 + size * 1.6 + Math.pow(rr2(), 1.3) * 260;
         if (isPl(m.b) && p.distanceTo(PLS[m.b - 1].C) < R * 2.2) continue;
         if (isPl(m.a) && p.distanceTo(PLS[m.a - 1].C) < R * 2.2) continue;
         p.addScaledVector(a1, Math.cos(ang) * d).addScaledVector(a2, Math.sin(ang) * d);
@@ -708,6 +708,9 @@ function frame(now) {
     if (cur === 0 && mouse.px >= 0) { const h = pick(mouse.px, mouse.py); if (h !== hover) { hover = h; canvas.style.cursor = h > 0 ? 'pointer' : ''; } }
   }
   base = { E: E.clone(), q: q.clone() };
+  shipUpdate(dt);
+  if (window.__shipCam) { const c = window.__shipCam, d = new THREE.Vector3(Math.sin(c.yaw) * Math.cos(c.pitch), Math.sin(c.pitch), Math.cos(c.yaw) * Math.cos(c.pitch)).applyQuaternion(SHIP.q);
+    E = SHIP.pos.clone().addScaledVector(d, c.dist); q = lookQ(E, SHIP.pos, new THREE.Vector3(0, 1, 0).applyQuaternion(SHIP.q)); }
   /* the mouse: a little parallax */
   mouse.sx += (mouse.x - mouse.sx) * Math.min(1, dt0 * 2.5); mouse.sy += (mouse.y - mouse.sy) * Math.min(1, dt0 * 2.5);
   if (!reduce.matches) { const rgt = new THREE.Vector3(1, 0, 0).applyQuaternion(q), up = new THREE.Vector3(0, 1, 0).applyQuaternion(q), k = Math.min(cur === 0 && !mv ? 9000 : 300, 300); E.addScaledVector(rgt, -mouse.sx * k * .025).addScaledVector(up, mouse.sy * k * .018); }
@@ -766,11 +769,159 @@ function begin() {
     next(); kick();
   });
 }
+/* ================= the ship (Jeff's concept): a bent spine joining two pylons of hexagonal pods =================
+   Built here in its own units (forward +z, up +y), drawn with its own cell material: cell lines every half unit, lit by
+   the spark, engines and running lights in the accent, a cell dissolve when it appears or leaves. It flies each warp
+   just ahead of the camera, peels off during the dive and parks upper right of the reading view. */
+const NOZ = [];
+const SHIP = (() => {
+  const C = GEN.COL, P = [], N = [], LN = [], CC = [], KK = [], v3 = (x, y, z) => new THREE.Vector3(x, y, z);
+  const K_HULL = 0, K_GLASS = 1, K_ENG = 2, K_LITE = 3;
+  const tri = (a, b, c, col, k, ref) => {
+    let n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
+    const m = a.clone().add(b).add(c).multiplyScalar(1 / 3); if (n.dot(m.sub(ref)) < 0) { n.negate(); [b, c] = [c, b]; }
+    for (const v of [a, b, c]) { P.push(v.x, v.y, v.z); N.push(n.x, n.y, n.z); CC.push(col[0], col[1], col[2]); KK.push(k); }
+  };
+  const quad = (a, b, c, d, col, k, ref) => { tri(a, b, c, col, k, ref); tri(a, c, d, col, k, ref); };
+  /* a prism between two loops of points (same count), with caps; capK lets one cap be glass or an engine */
+  const prism = (A, B, col, k = K_HULL, capA = k, capB = k, colA = col, colB = col) => {
+    const ref = A.concat(B).reduce((s, v) => s.add(v), v3(0, 0, 0)).multiplyScalar(1 / (A.length * 2)), n = A.length;
+    for (let i = 0; i < n; i++) { const j = (i + 1) % n; quad(A[i], A[j], B[j], B[i], col, k, ref); }
+    for (let i = 1; i < n - 1; i++) { tri(A[0], A[i], A[i + 1], colA, capA, ref); tri(B[0], B[i], B[i + 1], colB, capB, ref); }
+  };
+  const xf = (pts, o, rx = 0, ry = 0) => { const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, 0)); return pts.map(p => p.clone().applyQuaternion(q).add(o)); };
+  const box = (o, s, col, k = K_HULL, rx = 0, ry = 0, capF) => {
+    const x = s[0] / 2, y = s[1] / 2, z = s[2] / 2;
+    const A = xf([v3(-x, -y, -z), v3(x, -y, -z), v3(x, y, -z), v3(-x, y, -z)], o, rx, ry), B = xf([v3(-x, -y, z), v3(x, -y, z), v3(x, y, z), v3(-x, y, z)], o, rx, ry);
+    prism(A, B, col, k, capF ? capF[0] : k, capF ? capF[1] : k);
+  };
+  /* a hexagonal pod standing up (axis y): pointed fore and aft in plan, its ends chamfered */
+  const hex = (w, l, s = 1) => [v3(0, 0, l / 2 * s), v3(w / 2 * s, 0, l / 4 * s), v3(w / 2 * s, 0, -l / 4 * s), v3(0, 0, -l / 2 * s), v3(-w / 2 * s, 0, -l / 4 * s), v3(-w / 2 * s, 0, l / 4 * s)];
+  const pod = (o, w, l, y0, y1, ch0, ch1, tilt, col) => {
+    const at = (y, s) => xf(hex(w, l, s).map(p => p.setY(y)), o, tilt), e0 = (y1 - y0) * .12, e1 = (y1 - y0) * .12;
+    prism(at(y0, ch0), at(y0 + e0, 1), col); prism(at(y0 + e0, 1), at(y1 - e1, 1), col); prism(at(y1 - e1, 1), at(y1, ch1), col);
+  };
+  for (const sx of [-1, 1]) {
+    const X = 6.3 * sx;
+    pod(v3(X, 0, -1.3), 2.5, 6.6, 1.5, 6.9, 1, .62, -.17, C.light);                     // upper pod, leaning back
+    pod(v3(X, 0, -.5), 2.3, 5.2, -5.8, -.5, .6, 1, .17, C.bone);                        // lower pod, leaning forward
+    box(v3(X, .5, -.9), [2.1, 2.4, 3.2], C.dark);                                      // the knuckle where the spine meets the pylon
+    box(v3(X + sx * 1.1, .5, -.9), [.3, 1.6, 2.2], C.mid);
+    for (let v = 0; v < 3; v++) box(v3(X + sx * 1.28, 3.2 + v * .9, -1.6 - v * .16), [.18, .32, 2.2], C.dark);   // intakes on the outer face
+    for (let v = 0; v < 2; v++) box(v3(X + sx * 1.18, -2.4 - v * .9, -.3 + v * .16), [.18, .32, 1.8], C.dark);
+    /* engines: two nozzles at the back of each pod, glowing */
+    for (const [y, z] of [[3.9, -4.85], [5.3, -4.6], [-3.4, -3.3], [-2.0, -3.55]]) { box(v3(X, y, z), [1.1, 1.0, .9], C.dark, K_HULL, 0, 0, [K_ENG, K_HULL]); NOZ.push([X, y, z - .5]); }
+    box(v3(X, 7.6, -2.2), [.14, 2.0, .14], C.bone); box(v3(X, 8.1, -2.2), [1.2, .1, .1], C.bone);             // mast
+    box(v3(X, 8.6, -2.2), [.3, .3, .3], C.bone, K_LITE);
+    box(v3(X + sx * .9, 6.4, 1.2), [.3, .3, .3], C.bone, K_LITE); box(v3(X + sx * .8, -5.4, 1.6), [.3, .3, .3], C.bone, K_LITE);   // running lights
+  }
+  /* the spine: arms swept forward to a nose bar, then the cockpit */
+  for (const sx of [-1, 1]) {
+    const a = v3(5.3 * sx, .5, -.6), b = v3(2.1 * sx, .5, 3.0), d = b.clone().sub(a), L = d.length(), ry = Math.atan2(d.x, d.z);
+    box(a.clone().add(b).multiplyScalar(.5), [1.4, 1.6, L], C.light, K_HULL, 0, ry);
+    box(a.clone().add(b).multiplyScalar(.5).add(v3(0, .9, 0)), [.6, .25, L * .8], C.dark, K_HULL, 0, ry);          // a strip along the top
+    box(a.clone().lerp(b, .3).add(v3(0, -.95, 0)), [1.0, .35, 1.6], C.mid, K_HULL, 0, ry);
+  }
+  box(v3(0, .5, 3.1), [4.6, 1.6, 1.5], C.light);
+  const ck = (z, s, y) => [v3(-1.5 * s, y - .8 * s, z), v3(1.5 * s, y - .8 * s, z), v3(1.7 * s, y + .3 * s, z), v3(0, y + 1.3 * s, z), v3(-1.7 * s, y + .3 * s, z)];
+  prism(ck(3.4, 1, .7), ck(5.2, .92, .7), C.bone); prism(ck(5.2, .92, .7), ck(6.3, .5, .55), C.bone, K_HULL, K_HULL, K_GLASS);   // cockpit, the glass on its nose
+  box(v3(0, 2.05, 4.4), [.9, .5, 1.6], C.dark); box(v3(0, -.55, 4.6), [2.0, .3, 2.0], C.mid);
+  box(v3(0, 1.4, 2.4), [.2, 1.4, .2], C.bone); box(v3(0, 2.15, 2.4), [.28, .28, .28], C.bone, K_LITE);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+  g.setAttribute('aCol', new THREE.Float32BufferAttribute(CC, 3)); g.setAttribute('aK', new THREE.Float32BufferAttribute(KK, 1));
+  const U = { uMat: { value: 0 }, uAcc: { value: new THREE.Color(FRONTS[0][1]) }, uSpk: { value: CORE.clone() }, uFill: { value: new THREE.Vector3(0, 1, 0) }, uTime: UT, uThr: { value: 0 } };
+  const mat = new THREE.ShaderMaterial({ uniforms: U, side: THREE.DoubleSide, extensions: { derivatives: true },
+    vertexShader: `attribute vec3 aCol; attribute float aK; varying vec3 vLP, vLN, vW, vN, vC; varying float vK;
+void main(){ vLP = position; vLN = normal; vC = aCol; vK = aK; vec4 w = modelMatrix * vec4(position, 1.); vW = w.xyz; vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * w; }`,
+    fragmentShader: `precision highp float; uniform float uMat, uTime, uThr; uniform vec3 uAcc, uSpk, uFill; varying vec3 vLP, vLN, vW, vN, vC; varying float vK;
+float hash(vec3 c){ return fract(sin(dot(c, vec3(12.9898,78.233,37.719))) * 43758.5453); }
+void main(){
+  vec3 cid = floor(vLP * 2.); float h = hash(cid);
+  if (h > uMat * 1.15) discard;
+  vec3 n = normalize(vN); vec3 vd = normalize(vW - cameraPosition); if (dot(n, vd) > 0.) n = -n;
+  vec3 an = abs(normalize(vLN)); vec2 uv = (an.x > an.y && an.x > an.z ? vLP.yz : an.y > an.z ? vLP.xz : vLP.xy) * 2.;
+  vec2 fw = max(fwidth(uv), vec2(1e-4)), f = fract(uv), e = min(f, 1. - f), l = 1. - smoothstep(fw * .6, fw * 1.6, e);
+  float gl = max(l.x, l.y) * (1. - smoothstep(.15, .45, max(fw.x, fw.y)));
+  vec3 Ls = normalize(uSpk - vW); float dif = max(dot(n, Ls), 0.), fil = max(dot(n, uFill), 0.);
+  vec3 SPKC = vec3(1., .9, .72);
+  vec3 col = vC * (.2 + .32 * fil + .75 * dif * SPKC);
+  col = mix(col, mix(col * 1.25 + .015, col * .7, smoothstep(.1, .5, dif)), gl);
+  col += SPKC * pow(1. - abs(dot(n, vd)), 4.) * smoothstep(-.2, .6, dot(vd, Ls)) * .45;            // the spark behind it: a warm rim
+  if (vK > .5 && vK < 1.5) { vec2 g2 = floor(uv * 1.); col = vec3(.06, .07, .09) + vec3(.6, .65, .75) * step(.78, hash(vec3(g2, 4.))) * .8 + SPKC * dif * .15; }   // glass
+  else if (vK > 1.5 && vK < 2.5) { float fl = .8 + .2 * sin(uTime * 30. + h * 40.); col = mix(uAcc * .35, uAcc * 1.5 + .1, uThr) * fl; }   // engines
+  else if (vK > 2.5) col = fract(uTime * .7 + h * .3) < .12 ? uAcc * 1.4 : vec3(.85, .88, .95);                      // running lights
+  if (uMat < .999 && h > uMat * 1.15 - .12) col = uAcc * 1.2;                                                   // the cells catching as it builds
+  gl_FragColor = vec4(col, 1.);
+}` });
+  const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false;
+  /* exhaust: trains of square pixels streaming from each nozzle */
+  const EP = [], ES = []; NOZ.forEach((nz, i) => { for (let s = 0; s < 22; s++) { EP.push(nz[0] + (Math.random() - .5) * .5, nz[1] + (Math.random() - .5) * .5, nz[2]); ES.push(Math.random(), i); } });
+  const eg = new THREE.BufferGeometry(); eg.setAttribute('position', new THREE.Float32BufferAttribute(EP, 3)); eg.setAttribute('aS', new THREE.Float32BufferAttribute(ES, 2));
+  const ex = new THREE.Points(eg, new THREE.ShaderMaterial({ uniforms: { uTime: UT, uThr: U.uThr, uAcc: U.uAcc, uMat: U.uMat, uFoc: CARU.uFoc, uPx: CARU.uPx, uSc: { value: 1 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: `attribute vec2 aS; uniform float uTime, uThr, uFoc, uPx, uSc, uMat; varying float vA;
+void main(){ float p = fract(aS.x + uTime * (1.2 + uThr * 2.6)); vec3 q = position; q.z -= p * (2. + uThr * 22.); vA = (1. - p) * (.25 + .75 * uThr) * step(.99, uMat);
+  vec4 mv = modelViewMatrix * vec4(q, 1.); gl_PointSize = clamp(uFoc * .5 * uSc / -mv.z, 1., 7.) * uPx; gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `precision highp float; uniform vec3 uAcc; varying float vA; void main(){ if (vA < .02) discard; gl_FragColor = vec4(uAcc * 1.3 * vA, 1.); }` }));
+  ex.frustumCulled = false;
+  const grp = new THREE.Group(); grp.add(mesh, ex); grp.visible = false; scene.add(grp);
+  const S = 1.25; grp.scale.setScalar(S); ex.material.uniforms.uSc.value = S;
+  return { grp, U, S, pos: new THREE.Vector3(), q: new THREE.Quaternion(), mat: 0, prevF: null, bank: 0 };
+})();
+
+/* where the ship sits: parked upper right of a reading view (in the free sky, inside whatever window the screen uses),
+   nose across the frame toward the hero; at the spark, close and lower right, nose toward the star */
+const shipQ = (F, up) => lookQ(F, new THREE.Vector3(), up);
+function parkPose(s) {
+  const rp = restPose(s), E = rp.E, f = rp.T.clone().sub(E).normalize(), r = new THREE.Vector3().crossVectors(f, rp.up).normalize(), u = new THREE.Vector3().crossVectors(r, f);
+  const sp = s === 6, W = WINR && isPl(s) ? WINR : WIN0, D = sp ? 62 : 215, fx = sp ? .76 : .86, fy = sp ? .7 : .3;
+  const tx = W.l + fx * (W.r - W.l), ty = W.t - fy * (W.t - W.b);
+  const pos = E.clone().addScaledVector(f, D).addScaledVector(r, tx * D).addScaledVector(u, ty * D);
+  const F = sp ? CORE.clone().sub(pos).normalize().addScaledVector(r, -.35).normalize() : r.clone().multiplyScalar(-.86).addScaledVector(f, -.5).addScaledVector(u, -.06).normalize();
+  return { pos, q: shipQ(F, u) };
+}
+/* in flight the ship rides with the camera: its pose is blended in the camera's own frame, from where it was parked
+   (relative to that stop's reading camera) to just ahead and below centre, and on arrival to where it parks (relative to
+   the next reading camera, which is where the dive ends). It banks into turns. */
+const toRel = (P, E, q) => { const qi = q.clone().invert(); return { p: P.pos.clone().sub(E).applyQuaternion(qi), q: qi.multiply(P.q) }; };
+const restCam = s => { const r = restPose(s); return { E: r.E, q: lookQ(r.E, r.T, r.up) }; };
+const relPark = s => { const c = restCam(s); return toRel(parkPose(s), c.E, c.q); };
+function chaseRel(dt) {
+  const f = new THREE.Vector3(0, 0, -1).applyQuaternion(base.q), u = new THREE.Vector3(0, 1, 0).applyQuaternion(base.q);
+  if (SHIP.prevF && dt > 0) { const yaw = SHIP.prevF.clone().cross(f).dot(u) / dt; SHIP.bank += (cl(-yaw * .9, -.6, .6) - SHIP.bank) * Math.min(1, dt * 3); }
+  SHIP.prevF = f.clone();
+  const F = new THREE.Vector3(0, 0, -1), up = new THREE.Vector3(0, 1, 0).applyAxisAngle(F, SHIP.bank + Math.sin(clock * 1.3) * .03);
+  return { p: new THREE.Vector3(0, -13 + Math.sin(clock * 1.7) * .3, -60), q: shipQ(F, up) };
+}
+const blendR = (A, B, w) => ({ p: A.p.clone().lerp(B.p, w), q: A.q.clone().slerp(B.q, w) });
+function shipUpdate(dt) {
+  let tgt = null, mat = 1, thr = .15, acc = null;
+  if (mv) {
+    const m = mv, a = m.a, b = m.b; let r = chaseRel(dt); thr = 1;
+    if (isPl(a) || a === 6) { const w = sm5(cl(m.t / (m.tt * .5))); r = blendR(relPark(a), r, w); thr = .15 + .85 * w; }
+    if (isPl(b) || b === 6) { const t0 = m.tt - m.ovl - (b === 6 ? .6 : 0), w = sm5(cl((m.t - t0) / (b === 6 ? 1.2 : 3.0))); r = blendR(r, relPark(b), w); thr = thr * (1 - w) + .15 * w; }
+    mat = a === 0 && b === 0 ? 0 : a === 0 ? cl(m.t / 1.4) : b === 0 ? 1 - cl(m.t / (m.tt * .7)) : 1;
+    tgt = { pos: r.p.clone().applyQuaternion(base.q).add(base.E), q: base.q.clone().multiply(r.q) };
+    SHIP.mat = mat; acc = isPl(b) ? PLS[b - 1].U.uAcc.value : isPl(a) ? PLS[a - 1].U.uAcc.value : null;
+  } else {
+    SHIP.prevF = null; SHIP.bank *= .9;
+    if (cur !== 0) { tgt = parkPose(cur); const u = new THREE.Vector3(0, 1, 0).applyQuaternion(tgt.q);
+      tgt.pos.addScaledVector(u, Math.sin(clock * .7) * .9 * sm5(restT / 2)); tgt.q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.sin(clock * .5) * .04 * sm5(restT / 2))); }
+    SHIP.mat += ((cur !== 0 ? 1 : 0) - SHIP.mat) * Math.min(1, dt * 1.5); acc = isPl(cur) ? PLS[cur - 1].U.uAcc.value : null;
+  }
+  if (tgt) { SHIP.pos.copy(tgt.pos); SHIP.q.copy(tgt.q); }
+  SHIP.grp.visible = SHIP.mat > .01; SHIP.grp.position.copy(SHIP.pos); SHIP.grp.quaternion.copy(SHIP.q);
+  SHIP.U.uMat.value = SHIP.mat; SHIP.U.uThr.value += (thr - SHIP.U.uThr.value) * Math.min(1, dt * 3 + (window.__frozen ? 1 : 0));
+  if (acc) SHIP.U.uAcc.value.copy(acc); else SHIP.U.uAcc.value.set('#E9EBF0');
+  SHIP.U.uFill.value.set(0, 1, 0).applyQuaternion(base.q);
+}
+
 /* hooks for still renders */
 window.__about = {
   ready: () => PLS.filter(p => p.ready).length,
   full: () => PLS.filter(p => p.full).length,
-  pose: s => { mv = null; ROCKS.clear(); cur = want = s; restT = 4; PLS.forEach(P => { if (P.ready) setBuilt(P); }); panels(isPl(s) ? s - 1 : -1); cap.classList.toggle('on', s === 6); hud(s); kick(); },
+  ship: () => ({ vis: SHIP.grp.visible, mat: SHIP.mat, d: +SHIP.pos.distanceTo(camera.position).toFixed(1), ndc: SHIP.pos.clone().project(camera).toArray().map(v => +v.toFixed(2)) }),
+  pose: s => { mv = null; ROCKS.clear(); cur = want = s; SHIP.mat = s ? 1 : 0; restT = 4; PLS.forEach(P => { if (P.ready) setBuilt(P); }); panels(isPl(s) ? s - 1 : -1); cap.classList.toggle('on', s === 6); hud(s); kick(); },
   move: (a, b, t) => { mv = null; cur = a; want = b; restT = 4; base = (() => { const p = restPose(a); return { E: p.E.clone(), q: lookQ(p.E, p.T, p.up) }; })(); PLS.forEach(P => { if (P.ready) setBuilt(P); }); startMove(b); if (mv) mv.t = t; kick(); },
   hover: (x, y) => { mouse.px = x; mouse.py = y; kick(); },
   uni: (k, name, a) => { PLS[k].U[name].value.fromArray(a); kick(); },
