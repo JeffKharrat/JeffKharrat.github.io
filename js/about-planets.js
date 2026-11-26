@@ -29,6 +29,10 @@ const TL = [...tl.querySelectorAll('button')];
 const SS = 10, CORE = new THREE.Vector3(0, 40, 0);
 const ORB = [[3600, -32, 520], [3000, 28, -420], [2450, 92, 360], [1950, 158, -480], [1500, 222, 240]];
 const CEN = ORB.map(([d, a, y]) => new THREE.Vector3(Math.cos(a * D2R) * d, y, Math.sin(a * D2R) * d));
+/* Tau Jeffy VI: a sixth, secret planet on the outskirts, below and right of the system on the map, off every orbit. It is
+   reached only by clicking it there: stop 7, with no scroll stop and no timeline button. See the Tau section below. */
+const SEC = 7, TAU = 5;
+CEN.push(new THREE.Vector3(Math.cos(31 * D2R) * 4050, -360, Math.sin(31 * D2R) * 4050));
 const MAP = { E: new THREE.Vector3(700, 6200, 7400), T: new THREE.Vector3(0, -500, -150), up: Y }, MAP_D = MAP.E.clone().sub(MAP.T);
 const SPV = (() => { const d = new THREE.Vector3(Math.cos(95 * D2R), 0, Math.sin(95 * D2R)), side = new THREE.Vector3().crossVectors(d, Y).normalize();
   return { E: CORE.clone().addScaledVector(d, 9 * SS).addScaledVector(side, -.6 * SS).addScaledVector(Y, -.4 * SS), T: CORE.clone(), up: Y }; })();
@@ -107,7 +111,7 @@ void main(){
   float a1 = uProg - v, a2 = uProg - uLag - v;
   float stage = uMode < .5 ? 2. : (a1 < 0. ? 0. : (a2 < 0. ? 1. : 2.));
   vec3 col;
-  bool ground = vKind > .5 && vKind < 1.5, lampK = vKind > 1.5 && vKind < 2.5, win = vKind > 2.5 && vKind < 3.5;
+  bool ground = vKind > .5 && vKind < 1.5, lampK = vKind > 1.5 && vKind < 2.5, win = vKind > 2.5 && vKind < 3.5, glowK = vKind > 3.5 && vKind < 4.5;
   float wall = 1. - smoothstep(.3, .6, abs(dot(n, tR)));
   /* the spark's light. It sits ahead of the camera in the reading views, so it reads as a backlight: faces toward it warm,
      faces away a shade cooler, and a sheen where we look toward it across a surface at a grazing angle */
@@ -128,6 +132,7 @@ void main(){
     if (stage < .5) discard;
     if (!ff) col = PANEL;
     else if (stage < 1.5) col = ghostC(L * .8, max(gl, glm)) * cool + GHOST * SPKC * Ls * .8 + SPKC * sheen * .22;
+    else if (glowK) col = (vec3(.29, .36, 1.) * (.95 + .3 * sin(uTime * 1.3 + vSeed * 6.2832)) + vec3(.05) * step(.5, hash(cid))) * (1. - .55 * gl);   // the core's light, at the bottom of Tau Jeffy VI's shaft
     else if (lampK) {
       float ph = uTime * .45 + vSeed * 9.;
       float on = step(.3, hash(vec3(vSeed * 91., floor(ph), 2.)));
@@ -222,27 +227,45 @@ const PROP_G = (() => {
 /* ================= the signs' atlas ================= */
 const AW = 2048, AH = 2048, atlas = document.createElement('canvas'); atlas.width = AW; atlas.height = AH;
 const actx = atlas.getContext('2d'), SLOT = {};
-let ax = 0, ay = 0, rowH = 0;
-const slot = (name, w, h) => { if (ax + w > AW) { ax = 0; ay += rowH + 4; rowH = 0; } SLOT[name] = { x: ax, y: ay, w, h }; ax += w + 4; rowH = Math.max(rowH, h); return SLOT[name]; };
+/* shelf packing, tallest first: every slot fits (placed in order of drawing, the atlas ran out of rows) */
+function pack(items, width, S) {
+  items.sort((a, b) => b.h - a.h); let x = 0, y = 0, rh = 0;
+  items.forEach(it => { if (x + it.w > width) { x = 0; y += rh + 4; rh = 0; } S[it.name] = { x, y, w: it.w, h: it.h }; x += it.w + 4; rh = Math.max(rh, it.h); });
+  return y + rh;
+}
+/* the city's words: vertical (a column, the long-vowel bar turned) and horizontal */
+function wordItems(ctx, list, pre) {
+  const { WC, WP } = GEN, out = [];
+  list.forEach((w, n) => { const ch = [...w];
+    out.push({ name: pre + 'v' + n, w: WC + WP, h: WC * ch.length + WP, draw: s => ch.forEach((g, i) => { const x = s.x + (WC + WP) / 2, y = s.y + WP / 2 + WC * i + WC / 2 + 4;
+      if (g === 'ー') { ctx.save(); ctx.translate(x, y - 4); ctx.rotate(Math.PI / 2); ctx.fillText(g, 0, 4); ctx.restore(); } else ctx.fillText(g, x, y); }) });
+    out.push({ name: pre + 'h' + n, w: WC * ch.length + WP, h: WC + WP, draw: s => ch.forEach((g, i) => ctx.fillText(g, s.x + WP / 2 + WC * i + WC / 2, s.y + (WC + WP) / 2 + 4)) }); });
+  return out;
+}
 function drawAtlas() {
-  actx.clearRect(0, 0, AW, AH); ax = ay = rowH = 0; actx.fillStyle = '#fff'; actx.textBaseline = 'middle';
-  PLANETS.forEach((Pl, k) => {
-    actx.textAlign = 'start'; actx.font = "800 300px Tektur"; let s = slot(k + ':n01', Math.ceil(actx.measureText(Pl.num).width + 30), 300); actx.fillText(Pl.num, s.x + 15, s.y + 160);
-    actx.font = "800 90px Tektur"; s = slot(k + ':code', Math.ceil(actx.measureText(Pl.code).width + 20), 100); actx.fillText(Pl.code, s.x + 10, s.y + 54);
-    const ch = [...Pl.vk], c = 110; s = slot(k + ':vk', c, c * ch.length); actx.font = "400 96px 'Dela Gothic One'"; actx.textAlign = 'center';
-    ch.forEach((g, i) => actx.fillText(g, s.x + c / 2, s.y + c * i + c / 2 + 6));
+  actx.clearRect(0, 0, AW, AH); actx.fillStyle = '#fff'; actx.textBaseline = 'middle';
+  const items = [];
+  PLANETS.forEach((Pl, k) => { if (Pl.secret) return;
+    actx.font = "800 300px Tektur"; items.push({ name: k + ':n01', w: Math.ceil(actx.measureText(Pl.num).width + 30), h: 300, draw: s => { actx.font = "800 300px Tektur"; actx.textAlign = 'start'; actx.fillText(Pl.num, s.x + 15, s.y + 160); } });
+    actx.font = "800 90px Tektur"; items.push({ name: k + ':code', w: Math.ceil(actx.measureText(Pl.code).width + 20), h: 100, draw: s => { actx.font = "800 90px Tektur"; actx.textAlign = 'start'; actx.fillText(Pl.code, s.x + 10, s.y + 54); } });
+    const ch = [...Pl.vk], c = 110; items.push({ name: k + ':vk', w: c, h: c * ch.length, draw: s => { actx.font = "400 96px 'Dela Gothic One'"; actx.textAlign = 'center'; ch.forEach((g, i) => actx.fillText(g, s.x + c / 2, s.y + c * i + c / 2 + 6)); } });
   });
-  /* the city's words: vertical (a column, the long-vowel bar turned) and horizontal */
-  const { WORDS, WC, WP } = GEN; actx.font = "400 " + (WC - 10) + "px 'Dela Gothic One'"; actx.textAlign = 'center';
-  WORDS.forEach((w, n) => { const ch = [...w];
-    let s = slot('@v' + n, WC + WP, WC * ch.length + WP);
-    ch.forEach((g, i) => { const x = s.x + (WC + WP) / 2, y = s.y + WP / 2 + WC * i + WC / 2 + 4;
-      if (g === 'ー') { actx.save(); actx.translate(x, y - 4); actx.rotate(Math.PI / 2); actx.fillText(g, 0, 4); actx.restore(); } else actx.fillText(g, x, y); });
-    s = slot('@h' + n, WC * ch.length + WP, WC + WP);
-    ch.forEach((g, i) => actx.fillText(g, s.x + WP / 2 + WC * i + WC / 2, s.y + (WC + WP) / 2 + 4)); });
+  const words = wordItems(actx, GEN.WORDS, '@'); items.push(...words);
+  pack(items, AW, SLOT);
+  items.forEach(it => { if (it.name[0] === '@') { actx.font = "400 " + (GEN.WC - 10) + "px 'Dela Gothic One'"; actx.textAlign = 'center'; } it.draw(SLOT[it.name]); });
 }
 const atlasTex = new THREE.CanvasTexture(atlas); atlasTex.anisotropy = 8;
-const slotsFor = k => { const o = {}; ['n01', 'code', 'vk'].forEach(n => { const S = SLOT[k + ':' + n]; o[n] = { w: S.w, h: S.h }; }); return o; };
+/* Tau Jeffy VI's words (its signs and its buildings' names), drawn once, on first need */
+const TAT = { S: {}, w: 2048, h: 1, tex: null };
+function tauAtlas() {
+  if (TAT.tex) return TAT;
+  const cv = document.createElement('canvas'), ctx = cv.getContext('2d'), items = wordItems(ctx, GEN.TWORDS, '@t');
+  TAT.h = Math.ceil(pack(items, TAT.w, TAT.S) / 4) * 4 + 4; cv.width = TAT.w; cv.height = TAT.h;
+  ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.font = "400 " + (GEN.WC - 10) + "px 'Dela Gothic One'";
+  items.forEach(it => it.draw(TAT.S[it.name]));
+  TAT.tex = new THREE.CanvasTexture(cv); TAT.tex.anisotropy = 8; return TAT;
+}
+const slotsFor = k => { if (PLANETS[k].secret) return {}; const o = {}; ['n01', 'code', 'vk'].forEach(n => { const S = SLOT[k + ':' + n]; o[n] = { w: S.w, h: S.h }; }); return o; };
 
 /* ================= the planets ================= */
 const PLS = PLANETS.map((Pl, k) => ({ k, Pl, C: CEN[k], Q: new THREE.Quaternion(), Qi: new THREE.Quaternion(), group: new THREE.Group(), U: planetUniforms(),
@@ -299,6 +322,8 @@ function onPlanet(res) {
     kick(); return;
   }
   /* the planet up close: its triangles in chunks (each culled against the view and the horizon), sharing one set of buffers */
+  if (P.full) dropFull(P);                                             // a rebuild (Tau Jeffy VI, after the core changed it)
+  P.building = false;
   P.chunks = []; const CH = res.CH;
   for (let c = 0; c < CH.length; c += 13) {
     const cg = new THREE.BufferGeometry(); for (const k in g.attributes) cg.setAttribute(k, g.attributes[k]); cg.setIndex(g.index); cg.setDrawRange(CH[c], CH[c + 1]);
@@ -315,14 +340,14 @@ function onPlanet(res) {
       M.makeBasis(e.clone().multiplyScalar(sc), up.clone().multiplyScalar(sc), z.multiplyScalar(sc)).setPosition(pr[i + 1], pr[i + 2], pr[i + 3]); im.setMatrixAt(n++, M); }
     im.instanceMatrix.needsUpdate = true; im.frustumCulled = false; im.userData.tris = pg.attributes.position.count / 3 * cnt[t]; P.props.push(im); P.group.add(im); });
   P.full = true;
-  const Pp = [], UV = [], Cc = [], NN = [], SS = [];
-  res.LG.forEach(q => { const S = SLOT[q.item[0] === '@' ? q.item : P.k + ':' + q.item]; if (!S) return; const u0 = S.x / AW, u1 = (S.x + S.w) / AW, v0 = 1 - (S.y + S.h) / AH, v1 = 1 - S.y / AH, uv = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
+  const Pp = [], UV = [], Cc = [], NN = [], SS = [], AT = P.Pl.secret ? tauAtlas() : { S: SLOT, w: AW, h: AH, tex: atlasTex };
+  res.LG.forEach(q => { const S = AT.S[q.item[0] === '@' ? q.item : P.k + ':' + q.item]; if (!S) return; const u0 = S.x / AT.w, u1 = (S.x + S.w) / AT.w, v0 = 1 - (S.y + S.h) / AT.h, v1 = 1 - S.y / AT.h, uv = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
     [0, 1, 2, 0, 2, 3].forEach(i => { Pp.push(...q.pts[i]); UV.push(...uv[i]); Cc.push(...q.col); NN.push(...q.n); SS.push(q.g || 0, q.city || 0); }); });
   const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(Pp, 3)); lg.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2));
   lg.setAttribute('aCol', new THREE.Float32BufferAttribute(Cc, 3)); lg.setAttribute('aS', new THREE.Float32BufferAttribute(SS, 2)); lg.setAttribute('normal', new THREE.Float32BufferAttribute(NN, 3));
   /* signs: the hero's plates appear with the hero (uVis); the city's light up one by one once the solid front has passed
      them (the same order as the buildings), with a short flicker, lit white or in the accent, or painted */
-  P.labels = new THREE.Mesh(lg, new THREE.ShaderMaterial({ uniforms: { uTex: { value: atlasTex }, uVis: { value: 0 }, uKey: P.U.uKey, uProg: P.U.uProg, uLag: P.U.uLag, uMode: P.U.uMode,
+  P.labels = new THREE.Mesh(lg, new THREE.ShaderMaterial({ uniforms: { uTex: { value: AT.tex }, uVis: { value: 0 }, uKey: P.U.uKey, uProg: P.U.uProg, uLag: P.U.uLag, uMode: P.U.uMode,
       uOrigin: P.U.uOrigin, uAcc: P.U.uAcc, uR: P.U.uR, uCell: P.U.uCell, uM: P.U.uM }, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
     vertexShader: `uniform vec3 uOrigin; uniform float uR, uCell, uM; attribute vec3 aCol; attribute vec2 aS; varying vec2 vUv, vS; varying vec3 vC, vN; varying float vOrd, vSd;
 void main(){ vUv = uv; vC = aCol; vN = normal; vS = aS; float cr = uCell / uR;
@@ -342,6 +367,14 @@ void main(){ float a = texture2D(uTex, vUv).a; if (a < .4) discard;
   P.cars = carsMesh(P, res.lanes); P.group.add(P.cars);
   if (!P.ready) planetCommon(P, res); else { vis(P, P.fr.on && P.fr.mode === 1 ? (P.fr.prog - LAG > -.1 ? 1 : 0) : 1); kick(); }
 }
+/* let go of a planet's close-up (GPU buffers and all); its far mesh shows again */
+function dropFull(P) {
+  if (!P.full) return;
+  P.chunks.forEach(m => { P.group.remove(m); m.geometry.dispose(); }); P.chunks = null;
+  P.props.forEach(m => { P.group.remove(m); m.dispose(); }); P.props = null;
+  [P.labels, P.cars].forEach(o => { if (o) { P.group.remove(o); o.geometry.dispose(); o.material.dispose(); } }); P.labels = P.cars = null;
+  P.full = false; kick();
+}
 function planetCommon(P, res) {
   P.halo = new THREE.Mesh(HALO_G, new THREE.ShaderMaterial({ uniforms: { uC: { value: P.C }, uSpkW: { value: CORE.clone().sub(P.C).normalize() } }, vertexShader: HALO_VS, fragmentShader: HALO_FS,
     side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
@@ -350,7 +383,7 @@ function planetCommon(P, res) {
   orient(P, res.sparkDir);
   P.ready = true; P.tris = res.tris; addLogo(P);
   if (!mv && cur === 0) startFront(P, 1, HDIR, .5, 3.2);                // seen from the map, each planet computes itself in
-  else if (!mv && cur === P.k + 1) setBuilt(P);
+  else if (!mv && cur === stopOf(P.k)) setBuilt(P);
   kick();
 }
 function carsMesh(P, L) {
@@ -379,7 +412,7 @@ void main(){
 /* ================= fronts ================= */
 let acc = 0;
 function startFront(P, mode, origin, speed, maxV) {
-  acc++; const c = FRONTS[acc % 4];
+  acc++; const c = P.k === TAU ? FRONTS[0] : FRONTS[acc % 4];                 // Tau Jeffy VI keeps the corporation's blue
   Object.assign(P.fr, { on: true, prog: mode ? P0 - T0 * speed : -.02, speed, maxV, mode, drive: false });
   P.U.uMode.value = mode; P.U.uOrigin.value.set(...origin); P.U.uAcc.value.set(c[1]);
   if (mode) vis(P, 0);
@@ -413,7 +446,7 @@ const MAPU = { uA: { value: 1 } };
 (() => {
   const P = [], C = [];
   ORB.forEach(([d, , y]) => { const n = Math.round(d * Math.PI * 2 / 60); for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; P.push(Math.cos(a) * d, y, Math.sin(a) * d); C.push(.204, .224, .271); } });
-  const pts = [...CEN, CORE];
+  const pts = [...CEN.slice(0, 5), CORE];
   for (let k = 0; k < pts.length - 1; k++) { const a = pts[k], b = pts[k + 1], n = Math.round(a.distanceTo(b) / 45);
     for (let i = 0; i < n; i++) { const t = i / n, p = a.clone().lerp(b, t); p.y += Math.sin(t * Math.PI) * 120; P.push(p.x, p.y, p.z); C.push(.604, .631, .69); } }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aCol', new THREE.Float32BufferAttribute(C, 3));
@@ -481,8 +514,8 @@ void main(){ vec3 n = normalize(vN); float L = max(dot(n, vL), 0.);
         const s = .14 + rr2() * .74, p = bez(m, s), tg = bez(m, Math.min(1, s + .01)).sub(p).normalize();
         const a1 = new THREE.Vector3().crossVectors(tg, Y).normalize(), a2 = new THREE.Vector3().crossVectors(tg, a1);
         const size = 3 + Math.pow(rr2(), 2.2) * 26, ang = rr2() * Math.PI * 2, d = 10 + size * 1.6 + Math.pow(rr2(), 1.3) * 260;
-        if (isPl(m.b) && p.distanceTo(PLS[m.b - 1].C) < R * 2.2) continue;
-        if (isPl(m.a) && p.distanceTo(PLS[m.a - 1].C) < R * 2.2) continue;
+        if (isPl(m.b) && p.distanceTo(PLS[pk(m.b)].C) < R * 2.2) continue;
+        if (isPl(m.a) && p.distanceTo(PLS[pk(m.a)].C) < R * 2.2) continue;
         p.addScaledVector(a1, Math.cos(ang) * d).addScaledVector(a2, Math.sin(ang) * d);
         field.push({ k: i % 5, p, size, axis: new THREE.Vector3(rr2() - .5, rr2() - .5, rr2() - .5).normalize(), rot: rr2() * 6, spin: (rr2() - .5) * .8, t0: m.t });
       }
@@ -515,18 +548,19 @@ function doShear() { if (reduce.matches) return; const H = rt.height, cp = Math.
    heads off from the map or the spark, and arrives along b's approach), the camera's orientation turning by the shortest
    way (a quaternion slerp, eased), so there is no tilt to undo. At a planet the curve hands over to its dive during the
    last 0.9 s, so the camera never stops. The asteroid field is laid along the curve when the move starts. */
-const isPl = s => s >= 1 && s <= 5;
+const pk = s => s >= 1 && s <= 5 ? s - 1 : s === SEC ? TAU : -1, stopOf = k => k === TAU ? SEC : k + 1;   // stop ↔ planet
+const isPl = s => pk(s) >= 0;
 const lookQ = (E, T, up) => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(E, T, up));
 function shotW(k, name, t) { const P = PLS[k], s = GEN.view(k, P.heroTop, name, t); return { E: V3(s.E).applyQuaternion(P.Q).add(P.C), T: V3(s.T).applyQuaternion(P.Q).add(P.C), up: V3(s.up).applyQuaternion(P.Q) }; }
-const inPose = s => isPl(s) ? shotW(s - 1, 'play', T_IN) : s === 0 ? MAP : SPV;
-const restPose = s => isPl(s) ? shotW(s - 1, 'play', T_DIVE) : s === 0 ? MAP : SPV;
+const inPose = s => isPl(s) ? shotW(pk(s), 'play', T_IN) : s === 0 ? MAP : SPV;
+const restPose = s => isPl(s) ? shotW(pk(s), 'play', T_DIVE) : s === 0 ? MAP : SPV;
 let base = { E: MAP.E.clone(), q: lookQ(MAP.E, MAP.T, Y) };
 function plan(a, b) {
   const B = inPose(b), E0 = base.E.clone(), L = E0.distanceTo(B.E), f0 = new THREE.Vector3(0, 0, -1).applyQuaternion(base.q);
-  const d0 = isPl(a) ? E0.clone().sub(PLS[a - 1].C).normalize().addScaledVector(f0, -.4).normalize() : B.E.clone().sub(E0).normalize();
-  const d3 = isPl(b) ? PLS[b - 1].C.clone().sub(B.E).normalize() : b === 6 ? CORE.clone().sub(B.E).normalize() : B.E.clone().sub(E0).normalize();
+  const d0 = isPl(a) ? E0.clone().sub(PLS[pk(a)].C).normalize().addScaledVector(f0, -.4).normalize() : B.E.clone().sub(E0).normalize();
+  const d3 = isPl(b) ? PLS[pk(b)].C.clone().sub(B.E).normalize() : b === 6 ? CORE.clone().sub(B.E).normalize() : B.E.clone().sub(E0).normalize();
   const tt = 1.9 + Math.min(1.1, L / 6000), ovl = isPl(b) ? .9 : 0;
-  const F = isPl(b) ? PLS[b - 1].C.clone() : b === 6 ? CORE.clone() : B.T.clone();
+  const F = isPl(b) ? PLS[pk(b)].C.clone() : b === 6 ? CORE.clone() : B.T.clone();
   return { a, b, t: 0, tt, ovl, F, total: isPl(b) ? tt - ovl + (T_DIVE - T_IN) : tt + .3, A: { E: E0 }, B, q0: base.q.clone(), qB: lookQ(B.E, B.T, B.up),
     P1: E0.clone().addScaledVector(d0, L * .3), P2: B.E.clone().addScaledVector(d3, -L * .3) };
 }
@@ -536,16 +570,16 @@ function moveCam(m, t) {
   const qF = lookQ(E, m.F, new THREE.Vector3(0, 1, 0).applyQuaternion(qr));          // facing the destination, rolled as the slerp
   const q = m.q0.clone().slerp(qF, sm5(cl(u / .38))).slerp(m.qB, sm5(cl((u - .58) / .38)));
   if (isPl(m.b) && t > m.tt - m.ovl) {
-    const ta = Math.min(T_DIVE, T_IN + (t - (m.tt - m.ovl))), d = shotW(m.b - 1, 'play', ta), w = sm5((t - (m.tt - m.ovl)) / m.ovl);
+    const ta = Math.min(T_DIVE, T_IN + (t - (m.tt - m.ovl))), d = shotW(pk(m.b), 'play', ta), w = sm5((t - (m.tt - m.ovl)) / m.ovl);
     E.lerp(d.E, w); q.slerp(lookQ(d.E, d.T, d.up), w);
   }
   return { E, q };
 }
 let cur = 0, mv = null, want = 0, restT = 0, ff = 1;
 function startMove(b) {
-  if (b === cur || (isPl(b) && !PLS[b - 1].ready)) return;
+  if (b === cur || (isPl(b) && !PLS[pk(b)].ready)) return;
   mv = plan(cur, b); ff = 1;
-  if (isPl(b)) { const P = PLS[b - 1]; startFront(P, 1, HDIR, SPEED, 2.2); P.fr.drive = true; }
+  if (isPl(b)) { const P = PLS[pk(b)]; startFront(P, 1, HDIR, SPEED, 2.2); P.fr.drive = true; }
   ROCKS.lay(mv);
   panels(-1); cap.classList.remove('on'); hud(b); hover = -1;
 }
@@ -587,7 +621,8 @@ function mapLabels(a) {
   const text = (t, x, y) => { const w = fx.measureText(t).width; fx.fillText(t, Math.max(w / 2 + 8, Math.min(W - w / 2 - 8, x)), y); };   // kept inside the stage
   PLS.forEach((P, k) => {
     const c = screenRadius(P); if (!c) return;
-    const on = hover === k + 1, y0 = c[1] - c[2] - (sm ? 22 : 30);
+    if (P.Pl.secret && hover !== SEC) return;                          // the secret planet is named only under the cursor
+    const on = hover === stopOf(k), y0 = c[1] - c[2] - (sm ? 22 : 30);
     fx.fillStyle = on ? ac : '#E9EBF0'; fx.font = sm ? '800 15px Tektur' : '800 18px Tektur'; text(P.Pl.num, c[0], y0 - (sm ? 8 : 10));
     fx.fillStyle = on ? '#E9EBF0' : '#9AA1B0'; fx.font = sm ? '400 9px "M PLUS 1 Code"' : '400 11px "M PLUS 1 Code"'; text(title(k), c[0], y0 + (sm ? 6 : 8));
     if (on) {                                                           // brackets: four corner squares around the planet
@@ -600,7 +635,7 @@ function mapLabels(a) {
 }
 function pick(x, y) {
   let best = -1, bd = 1e9;
-  PLS.forEach((P, k) => { if (!P.ready) return; const c = screenRadius(P); if (!c) return; const d = Math.hypot(x - c[0], y - c[1]); if (d < Math.max(c[2] * 1.35, 30) && d < bd) { bd = d; best = k + 1; } });
+  PLS.forEach((P, k) => { if (!P.ready) return; const c = screenRadius(P); if (!c) return; const d = Math.hypot(x - c[0], y - c[1]); if (d < Math.max(c[2] * 1.35, 30) && d < bd) { bd = d; best = stopOf(k); } });
   const s = proj(CORE); if (s) { const d = Math.hypot(x - s[0], y - s[1]); if (d < 40 && d < bd) best = 6; }
   return best;
 }
@@ -612,6 +647,7 @@ function hud(s) {
   TL.forEach(b => { if (+b.dataset.stop === s) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
   if (s === 0) { hudN.textContent = '—'; hudT.dataset.i18n = 'run.hint'; hudT.textContent = T('run.hint', 'Scroll to follow the path'); }
   else if (s === 6) { hudN.textContent = '✦'; hudT.dataset.i18n = 'run.sp'; hudT.textContent = cap.textContent; }
+  else if (s === SEC) { hudN.textContent = 'VI'; delete hudT.dataset.i18n; hudT.textContent = 'Tau Jeffy VI'; }
   else { hudN.textContent = PLANETS[s - 1].num + ' / 05'; delete hudT.dataset.i18n; hudT.textContent = title(s - 1); }
 }
 let WIN0 = null, WINR = null;
@@ -629,7 +665,9 @@ document.querySelectorAll('li[data-run]').forEach(el => {
   el.addEventListener('click', go);
   el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
 });
-addEventListener('scroll', () => { if (active()) { want = stopOfScroll(); kick(); } }, { passive: true });
+let secY = 0;                                                          // where the page was when Tau Jeffy VI was entered
+const scrollWant = () => (want === SEC || (cur === SEC && !mv)) && Math.abs(scrollY - secY) < 80 ? SEC : stopOfScroll();
+addEventListener('scroll', () => { if (active()) { want = scrollWant(); kick(); } }, { passive: true });
 const mouse = { x: 0, y: 0, sx: 0, sy: 0, px: -1, py: -1 };
 box.addEventListener('pointermove', e => { const r = box.getBoundingClientRect(); mouse.px = e.clientX - r.left; mouse.py = e.clientY - r.top; mouse.x = mouse.px / r.width * 2 - 1; mouse.y = mouse.py / r.height * 2 - 1; kick(); });
 box.addEventListener('pointerleave', () => { mouse.px = -1; hover = -1; canvas.style.cursor = ''; });
@@ -637,9 +675,10 @@ let down = null;
 canvas.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
 canvas.addEventListener('pointerup', e => {
   if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6) return;
-  if (!mv && cur === 0 && hover > 0) { goStop(hover); return; }       // the map: a planet (or the spark) under the cursor
+  if (!mv && cur === 0 && hover > 0) { if (hover === SEC) { secY = scrollY; want = SEC; wakeBuild(); kick(); } else goStop(hover); return; }   // the map: a planet (or the spark) under the cursor
+  if (!mv && cur === SEC && tauClick(e)) return;                       // Tau Jeffy VI: a landmark under the cursor
   if (mv || !isPl(cur)) return;
-  const P = PLS[cur - 1]; if (!P.ready || (P.fr.on && P.fr.mode === 1 && P.fr.prog < 1.05)) return;
+  const P = PLS[pk(cur)]; if (!P.ready || (P.fr.on && P.fr.mode === 1 && P.fr.prog < 1.05)) return;
   const r = box.getBoundingClientRect(), ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
   const hit = ray.ray.intersectSphere(new THREE.Sphere(P.C, R + 4), new THREE.Vector3()); if (!hit) return;
   if (P.fr.on && P.fr.mode === 1) setBuilt(P);
@@ -668,13 +707,13 @@ function resize() {
 }
 new ResizeObserver(() => { resize(); kick(); }).observe(box);
 const about = () => !sec.closest('[hidden]');
-let onScreen = false, raf = 0, started = false;
-const active = () => onScreen && about() && !document.hidden;
+let onScreen = false, raf = 0, started = false, inCore = false;
+const active = () => onScreen && about() && !document.hidden && !inCore;
 function setSnap() { document.documentElement.classList.toggle('run-snap-on', about()); }
-document.addEventListener('viewchange', () => { setSnap(); resize(); want = stopOfScroll(); kick(); });
+document.addEventListener('viewchange', () => { setSnap(); resize(); want = scrollWant(); kick(); });
 document.addEventListener('visibilitychange', kick);
 document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => setTimeout(() => { if (started) hud(mv ? mv.a : cur); }, 0)));   // the HUD follows the language
-new IntersectionObserver(es => { onScreen = es[0].isIntersecting; if (onScreen) { begin(); want = stopOfScroll(); } kick(); }, { rootMargin: '25% 0px' }).observe(sec);
+new IntersectionObserver(es => { onScreen = es[0].isIntersecting; if (onScreen) { begin(); want = scrollWant(); } kick(); }, { rootMargin: '25% 0px' }).observe(sec);
 function kick() { if (!raf && active()) { last = performance.now(); raf = requestAnimationFrame(frame); } }
 
 /* ================= the loop ================= */
@@ -692,28 +731,31 @@ function frame(now) {
     mv.t += dt * ff;
     ({ E, q } = moveCam(mv, Math.min(mv.t, mv.total)));
     ROCKS.update(mv.t);
-    if (isPl(mv.b)) { const P = PLS[mv.b - 1], ta = T_IN + (mv.t - (mv.tt - mv.ovl)); P.fr.prog = P0 + (ta - T0) * SPEED; if (ta > T_IN + 2.2) panels(mv.b - 1); }   // the panel opens while the scan is still building
+    if (isPl(mv.b)) { const P = PLS[pk(mv.b)], ta = T_IN + (mv.t - (mv.tt - mv.ovl)); P.fr.prog = P0 + (ta - T0) * SPEED; if (ta > T_IN + 2.2) panels(pk(mv.b)); }   // the panel opens while the scan is still building
     if (mv.b === 6 && mv.t > mv.tt * .8) cap.classList.add('on');
     if (mv.t >= mv.total) {
-      const b = mv.b; cur = b; mv = null; restT = 0; ff = 1; ROCKS.clear();
-      if (isPl(b)) { PLS[b - 1].fr.drive = false; doShear(); panels(b - 1); } else panels(-1);
+      const a = mv.a, b = mv.b; cur = b; mv = null; restT = 0; ff = 1; ROCKS.clear();
+      if (a === SEC && b !== SEC) { TV.view = 'read'; TV.t = 1; dropFull(PLS[TAU]); }
+      if (b === SEC) tauPanel();
+      if (isPl(b)) { PLS[pk(b)].fr.drive = false; doShear(); panels(pk(b)); } else panels(-1);
       cap.classList.toggle('on', b === 6); hud(b);
     }
   }
   if (!mv) {
     restT += dt; const p = restPose(cur); E = p.E.clone();
     drift = reduce.matches ? 0 : sm5(restT / 2);
-    if (drift > 0) { const ax = isPl(cur) ? PLS[cur - 1].C : CORE, a = Math.sin(restT * .09) * .045 * drift * (cur === 0 ? .5 : 1); E.sub(ax).applyAxisAngle(p.T.clone().sub(ax).normalize(), a).add(ax); }
+    if (drift > 0) { const ax = isPl(cur) ? PLS[pk(cur)].C : CORE, a = Math.sin(restT * .09) * .045 * drift * (cur === 0 ? .5 : 1); E.sub(ax).applyAxisAngle(p.T.clone().sub(ax).normalize(), a).add(ax); }
     q = lookQ(E, p.T, p.up);
+    if (cur === SEC) ({ E, q } = tauCam(E, q, dt));
     if (cur === 0 && mouse.px >= 0) { const h = pick(mouse.px, mouse.py); if (h !== hover) { hover = h; canvas.style.cursor = h > 0 ? 'pointer' : ''; } }
   }
   base = { E: E.clone(), q: q.clone() };
   shipUpdate(dt);
-  if (window.__shipCam && isPl(cur)) { const c = window.__shipCam, o = FLEET[cur - 1][c.n || 0].g, d = new THREE.Vector3(Math.sin(c.yaw) * Math.cos(c.pitch), Math.sin(c.pitch), Math.cos(c.yaw) * Math.cos(c.pitch)).applyQuaternion(o.quaternion);
+  if (window.__shipCam && isPl(cur)) { const c = window.__shipCam, o = FLEET[pk(cur)][c.n || 0].g, d = new THREE.Vector3(Math.sin(c.yaw) * Math.cos(c.pitch), Math.sin(c.pitch), Math.cos(c.yaw) * Math.cos(c.pitch)).applyQuaternion(o.quaternion);
     E = o.position.clone().addScaledVector(d, c.dist); q = lookQ(E, o.position, new THREE.Vector3(0, 1, 0).applyQuaternion(o.quaternion)); }
   /* the mouse: a little parallax */
   mouse.sx += (mouse.x - mouse.sx) * Math.min(1, dt0 * 2.5); mouse.sy += (mouse.y - mouse.sy) * Math.min(1, dt0 * 2.5);
-  if (!reduce.matches) { const rgt = new THREE.Vector3(1, 0, 0).applyQuaternion(q), up = new THREE.Vector3(0, 1, 0).applyQuaternion(q), k = Math.min(cur === 0 && !mv ? 9000 : 300, 300); E.addScaledVector(rgt, -mouse.sx * k * .025).addScaledVector(up, mouse.sy * k * .018); }
+  if (!reduce.matches && !(cur === SEC && !mv && TV.view !== 'read')) { const rgt = new THREE.Vector3(1, 0, 0).applyQuaternion(q), up = new THREE.Vector3(0, 1, 0).applyQuaternion(q), k = Math.min(cur === 0 && !mv ? 9000 : 300, 300); E.addScaledVector(rgt, -mouse.sx * k * .025).addScaledVector(up, mouse.sy * k * .018); }
   camera.position.copy(E); camera.quaternion.copy(q); camera.updateMatrixWorld();
   /* the near plane follows the distance to the nearest surface: depth precision where it is needed (kept small in flight,
      where asteroids pass close) */
@@ -729,7 +771,7 @@ function frame(now) {
   PLS.forEach(P => P.U.uCamL.value.copy(E).sub(P.C).applyQuaternion(P.Qi));
   /* detail: the planet we are at (or travelling from or to) up close, in chunks culled against the horizon; every other one its far mesh */
   const det = [cur, mv && mv.a, mv && mv.b];
-  PLS.forEach(P => { const near = !!P.full && det.includes(P.k + 1);
+  PLS.forEach(P => { const near = !!P.full && det.includes(stopOf(P.k));
     if (P.far) P.far.visible = !near || !P.chunks;
     if (P.chunks) { const c = P.U.uCamL.value, Dc = c.length() || 1, hz = Dc > R ? Math.acos(R / Dc) : Math.PI;
       P.chunks.forEach(m => { const u = m.userData; m.visible = near && Math.acos(Math.max(-1, Math.min(1, (c.x * u.d.x + c.y * u.d.y + c.z * u.d.z) / Dc))) < hz + u.a + u.h + .06; }); }
@@ -745,26 +787,32 @@ function frame(now) {
   const sp = coreLight((!mv && cur === 6) || (mv && mv.b === 6 && mv.t > mv.tt * .5), clock);
   if (sp && cur === 6) cap.style.transform = 'translate(' + Math.round(sp[0]) + 'px,' + Math.round(sp[1] + 110) + 'px) translateX(-50%)';
   mapLabels(mapA);
+  if (cur === SEC && !mv) tauLabels();
   if (active() && (mv || !window.__frozen)) raf = requestAnimationFrame(frame);
 }
 
 /* ================= start: fonts, atlas, the worker builds the planets ================= */
+let idle = false, wakeBuild = () => {};
 function begin() {
   if (started) return; started = true;
-  const fonts = document.fonts ? Promise.race([Promise.all([document.fonts.load("800 80px Tektur", '0123456789-ARKTUMCZGHS'), document.fonts.load("400 80px 'Dela Gothic One'", '研究室書割りの街回転台撮影舞台階段教' + GEN.WORDS.join(''))]), new Promise(r => setTimeout(r, 3000))]) : Promise.resolve();
+  const fonts = document.fonts ? Promise.race([Promise.all([document.fonts.load("800 80px Tektur", '0123456789-ARKTUMCZGHS'), document.fonts.load("400 80px 'Dela Gothic One'", '研究室書割りの街回転台撮影舞台階段教' + GEN.WORDS.join('') + GEN.TWORDS.join(''))]), new Promise(r => setTimeout(r, 3000))]) : Promise.resolve();
   fonts.then(() => {
     drawAtlas(); atlasTex.needsUpdate = true; resize(); hud(0); setSnap();
     /* every planet's far mesh first (the map fills in quickly), then the close-up builds, the stop we are heading for first */
-    const queue = [0, 1, 2, 3, 4].map(k => ({ k, far: 1 })), slots = PLANETS.map((_, k) => slotsFor(k)), todo = [0, 1, 2, 3, 4];
+    const queue = PLANETS.map((_, k) => ({ k, far: 1 })), slots = PLANETS.map((_, k) => slotsFor(k)), todo = [0, 1, 2, 3, 4];
     let worker = null, kNow = null;
-    const pickFull = () => { if (!todo.length) return null; const t = isPl(want) ? want - 1 : isPl(cur) ? cur - 1 : 0; let i = todo.indexOf(t); if (i < 0) i = 0; return { k: todo.splice(i, 1)[0], far: 0 }; };
-    const next = () => { const job = kNow = queue.length ? queue.shift() : pickFull(); if (!job) return;
-      if (worker) worker.postMessage({ k: job.k, slots: slots[job.k], lite: LITE, far: job.far });
-      else setTimeout(() => { onPlanet(GEN.buildPlanet(job.k, slots[job.k], LITE, job.far)); next(); }, 30); };
+    /* Tau Jeffy VI's close-up is heavy: built only when it is wanted, first in line then, and let go when the camera leaves */
+    const tauWant = () => (want === SEC || cur === SEC) && !PLS[TAU].full && !PLS[TAU].building;
+    const pickFull = () => { if (tauWant()) return { k: TAU, far: 0 }; if (!todo.length) return null; const t = isPl(want) ? pk(want) : isPl(cur) ? pk(cur) : 0; let i = todo.indexOf(t); if (i < 0) i = 0; return { k: todo.splice(i, 1)[0], far: 0 }; };
+    const next = () => { const job = kNow = queue.length ? queue.shift() : pickFull(); if (!job) { idle = true; return; } idle = false;
+      const tau = job.k === TAU ? tauState() : null; if (job.k === TAU && !job.far) { PLS[TAU].building = true; TV.built = JSON.stringify(tau); }
+      if (worker) worker.postMessage({ k: job.k, slots: slots[job.k], lite: LITE, far: job.far, tau });
+      else setTimeout(() => { onPlanet(GEN.buildPlanet(job.k, slots[job.k], LITE, job.far, tau)); next(); }, 30); };
+    wakeBuild = () => { if (idle) next(); };
     try {
       worker = new Worker(document.querySelector('script[src*="about-gen.js"]').src);
       worker.onmessage = e => { onPlanet(e.data); next(); };
-      worker.onerror = e => { e.preventDefault && e.preventDefault(); worker = null; if (kNow) (kNow.far ? queue.unshift(kNow) : todo.unshift(kNow.k)); next(); };   // no worker: build here, one planet a tick
+      worker.onerror = e => { e.preventDefault && e.preventDefault(); worker = null; if (kNow) (kNow.far ? queue.unshift(kNow) : kNow.k === TAU ? (PLS[TAU].building = false) : todo.unshift(kNow.k)); next(); };   // no worker: build here, one planet a tick
     } catch (e) { worker = null; }
     next(); kick();
   });
@@ -882,7 +930,7 @@ const FLEET = PLS.map(P => [0, 1, 2, 3, 4, 5, 6, 7, 8].map(n => {
 /* lay the orbits once the planet sits in place: through a point ~140 units in front of the reading camera, 15% above
    centre, each ship's plane turned a little about it, opposite directions for variety */
 function layOrbits(P) {
-  const rp = restPose(P.k + 1), f = rp.T.clone().sub(rp.E).normalize(), rt = new THREE.Vector3().crossVectors(f, rp.up).normalize(), u = new THREE.Vector3().crossVectors(rt, f);
+  const rp = restPose(stopOf(P.k)), f = rp.T.clone().sub(rp.E).normalize(), rt = new THREE.Vector3().crossVectors(f, rp.up).normalize(), u = new THREE.Vector3().crossVectors(rt, f);
   FLEET[P.k].forEach(o => {
     const L = o.n % 3, sl = o.n / 3 | 0;                                   // lane, slot on the lane
     const Q = rp.E.clone().addScaledVector(f, 120 + L * 45).addScaledVector(u, 14 + L * 9).addScaledVector(rt, (L - 1) * 25), a = Q.clone().sub(P.C);
@@ -895,7 +943,7 @@ function shipUpdate(dt) {
   const det = [cur, mv && mv.a, mv && mv.b];
   FILL.value.set(0, 1, 0).applyQuaternion(base.q);
   PLS.forEach(P => FLEET[P.k].forEach(o => {
-    const near = P.ready && det.includes(P.k + 1); o.g.visible = near && o.m.uniforms.uMat.value > .01; if (!near) return;
+    const near = P.ready && det.includes(stopOf(P.k)); o.g.visible = near && o.m.uniforms.uMat.value > .01; if (!near) return;
     if (!o.a) layOrbits(P);
     const F = P.fr, tgt = F.on && F.mode === 1 ? cl((F.prog - LAG - .3) / .25) : 1;
     o.m.uniforms.uMat.value += (tgt - o.m.uniforms.uMat.value) * Math.min(1, dt * 2 + (window.__frozen ? 1 : 0)); if (Math.abs(tgt - o.m.uniforms.uMat.value) < .01) o.m.uniforms.uMat.value = tgt; o.g.visible = o.m.uniforms.uMat.value > .01;
@@ -905,16 +953,164 @@ function shipUpdate(dt) {
   }));
 }
 
+/* ================= Tau Jeffy VI: the surface =================
+   At the planet the camera has four views: 'read' (the reading view, as on every planet), 'globe' (the planet in the
+   hand: drag to turn it, wheel to zoom), 'site' (low over one landmark, the atmosphere view) and 'dive' (down the core's
+   shaft; the core opens over the page in a frame: /karatto/?embed=1). A landmark under the cursor is outlined with corner
+   brackets and named; a click flies to it. The planet's state (which districts are lit, which buildings are open) comes
+   from the summary the core writes in this browser (karatto.summary); after a visit to the core it is rebuilt if it moved. */
+const SITES = GEN.SITES, SH = { core: 54, factory: 42, logistics: 36, power: 48, lab: 40, broadcast: 76, security: 48, exchange: 54, hq: 86 };
+const TV = { view: 'read', yaw: 0, pitch: .3, dist: R * 4.8, site: 0, from: null, t: 1, dur: 1.6, hov: -1, drag: null, diveT: 0, opened: false, built: '' };
+const TIER_N = ['町工場', '中小企業', '中堅企業', '大企業', '財閥'], TIER_E = ['Backstreet workshop', 'Small enterprise', 'Mid-size firm', 'Large corporation', 'Zaibatsu'];
+function tauSummary() { try { return JSON.parse(localStorage.getItem('karatto.summary')) || null; } catch (e) { return null; } }
+function tauState() {
+  const s = tauSummary(); if (!s) return { tier: -1, held: 0, total: 27 };
+  let held = 0, total = 0; Object.values(s.div || {}).forEach(a => (a || []).forEach(v => { total++; if (v >= .8) held++; }));
+  return { tier: s.tier ?? -1, held, total: total || 27 };
+}
+const siteOpen = (st, s) => s.t <= st.tier + 1;
+const siteNeed = s => 'Opens when N' + [5, 4, 3, 2, 1][s.t - 1] + ' is held';
+const poseQ = p => ({ E: p.E, q: lookQ(p.E, p.T, p.up) });
+function tauPose(v) {
+  const P = PLS[TAU], L = a => new THREE.Vector3(a[0], a[1], a[2]).applyQuaternion(P.Q), W = a => L(a).add(P.C);
+  if (v === 'globe') {                                                // the planet held right of the panel (above it on a phone)
+    const d = [Math.cos(TV.pitch) * Math.sin(TV.yaw), Math.sin(TV.pitch), Math.cos(TV.pitch) * Math.cos(TV.yaw)], E = W(GEN.mul(d, TV.dist)), up = L([0, 1, 0]);
+    const f = P.C.clone().sub(E).normalize(), rt = new THREE.Vector3().crossVectors(f, up).normalize(), u = new THREE.Vector3().crossVectors(rt, f), wide = camera.aspect > 1.2;
+    return { E, T: P.C.clone().addScaledVector(rt, wide ? -TV.dist * .13 : 0).addScaledVector(u, wide ? 0 : -TV.dist * .16), up }; }
+  if (v === 'site') {
+    const s = SITES[TV.site], d = GEN.gdir(s.f, s.i, s.j), ref = Math.abs(d[1]) > .9 ? [0, 0, 1] : [0, 1, 0], e = GEN.unit(GEN.cross(ref, d)), b = GEN.cross(d, e), h = SH[s.id], k = s.r * 2.3 + 30 + h * .55;
+    return { E: W(GEN.add(GEN.mul(d, R + k * .72), GEN.add(GEN.mul(e, k * .45), GEN.mul(b, -k * .82)))), T: W(GEN.mul(d, R + h * .32)), up: L(d) };
+  }
+  if (v === 'dive') { const d = GEN.HDIR, u = TV.diveT; return { E: W(GEN.mul(d, R + 92 - 150 * u * u)), T: W(GEN.mul(d, R - 400)), up: L([0, 1, 0]) }; }
+  return restPose(SEC);
+}
+/* between two views: around the planet's centre when both are outside it (never through it), straight otherwise */
+function arcLerp(A, B, w) {
+  const C = PLS[TAU].C, a = A.clone().sub(C), b = B.clone().sub(C), ra = a.length(), rb = b.length();
+  if (ra < R * 1.05 || rb < R * 1.05) return A.clone().lerp(B, w);
+  const q = new THREE.Quaternion().setFromUnitVectors(a.clone().normalize(), b.clone().normalize()), qi = new THREE.Quaternion().slerp(q, w);
+  return a.normalize().applyQuaternion(qi).multiplyScalar(ra + (rb - ra) * w + Math.sin(w * Math.PI) * Math.min(ra, rb) * .12).add(C);
+}
+function setView(v, n) {
+  if (!PLS[TAU].ready || (v === TV.view && (v !== 'site' || n === TV.site))) return;
+  TV.from = { E: camera.position.clone(), q: camera.quaternion.clone() }; TV.t = 0; TV.dur = v === 'dive' ? 1.8 : 1.6;
+  if (v === 'globe' && TV.view !== 'globe') { const dl = camera.position.clone().sub(PLS[TAU].C).applyQuaternion(PLS[TAU].Qi).normalize(); TV.yaw = Math.atan2(dl.x, dl.z); TV.pitch = cl(Math.asin(dl.y), -1.2, 1.2); TV.dist = R * 4.8; }
+  if (n !== undefined) TV.site = n;
+  if (v === 'dive') { TV.diveT = 0; TV.opened = false; loadCore(); }
+  TV.view = v; TV.hov = -1; tauPanel(); kick();
+}
+function tauCam(E0, q0, dt) {
+  dt *= window.__tauFast || 1;                                         // (still renders run the moves faster)
+  if (TV.view === 'read' && TV.t >= 1) return { E: E0, q: q0 };
+  if (TV.view === 'dive' && TV.t >= 1) TV.diveT = Math.min(1, TV.diveT + dt / 2.4);
+  const p = TV.view === 'read' ? { E: E0, q: q0 } : poseQ(tauPose(TV.view));
+  if (TV.view === 'dive' && TV.diveT > .5 && !TV.opened) { TV.opened = true; openCore(); }
+  if (TV.t < 1) { TV.t = Math.min(1, TV.t + dt / TV.dur); const w = sm5(TV.t); return { E: arcLerp(TV.from.E, p.E, w), q: TV.from.q.clone().slerp(p.q, w) }; }
+  return p;
+}
+/* a landmark's outline on screen: its footprint's corners at the ground and at its top; none on the far side */
+function siteBox(n) {
+  const P = PLS[TAU], s = SITES[n], d = V3(GEN.gdir(s.f, s.i, s.j)).applyQuaternion(P.Q), C0 = P.C.clone().addScaledVector(d, R);
+  if (camera.position.distanceTo(P.C) < R * 1.02 || camera.position.clone().sub(C0).normalize().dot(d) < .1) return null;
+  const e = new THREE.Vector3().crossVectors(d, Math.abs(d.y) > .9 ? new THREE.Vector3(1, 0, 0) : Y).normalize(), b = new THREE.Vector3().crossVectors(d, e), rr = s.r * .82;
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, ok = 0;
+  for (const h of [0, SH[s.id]]) for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    const q = proj(C0.clone().addScaledVector(d, h).addScaledVector(e, u * rr).addScaledVector(b, v * rr)); if (!q) continue; ok++;
+    x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]); }
+  return ok > 4 && x1 > 0 && y1 > 0 && x0 < W && y0 < H ? [x0, y0, x1, y1] : null;
+}
+function tauLabels() {
+  if (!PLS[TAU].full || TV.view === 'dive' || inCore) { TV.hov = -1; return; }
+  const st = tauState(), ac = accent(), boxes = SITES.map((_, n) => TV.t < 1 || (TV.view === 'site' && TV.site === n) ? null : siteBox(n));
+  let hv = -1, ba = 1e12;
+  if (mouse.px >= 0 && !TV.drag) boxes.forEach((B, n) => { if (!B) return; const pad = 10; if (mouse.px > B[0] - pad && mouse.px < B[2] + pad && mouse.py > B[1] - pad && mouse.py < B[3] + pad) { const a = (B[2] - B[0]) * (B[3] - B[1]); if (a < ba) { ba = a; hv = n; } } });
+  if (hv !== TV.hov) { TV.hov = hv; canvas.style.cursor = hv >= 0 ? 'pointer' : TV.view === 'globe' ? 'grab' : ''; }
+  fx.textBaseline = 'middle'; fx.textAlign = 'center';
+  boxes.forEach((B, n) => {
+    if (!B) return; const s = SITES[n], on = n === hv, open = siteOpen(st, s), cx = (B[0] + B[2]) / 2;
+    if (on) {
+      const sq = 10, x0 = Math.round(B[0] - 8), y0 = Math.round(B[1] - 8), x1 = Math.round(B[2] + 8), y1 = Math.round(B[3] + 8); fx.fillStyle = open ? ac : '#9AA1B0';
+      [[x0, y0, 1, 1], [x1, y0, -1, 1], [x1, y1, -1, -1], [x0, y1, 1, -1]].forEach(([x, y, sx, sy]) => { fx.fillRect(sx > 0 ? x : x - sq, sy > 0 ? y : y - 2, sq, 2); fx.fillRect(sx > 0 ? x : x - 2, sy > 0 ? y : y - sq, 2, sq); });
+      const ty = Math.max(46, y0 - 40), sub = (s.en + ' · ' + (s.id === 'core' ? 'Descend into the core' : open ? 'Open' : siteNeed(s))).toUpperCase();
+      fx.font = '500 11px "M PLUS 1 Code"'; const tw = Math.max(fx.measureText(sub).width, s.jp.length * 22) + 20;
+      fx.fillStyle = 'rgba(14,16,20,.86)'; fx.fillRect(Math.round(cx - tw / 2), ty - 18, Math.round(tw), 48); fx.fillStyle = open ? ac : '#9AA1B0'; fx.fillRect(Math.round(cx - tw / 2), ty - 18, 6, 6);
+      fx.font = "400 22px 'Dela Gothic One'"; fx.fillStyle = '#E9EBF0'; fx.fillText(s.jp, cx, ty);
+      fx.font = '500 11px "M PLUS 1 Code"'; fx.fillStyle = open ? '#C9CDD6' : '#9AA1B0'; fx.fillText(sub, cx, ty + 20);
+    } else if (TV.view === 'globe') {
+      fx.font = "400 13px 'Dela Gothic One'"; fx.fillStyle = open ? '#E9EBF0' : '#6E7584'; fx.fillText(s.jp, cx, B[1] - 10);
+      fx.fillStyle = open ? ac : '#6E7584'; fx.fillRect(Math.round(cx) - 1, Math.round(B[1] - 2), 2, 6);
+    }
+  });
+}
+function tauClick() {
+  if (TV.hov < 0) return false;
+  const n = TV.hov; if (TV.view === 'site' && TV.site === n && SITES[n].id === 'core') setView('dive'); else setView('site', n);
+  return true;
+}
+/* the planet in the hand: drag to turn it (from any view), wheel to come closer or further */
+canvas.addEventListener('pointerdown', e => { if (cur === SEC && !mv && TV.view !== 'dive' && TV.t >= 1) TV.drag = { x: e.clientX, y: e.clientY, m: 0 }; });
+addEventListener('pointermove', e => {
+  if (!TV.drag) return; const dx = e.clientX - TV.drag.x, dy = e.clientY - TV.drag.y; TV.drag.x = e.clientX; TV.drag.y = e.clientY; TV.drag.m += Math.abs(dx) + Math.abs(dy);
+  if (TV.view !== 'globe') { if (TV.drag.m > 10) setView('globe'); return; }
+  const k = .005 * TV.dist / (R * 4.8); TV.yaw -= dx * k; TV.pitch = cl(TV.pitch + dy * k, -1.3, 1.3); kick();
+});
+addEventListener('pointerup', () => { TV.drag = null; });
+canvas.addEventListener('wheel', e => {
+  if (cur !== SEC || mv) return;
+  if (TV.view === 'globe') { e.preventDefault(); TV.dist = cl(TV.dist * (1 + Math.sign(e.deltaY) * .09), R * 1.6, R * 6.5); kick(); }
+  else if (TV.view === 'site') { e.preventDefault(); if (e.deltaY > 0) setView('globe'); }
+}, { passive: false });
+/* the panel: the corporation's state, the views, the landmarks */
+function tauPanel() {
+  const el = panelsEl[TAU]; if (!el) return;
+  const sm = tauSummary(), st = tauState(), mem = sm && sm.counts ? sm.counts[2] + sm.counts[3] + sm.counts[4] : 0;
+  el.querySelector('[data-t="tier"]').textContent = st.tier < 0 ? '創業準備中 · Founding' : TIER_N[st.tier] + ' · ' + TIER_E[st.tier];
+  el.querySelector('[data-t="stat"]').textContent = st.held + ' / ' + st.total + ' districts online · ' + mem + ' kanji in memory';
+  el.querySelector('[data-t="sites"]').innerHTML = SITES.map((s, n) => { const open = siteOpen(st, s);
+    return `<li><button type="button" data-n="${n}" class="${TV.view === 'site' && TV.site === n ? 'on' : ''}${open ? '' : ' off'}"><b>${s.jp}</b><span>${s.en}</span><i>${s.id === 'core' ? '↓' : open ? '●' : 'N' + [5, 4, 3, 2, 1][s.t - 1]}</i></button></li>`; }).join('');
+  el.querySelectorAll('[data-t="sites"] button').forEach(b => b.onclick = () => setView('site', +b.dataset.n));
+  el.querySelector('[data-t="globe"]').classList.toggle('on', TV.view === 'globe');
+}
+(() => {
+  const el = panelsEl[TAU]; if (!el) return;
+  el.querySelector('[data-t="globe"]').onclick = () => setView(TV.view === 'globe' ? 'read' : 'globe');
+  el.querySelector('[data-t="dive"]').onclick = () => setView('dive');
+  el.querySelector('[data-t="map"]').onclick = () => { want = 0; kick(); };
+})();
+/* the core, over the page */
+let coreEl = null;
+function loadCore() {
+  if (coreEl) return;
+  coreEl = document.createElement('div'); coreEl.className = 'tau-core';
+  coreEl.innerHTML = '<p class="tau-core-l">中枢へ接続中 · Connecting to the core</p><iframe title="カラット · the core" src="karatto/?embed=1"></iframe>';
+  document.body.appendChild(coreEl);
+}
+function openCore() { loadCore(); coreEl.classList.add('on'); document.documentElement.classList.add('tau-in'); setTimeout(() => { if (coreEl && coreEl.classList.contains('on')) inCore = true; }, 900); }
+function closeCore() {
+  if (!coreEl) return; const el = coreEl; coreEl = null; inCore = false;
+  el.classList.remove('on', 'ready'); document.documentElement.classList.remove('tau-in'); setTimeout(() => el.remove(), 800);
+  TV.diveT = 1; TV.from = poseQ(tauPose('dive')); TV.view = 'site'; TV.site = 0; TV.t = 0; TV.dur = 2.6;            // back up the shaft
+  if (JSON.stringify(tauState()) !== TV.built) { dropFull(PLS[TAU]); wakeBuild(); }                                 // the city follows the memory
+  tauPanel(); kick();
+}
+addEventListener('message', e => {
+  if (e.origin !== location.origin || !coreEl) return;
+  if (e.data === 'karatto:ready') coreEl.classList.add('ready');
+  if (e.data === 'karatto:surface') closeCore();
+});
+
 /* hooks for still renders */
 window.__about = {
   ready: () => PLS.filter(p => p.ready).length,
   full: () => PLS.filter(p => p.full).length,
   ship: () => FLEET.map(L => L.map(o => o.g.visible ? o.g.position.clone().project(camera).toArray().map(v => +v.toFixed(2)) : null)),
-  pose: s => { mv = null; ROCKS.clear(); cur = want = s; restT = 4; PLS.forEach(P => { if (P.ready) setBuilt(P); }); panels(isPl(s) ? s - 1 : -1); cap.classList.toggle('on', s === 6); hud(s); kick(); },
+  pose: s => { mv = null; ROCKS.clear(); cur = want = s; restT = 4; PLS.forEach(P => { if (P.ready) setBuilt(P); }); panels(isPl(s) ? pk(s) : -1); if (s === SEC) { wakeBuild(); tauPanel(); } cap.classList.toggle('on', s === 6); hud(s); kick(); },
   move: (a, b, t) => { mv = null; cur = a; want = b; restT = 4; base = (() => { const p = restPose(a); return { E: p.E.clone(), q: lookQ(p.E, p.T, p.up) }; })(); PLS.forEach(P => { if (P.ready) setBuilt(P); }); startMove(b); if (mv) mv.t = t; kick(); },
   hover: (x, y) => { mouse.px = x; mouse.py = y; kick(); },
   uni: (k, name, a) => { PLS[k].U[name].value.fromArray(a); kick(); },
   state: () => ({ cur, want, frames: nF, mv: mv && { a: mv.a, b: mv.b, t: +mv.t.toFixed(2), total: +mv.total.toFixed(2) } }),
-  at: s => { const p = proj(isPl(s) ? PLS[s - 1].C : CORE); return p && [Math.round(p[0]), Math.round(p[1])]; }
+  tau: { view: (v, n, snap) => { setView(v, n); if (snap) TV.t = .999; }, state: () => ({ view: TV.view, site: TV.site, t: +TV.t.toFixed(2), dive: +TV.diveT.toFixed(2), full: !!PLS[TAU].full, building: !!PLS[TAU].building, inCore, hov: TV.hov }),
+    turn: (y, p, d) => { TV.yaw = y; TV.pitch = p; if (d) TV.dist = d; kick(); }, close: () => closeCore(), diveAt: u => { TV.view = 'dive'; TV.t = 1; TV.diveT = u; TV.opened = true; kick(); }, boxes: () => SITES.map((_, n) => { const B = siteBox(n); return B && B.map(Math.round); }) },
+  at: s => { const p = proj(isPl(s) ? PLS[pk(s)].C : CORE); return p && [Math.round(p[0]), Math.round(p[1])]; }
 };
 }

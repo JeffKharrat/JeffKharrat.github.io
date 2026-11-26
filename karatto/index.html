@@ -51,6 +51,9 @@ canvas#k3 { position:fixed; inset:0; width:100%; height:100%; display:block; cur
 #jump .btn i s { position:absolute; inset:0 auto 0 0; background:var(--acc); }
 body.wall #corp, body.wall #side, body.wall #res { display:none; }
 body.wall #jump { display:flex; }
+#b-batch { display:none; } body.wall #b-batch { display:inline-block; }
+body.batch canvas#k3 { outline:2px solid var(--warm); outline-offset:-2px; }
+#file .man { margin-top:16px; }
 /* the kanji's file */
 #file { right:24px; top:84px; bottom:84px; width:min(420px, calc(100vw - 48px)); padding:20px 22px; overflow:auto; display:none; }
 #file.on { display:block; }
@@ -71,8 +74,9 @@ body.wall #jump { display:flex; }
 .wd .s { margin-left:auto; font-size:11px; color:var(--ink2); }
 .x { position:absolute; right:10px; top:8px; background:none; border:0; color:var(--ink2); font:20px var(--mono); cursor:pointer; }
 /* settings */
-#set { left:50%; top:50%; transform:translate(-50%,-50%); width:min(520px, calc(100vw - 32px)); padding:22px; display:none; }
+#set { left:50%; top:50%; transform:translate(-50%,-50%); width:min(520px, calc(100vw - 32px)); max-height:calc(100vh - 40px); overflow:auto; box-sizing:border-box; padding:22px; display:none; }
 #set.on { display:block; }
+#set textarea { width:100%; box-sizing:border-box; background:#0E1014; border:1px solid var(--line); color:var(--ink); font:16px/1.5 var(--jp); padding:9px 10px; margin:6px 0 10px; resize:vertical; }
 #set input { width:100%; background:#0E1014; border:1px solid var(--line); color:var(--ink); font:13px var(--mono); padding:9px 10px; margin:6px 0 10px; }
 #set p { color:var(--ink2); font-size:12.5px; margin:6px 0; }
 #set .grp { padding:12px 0; border-top:1px solid #23272F; }
@@ -107,12 +111,13 @@ body.wall #hint { display:block; }
 <div class="ui" id="bar">
   <button class="btn" id="b-wall">記憶の壁<small>Memory wall</small></button>
   <button class="btn" id="b-base" style="display:none">中枢<small>Back to the core</small></button>
+  <button class="btn" id="b-batch">一括取得<small>Batch mark kanji</small></button>
   <button class="btn" id="b-set">設定<small>Settings</small></button>
 </div>
 <div class="ui" id="hint">Drag to look around · scroll to zoom · click a key to open its file</div>
 <div class="ui pnl" id="file"><button class="x" id="file-x">×</button><div id="file-c"></div></div>
 <div class="ui pnl" id="set"><button class="x" id="set-x">×</button><div id="set-c"></div></div>
 <div class="ui pnl" id="toast"></div>
-<script type="module" src="../js/karatto/core.js?v=1"></script>
+<script type="module" src="../js/karatto/core.js?v=2"></script>
 </body>
 </html>

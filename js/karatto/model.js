@@ -26,8 +26,9 @@ export function wordFacets(word, KD) {
   });
 }
 
-/* every key's state from the deck and the certified set */
-export function keyStates(KD, deck, certified) {
+/* every key's state from the deck, the certified set, and the kanji Jeff marked as acquired by hand
+   (a hand mark puts a key at acquired, the minimum; words then take it further) */
+export function keyStates(KD, deck, certified, manual = new Set()) {
   const S = KD.list.map(x => ({ lvl: 0, words: [], cert: [], cov: 0, covered: new Set() }));
   for (const w of deck) {
     const fs = w._facets || (w._facets = wordFacets(w, KD));
@@ -41,6 +42,7 @@ export function keyStates(KD, deck, certified) {
     s.cov = x.fa.reduce((t, f) => t + (s.covered.has(f.id) ? f.w : 0), 0);
     const main = x.fa[0] && s.covered.has(x.fa[0].id), nc = new Set(s.cert).size;
     s.lvl = !s.words.length ? 0 : !nc ? 1 : (s.cov >= .85 && nc >= Math.max(3, x.fa.length)) ? 4 : (main && nc >= 2) ? 3 : 2;
+    s.manual = manual.has(x.k); if (s.manual && s.lvl < 2) s.lvl = 2;
   });
   return S;
 }

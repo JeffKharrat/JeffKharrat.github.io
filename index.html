@@ -554,6 +554,23 @@ html.run-snap-on{scroll-snap-type:y proximity;scroll-padding-top:var(--hdr)}
 .run[data-planets] .run-sp{font-family:var(--display);font-weight:800;font-size:1.4rem;color:#E9EBF0;transition:opacity .4s steps(4)}
 .run[data-planets] .run-sp.on{opacity:1}
 @media (prefers-reduced-motion:reduce){.run[data-planets] .run-p,.run[data-planets] .run-p.on{transition:none}}
+/* Tau Jeffy VI (the secret planet): its panel's landmark list and views, and the core opened over the page */
+.run[data-planets] .tau-sites{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:.25rem}
+.run[data-planets] .tau-sites button{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:auto 1fr auto;align-items:baseline;gap:.4rem;padding:.3rem .45rem;border:1px solid #2A2F39;cursor:pointer;font-size:.6875rem;color:#9AA1B0}
+.run[data-planets] .tau-sites button b{font:400 .95rem/1.1 'Dela Gothic One',sans-serif;color:#E9EBF0}
+.run[data-planets] .tau-sites button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.run[data-planets] .tau-sites button i{font-style:normal;color:var(--accent)}
+.run[data-planets] .tau-sites button.off b,.run[data-planets] .tau-sites button.off i{color:#6E7584}
+.run[data-planets] .tau-sites button:hover,.run[data-planets] .tau-sites button.on{border-color:var(--accent);color:#E9EBF0}
+.run[data-planets] .tau-act{display:flex;flex-wrap:wrap;gap:.35rem}
+.run[data-planets] .tau-act button{padding:.45rem .7rem;font-size:.75rem;letter-spacing:.04em;color:#E9EBF0;border:1px solid #343945;background:rgba(22,25,32,.85);cursor:pointer}
+.run[data-planets] .tau-act button:hover,.run[data-planets] .tau-act button.on{border-color:var(--accent)}
+.tau-core{position:fixed;inset:0;z-index:1000;background:#050608;opacity:0;pointer-events:none;transition:opacity .7s}
+.tau-core.on{opacity:1;pointer-events:auto}
+.tau-core iframe{position:absolute;inset:0;width:100%;height:100%;border:0;opacity:0;transition:opacity .9s}
+.tau-core.ready iframe{opacity:1}
+.tau-core-l{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);margin:0;font:500 .75rem/1 'M PLUS 1 Code',monospace;letter-spacing:.14em;color:#9AA1B0;text-shadow:0 0 24px #4A5BFF}
+html.tau-in{overflow:hidden}
 @media (max-width:47.5rem){.run[data-planets]:not(.run--flat) .run-p{right:var(--pad);width:auto;top:auto;bottom:3.6rem;transform:none;max-height:44%;overflow:auto}
   .run[data-planets] .run-tl{right:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-right:var(--pad)}
   .run[data-planets] .run-tl::-webkit-scrollbar{display:none}
@@ -947,6 +964,7 @@ body[data-view="page"] .lore--bg{display:none}
         <article class="run-p" tabindex="-1"><p class="label">2023.01 – 2023.06 · 03</p><h3 class="disp"><a href="https://www.linkedin.com/company/zagstudios/home/" target="_blank" rel="noopener">Zag Studios</a></h3><p class="run-r label" data-i18n="ab.gen">3D generalist</p><p data-i18n="run.b2"></p><p class="run-g">Maya · Unreal Engine · Photoshop</p></article>
         <article class="run-p" tabindex="-1"><p class="label">2022.01 – 2022.06 · 04</p><h3 class="disp"><a href="https://mathematic.tv/" target="_blank" rel="noopener">Mathematic Studio</a></h3><p class="run-r label" data-i18n="ab.gen">3D generalist</p><p data-i18n="run.b1"></p><p class="run-g">Maya · Unreal Engine</p></article>
         <article class="run-p" tabindex="-1"><p class="label">2020.09 – 2025.06 · 05</p><h3 class="disp"><a href="https://www.isart.com/" target="_blank" rel="noopener" data-i18n="ab.isart">Isart Digital, Paris</a></h3><p class="run-r label" data-i18n="ab.ms2">Master's, 3D cinema</p><p data-i18n="run.b0"></p><p class="run-g">Maya · Creature rig · Joint-based muscles · Team pipeline</p></article>
+        <article class="run-p run-p--tau" tabindex="-1"><p class="label">VI · 秘 · カラット</p><h3 class="disp">Tau Jeffy VI</h3><p class="run-r label" data-t="tier">創業準備中 · Founding</p><p>An old industrial world, woken by the AI in its core. Districts come back online as its memory grows.</p><p class="run-g" data-t="stat"></p><ul class="tau-sites" data-t="sites"></ul><div class="tau-act"><button type="button" data-t="globe">地表 · Survey</button><button type="button" data-t="dive">中枢 · Descend</button><button type="button" data-t="map">← Map</button></div></article>
           <p class="run-sp label" id="run-sp" data-i18n="run.sp">Frame 0</p>
           <button type="button" class="run-spb" id="run-spb" hidden><span class="vh" data-i18n="run.spb">Enter the spark</span></button>
           <div class="run-hud"><span class="label"><span data-i18n="run.k">The path</span> <span id="run-n">—</span></span><b id="run-t" data-i18n="run.hint">Scroll to follow the path</b></div>
@@ -1009,8 +1027,8 @@ body[data-view="page"] .lore--bg{display:none}
 
 <script src="js/flower-gl.js"></script>
 <script src="js/lookdev-ball.js?v=2"></script>
-<script src="js/about-gen.js?v=6"></script>
-<script type="module" src="js/about-planets.js?v=6"></script>
+<script src="js/about-gen.js?v=7"></script>
+<script type="module" src="js/about-planets.js?v=7"></script>
 <script src="js/node-editor.js?v=8" defer></script>
 <script src="js/graphs-fiffy.js?v=3" defer></script>
 <script src="js/flower-wave.js?v=3" defer></script>

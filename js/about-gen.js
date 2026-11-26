@@ -23,9 +23,10 @@ const angTo = (d, e) => Math.acos(Math.min(1, Math.max(-1, dot(d, e))));
 
 /* ================= palette ================= */
 const hex = h => [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255];
-const COL = { light: hex('#C9CDD6'), mid: hex('#5A606C'), dark: hex('#2F333C'), bone: hex('#E7E7E2'), slate: hex('#3A3F4A'), steel: hex('#8A909C'), ink: hex('#E9EBF0'), deep: hex('#22252C') };
+const COL = { light: hex('#C9CDD6'), mid: hex('#5A606C'), dark: hex('#2F333C'), bone: hex('#E7E7E2'), slate: hex('#3A3F4A'), steel: hex('#8A909C'), ink: hex('#E9EBF0'), deep: hex('#22252C'),
+  red: hex('#B8432E'), warm: hex('#D9962F'), rust: hex('#5E463B') };                 // the last three: Tau Jeffy VI only (chimney bands, cranes, rust)
 const FRONTS = [['blue', '#4A5BFF'], ['red', '#FF5A3D'], ['lime', '#B4F000'], ['yellow', '#FFC400']];
-const K_SOLID = 0, K_GROUND = 1, K_LAMP = 2, K_WIN = 3;
+const K_SOLID = 0, K_GROUND = 1, K_LAMP = 2, K_WIN = 3, K_GLOW = 4;            // K_GLOW: the core's light (Tau Jeffy VI)
 
 /* ================= the builder ================= */
 class Geo {
@@ -133,11 +134,11 @@ function tank(fr, x, z, r, h, col) {                               // a cylinder
   cyl(fr, x, z, r * 1.05, h * .3, h * .3 + .5, COL.dark, 14); cyl(fr, x, z, r * 1.05, h * .7, h * .7 + .5, COL.dark, 14);
 }
 function lamp(f, side, w, a, k, s = .5) {                         // a small light on a grid wall
-  k += KB; const e = .03, out = side[1] === '+' ? 1 : -1, q = side[0] === 'i' ? (u, v) => gp(f, w + out * e, u, v) : (u, v) => gp(f, u, w + out * e, v);
+  if (DERELICT) return; k += KB; const e = .03, out = side[1] === '+' ? 1 : -1, q = side[0] === 'i' ? (u, v) => gp(f, w + out * e, u, v) : (u, v) => gp(f, u, w + out * e, v);
   const ref = side[0] === 'i' ? gp(f, w - out * 5, a, k) : gp(f, a, w - out * 5, k);
   G.quad(q(a, k), q(a + s, k), q(a + s, k + s), q(a, k + s), COL.ink, K_LAMP, r(), ref, true);
 }
-function topLamp(f, i, j, k, s = .6) { k += KB; G.quad(gp(f, i, j, k + .02), gp(f, i + s, j, k + .02), gp(f, i + s, j + s, k + .02), gp(f, i, j + s, k + .02), COL.ink, K_LAMP, r(), [0, 0, 0], true); }
+function topLamp(f, i, j, k, s = .6) { if (DERELICT) return; k += KB; G.quad(gp(f, i, j, k + .02), gp(f, i + s, j, k + .02), gp(f, i + s, j + s, k + .02), gp(f, i, j + s, k + .02), COL.ink, K_LAMP, r(), [0, 0, 0], true); }
 
 /* ================= seeded random and noise ================= */
 function rng(seed) { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -180,6 +181,7 @@ function fins(f, a0, a1, b0, b1, k0, k1, sides, col) {           // vertical fin
 }
 function building(f, i0, i1, j0, j1, H, col, lod, o = {}) {
   if (lod <= 0) { gbox(f, i0, i1, j0, j1, -1.5, Math.max(1, Math.round(H * .6)), col); return H; }
+  const WK = lod > 1 && !DERELICT ? K_WIN : K_SOLID;
   gbox(f, i0 - .3, i1 + .3, j0 - .3, j1 + .3, -1.5, 1, COL.dark);
   let k = 1, a0 = i0, a1 = i1, b0 = j0, b1 = j1;
   const nL = o.levels || (H > 14 ? 3 : H > 7 ? 2 : 1), notch = o.notch ?? (i1 - i0 >= 5 && j1 - j0 >= 5 ? 1 : 0);
@@ -191,7 +193,7 @@ function building(f, i0, i1, j0, j1, H, col, lod, o = {}) {
     let y = 0;
     while (y < h - .01) {
       const seg = Math.min(sp, h - y);
-      nbox(f, a0, a1, b0, b1, k + y, k + y + seg, col, lod > 1 ? K_WIN : K_SOLID, notch);
+      nbox(f, a0, a1, b0, b1, k + y, k + y + seg, col, WK, notch);
       y += seg;
       if (y < h - 1.2 && lod > 1) { nbox(f, a0 + .35, a1 - .35, b0 + .35, b1 - .35, k + y, k + y + 1, COL.deep, K_SOLID, notch); y += 1; }
     }
@@ -203,7 +205,7 @@ function building(f, i0, i1, j0, j1, H, col, lod, o = {}) {
     if (l < nL - 1) { a0 += ins; a1 -= ins; b0 += ins; b1 -= ins; if (a1 - a0 < 2.5 || b1 - b0 < 2.5) break; }
   }
   if (o.roof !== false) roof(f, a0, a1, b0, b1, k, lod);
-  if (lod >= 1) citySigns(f, i0, i1, j0, j1, k, a0, a1, b0, b1, notch);
+  if (lod >= 1 && !DERELICT) citySigns(f, i0, i1, j0, j1, k, a0, a1, b0, b1, notch);
   return k;
 }
 
@@ -211,7 +213,7 @@ function building(f, i0, i1, j0, j1, H, col, lod, o = {}) {
 let LANES = [];
 function lane(f, axis, c, a0, a1, k) {
   const A = axis === 'i' ? gp(f, a0, c, k) : gp(f, c, a0, k), B = axis === 'i' ? gp(f, a1, c, k) : gp(f, c, a1, k), m = unit(add(A, B));
-  if (!seen(m) || angTo(m, DCTR) > .85 || angTo(m, HDIR) < .1) return;
+  if (!seen(m) || (!ALL && angTo(m, DCTR) > .85) || angTo(m, HDIR) < .1 || (TAUW && !onlineAt(m))) return;
   LANES.push([A, B, len(sub(B, A))]);
 }
 function lanesGrid(start, pitch, seg, k0, k1, p, along = ['i', 'j']) {
@@ -221,9 +223,12 @@ function lanesGrid(start, pitch, seg, k0, k1, p, along = ['i', 'j']) {
 /* ================= the planets ================= */
 const HERO = { f: 4, i: 0, j: 0 }, HDIR = gdir(4, 0, 0);
 let VIS = HDIR, DCTR = HDIR, LG = [];
-const seen = d => dot(d, VIS) > -.12;
+const seen = d => ALL || dot(d, VIS) > -.12;
 let LITE = false, FAR = false;                                                   // small screens: no full-detail districts, far fewer triangles
-const lodOf = d => { if (FAR) return 0; const a = angTo(d, DCTR); return LITE ? (a < .55 ? 1 : 0) : (a < .64 ? 2 : a < 1.05 ? 1 : 0); };   // far: the planet seen from afar, blocks only
+/* Tau Jeffy VI: ALL (every side of it is seen: it can be turned), DERELICT (districts not yet online: no lights, no signs),
+   LODF (its own detail rule), TAUW (its words, from its own atlas) */
+let ALL = false, DERELICT = false, LODF = null, TAUW = false;
+const lodOf = d => { if (FAR) return 0; if (LODF) return LODF(d); const a = angTo(d, DCTR); return LITE ? (a < .55 ? 1 : 0) : (a < .64 ? 2 : a < 1.05 ? 1 : 0); };   // far: the planet seen from afar, blocks only
 const PAINT = hex('#14161B');
 let SLOT = {};
 /* a sign on the hero's j- wall at jw, centred (ic, kc), width w; PAINT signs sit on a solid bone panel. The quad's texture
@@ -275,24 +280,25 @@ function signQ(f, item, A, B, C, D, outG, col, g) {
 const wallOf = (sd, I0, I1, J0, J1) => sd === 0 ? { u0: J0, u1: J1, M: (u, d, k) => [I1 + d, u, k], O: [1, 0, 0], U: [0, 1, 0] }
   : sd === 1 ? { u0: J0, u1: J1, M: (u, d, k) => [I0 - d, u, k], O: [-1, 0, 0], U: [0, 1, 0] }
   : sd === 2 ? { u0: I0, u1: I1, M: (u, d, k) => [u, J1 + d, k], O: [0, 1, 0], U: [1, 0, 0] } : { u0: I0, u1: I1, M: (u, d, k) => [u, J0 - d, k], O: [0, -1, 0], U: [1, 0, 0] };
-const signWord = () => { const pw = WORDS_P[PK]; return rs() < .55 ? WORDS_C.length + PK * 6 + (rs() * pw.length | 0) : rs() * WORDS_C.length | 0; };
+const signWord = () => { if (TAUW) return rs() * WORDS_T.length | 0; const pw = WORDS_P[PK]; return rs() < .55 ? WORDS_C.length + PK * 6 + (rs() * pw.length | 0) : rs() * WORDS_C.length | 0; };
+const WL = () => TAUW ? WORDS_TL : WORDS, WI = (vert, n) => (TAUW ? '@t' : '@') + (vert ? 'v' : 'h') + n;
 const signLook = () => { const x = rs(); return x < .55 ? [SIGN, 1, COL.deep] : x < .75 ? [SIGN, 2, COL.deep] : [PAINT, 0, COL.bone]; };   // lit white, lit accent, painted on bone
 function wbox(f, W, uA, uB, dA, dB, kA, kB, col) { const p = W.M(uA, dA, 0), q = W.M(uB, dB, 0); gbox(f, Math.min(p[0], q[0]), Math.max(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[1], q[1]), kA, kB, col); }
 /* a sign flat on a wall, centred at uc, bottom at kb; size is the width (vertical) or the height (horizontal). Returns its height or 0 */
 function flatSign(f, W, uc, kb, size, vert, kMax, back = true, n = signWord(), lk = signLook()) {
-  const L = WORDS[n].length; let tw = vert ? size : size / wAsp(L, 0), th = vert ? size * wAsp(L, 1) : size;
+  const L = [...WL()[n]].length; let tw = vert ? size : size / wAsp(L, 0), th = vert ? size * wAsp(L, 1) : size;
   const room = W.u1 - W.u0 - 1; if (tw > room) { th *= room / tw; tw = room; } if (kb + th > kMax || th < .8) return 0;
   const [col, g, bk] = back ? lk : [PAINT, 0, 0], d = back ? .26 : .05;
   uc = Math.max(W.u0 + .5 + tw / 2, Math.min(W.u1 - .5 - tw / 2, uc));
   if (back) wbox(f, W, uc - tw / 2 - .25, uc + tw / 2 + .25, 0, .22, kb - .22, kb + th + .22, bk);
-  signQ(f, (vert ? '@v' : '@h') + n, W.M(uc - tw / 2, d, kb), W.M(uc + tw / 2, d, kb), W.M(uc + tw / 2, d, kb + th), W.M(uc - tw / 2, d, kb + th), W.O, col, g);
+  signQ(f, WI(vert, n), W.M(uc - tw / 2, d, kb), W.M(uc + tw / 2, d, kb), W.M(uc + tw / 2, d, kb + th), W.M(uc - tw / 2, d, kb + th), W.O, col, g);
   return th;
 }
 /* a blade sign standing out from a wall at uc, lettered on both faces */
 function bladeSign(f, W, uc, kb, tw, kMax) {
-  const n = signWord(), [col, g, bk] = signLook(), th = tw * wAsp(WORDS[n].length, 1), bh = th + .45; if (kb + bh > kMax) return;
+  const n = signWord(), [col, g, bk] = signLook(), th = tw * wAsp([...WL()[n]].length, 1), bh = th + .45; if (kb + bh > kMax) return;
   wbox(f, W, uc - .2, uc + .2, 0, tw + .7, kb, kb + bh, bk); wbox(f, W, uc - .08, uc + .08, 0, .45, kb - .6, kb, COL.mid);
-  const bl = (u, out) => signQ(f, '@v' + n, W.M(u, .35, kb + .22), W.M(u, .35 + tw, kb + .22), W.M(u, .35 + tw, kb + .22 + th), W.M(u, .35, kb + .22 + th), out, col, g);
+  const bl = (u, out) => signQ(f, WI(true, n), W.M(u, .35, kb + .22), W.M(u, .35 + tw, kb + .22), W.M(u, .35 + tw, kb + .22 + th), W.M(u, .35, kb + .22 + th), out, col, g);
   bl(uc + .22, W.U); bl(uc - .22, W.U.map(x => -x));
 }
 function citySigns(f, i0, i1, j0, j1, top, a0, a1, b0, b1, notch) {
@@ -350,6 +356,332 @@ function district(f, i0, i1, j0, j1, hs, P = 14, BS = 12, skip = () => false, pa
 /* the face cells of the seen hemisphere, for planets that cover everything */
 function eachFace(fn) { for (let f = 0; f < 6; f++) fn(f); }
 const nearHero = (rad) => (f, i, j, d) => angTo(d, HDIR) < rad;
+
+/* ================= VI · Tau Jeffy VI: the secret planet (カラット's company world) =================
+   An old industrial world the AI カラット woke up in. Every side of it is built at full detail (it can be turned in the
+   hand). Districts stay derelict (no lights, no signs, rust) until the corporation brings them online: a disc around the
+   core that grows with the divisions held on the memory wall, and the ground around each building it has unlocked. The
+   landmarks: the core's shaft (the hero) and one building per game, each unlocked with a corporate tier. */
+const WORDS_T = ['安全第一', '立入禁止', '高圧注意', '非常口', '火気厳禁', '危険', '出荷場', '社員寮', '変電所', '整理整頓', '指差確認', '構内徐行', '倉庫', '第三工場', '資材置場', '作業中', 'カラット', '電気', '組立', '検査'];
+/* t: the tier that opens it (-1 founding, 0 N5 ... 4 N1); a building opens when the corporation reaches the tier before it */
+const SITES = [
+  { id: 'core', jp: '中枢', en: 'The core', t: -1, f: 4, i: 0, j: 0, r: 36 },
+  { id: 'factory', jp: '大工場', en: 'Great Factory', t: 0, f: 4, i: 76, j: 40, r: 26 },
+  { id: 'logistics', jp: '物流センター', en: 'Logistics centre', t: 0, f: 4, i: -82, j: 56, r: 26 },
+  { id: 'power', jp: '発電所', en: 'Power plant', t: 1, f: 4, i: 74, j: -90, r: 24 },
+  { id: 'lab', jp: '研究所', en: 'R&D lab', t: 2, f: 2, i: -10, j: 40, r: 26 },
+  { id: 'broadcast', jp: '放送局', en: 'Broadcast station', t: 2, f: 0, i: 34, j: 24, r: 18 },
+  { id: 'security', jp: '保安部', en: 'Security', t: 2, f: 1, i: -20, j: -18, r: 26 },
+  { id: 'exchange', jp: '取引所', en: 'Exchange', t: 3, f: 3, i: 16, j: 40, r: 26 },
+  { id: 'hq', jp: '本社', en: 'Headquarters', t: 4, f: 5, i: 0, j: 12, r: 36 }];
+const WORDS_TL = [...WORDS_T, ...SITES.map(s => s.jp)];
+let TS = { tier: -1, held: 0, total: 27 };
+const unlocked = s => s.t <= TS.tier + 1;
+const siteD = s => gdir(s.f, s.i, s.j);
+function onlineAt(d) {
+  const ona = .3 + Math.min(1, TS.held / TS.total) * 2.9;
+  return angTo(d, HDIR) < ona || SITES.some(s => unlocked(s) && angTo(d, siteD(s)) < (s.r + 22) / R);
+}
+const L2 = () => FAR ? 0 : LITE ? 1 : 2;
+function subFr(fr, x, z, rot) { const o = fr.L([x, 0, z]), e = add(mul(fr.e, Math.cos(rot)), mul(fr.n, Math.sin(rot))), n = cross(e, fr.up); return { o, up: fr.up, e, n, L: ([a, b, c]) => add(o, add(add(mul(e, a), mul(fr.up, b)), mul(n, c))) }; }
+
+/* ---- the kit's industrial pieces ---- */
+function sawHall(f, i0, i1, j0, j1, h, lod, col) {               // a factory hall with a sawtooth roof, the glazed faces toward +i
+  const win = lod > 1 && !DERELICT ? K_WIN : K_SOLID;
+  nbox(f, i0, i1, j0, j1, -1, h, col, win, 0);
+  if (lod < 1) return;
+  const tw = 2.5, th = 1.7, k0 = h + KB, k1 = h + th + KB, rc = DERELICT ? COL.rust : COL.steel, jm = (j0 + j1) / 2;
+  for (let x = i0; x + tw <= i1 + .01; x += tw) {
+    const a = x, b = x + tw;
+    G.quad(gp(f, a, j0, k0), gp(f, b, j0, k1), gp(f, b, j1, k1), gp(f, a, j1, k0), rc, K_SOLID, 0, [0, 0, 0], true);
+    G.quad(gp(f, b, j0, k0), gp(f, b, j1, k0), gp(f, b, j1, k1), gp(f, b, j0, k1), COL.bone, win, 0, gp(f, b - 1, jm, k0), true);
+    G.triOut(gp(f, a, j0, k0), gp(f, b, j0, k0), gp(f, b, j0, k1), col, K_SOLID, 0, gp(f, b - .5, j0 + 1, k0));
+    G.triOut(gp(f, a, j1, k0), gp(f, b, j1, k0), gp(f, b, j1, k1), col, K_SOLID, 0, gp(f, b - .5, j1 - 1, k0));
+  }
+}
+function chimney(fr, x, z, rr, h, lite) {                          // banded red and white at the top (rust when derelict)
+  const band = DERELICT ? COL.rust : COL.red, sd = lite ? 8 : 12, b = h / 8;
+  cyl(fr, x, z, rr, -1, h - 4 * b, DERELICT ? COL.mid : COL.light, sd);                   // the shaft, then four bands
+  for (let s = 0; s < 4; s++) cyl(fr, x, z, rr * (.9 - s * .03), h - (4 - s) * b, h - (3 - s) * b, s % 2 ? COL.bone : band, sd);
+  cyl(fr, x, z, rr * .7, h, h + .4, COL.dark, sd);
+  if (!DERELICT) topLampAt(fr.L([x, h + .5, z]), fr.up, .35);
+}
+function lathe(fr, x, z, prof, col, n = 20, kind = K_SOLID) {      // a surface of revolution about the frame's up
+  for (let s = 0; s < n; s++) { const a0 = s / n * Math.PI * 2, a1 = (s + 1) / n * Math.PI * 2;
+    for (let p = 0; p < prof.length - 1; p++) { const [r0, y0] = prof[p], [r1, y1] = prof[p + 1], P = (a, rr, y) => fr.L([x + Math.cos(a) * rr, y, z + Math.sin(a) * rr]);
+      G.quad(P(a0, r0, y0), P(a1, r0, y0), P(a1, r1, y1), P(a0, r1, y1), col, kind, 0, fr.L([x, (y0 + y1) / 2 - 2, z]), true); } }
+}
+function coolingTower(fr, x, z, rb, h) {
+  lathe(fr, x, z, [[rb, -1], [rb * .86, h * .3], [rb * .7, h * .62], [rb * .66, h * .8], [rb * .7, h]], DERELICT ? COL.mid : COL.light, 24);
+  cyl(fr, x, z, rb * 1.04, -1, 1.4, COL.dark, 24);
+  if (!DERELICT) for (let a = 0; a < 4; a++) topLampAt(fr.L([x + Math.cos(a * 1.57) * rb * .7, h + .1, z + Math.sin(a * 1.57) * rb * .7]), fr.up, .3);
+}
+function torii(fr, w, h) {                                          // a shrine gate, vermilion (bare and rusted when derelict)
+  const c = DERELICT ? COL.rust : COL.red;
+  cyl(fr, -w / 2, 0, .32, -1, h, c, 10); cyl(fr, w / 2, 0, .32, -1, h, c, 10);
+  beam(fr, [-w / 2 - 1.1, h + .35, 0], [w / 2 + 1.1, h + .35, 0], .55, COL.dark);
+  beam(fr, [-w / 2 - .8, h - .2, 0], [w / 2 + .8, h - .2, 0], .4, c);
+  beam(fr, [-w / 2 - .4, h * .72, 0], [w / 2 + .4, h * .72, 0], .3, c);
+  beam(fr, [0, h * .72, 0], [0, h - .2, 0], .25, c);
+}
+function gableHall(f, i0, i1, j0, j1, h, rise, col, rc) {          // a hall with a pitched roof, the ridge along i
+  gbox(f, i0, i1, j0, j1, -1, h, col);
+  const o = .5, k0 = h + KB, k1 = h + rise + KB, jm = (j0 + j1) / 2, A = i0 - o, B = i1 + o;
+  G.quad(gp(f, A, j0 - o, k0 - .3), gp(f, B, j0 - o, k0 - .3), gp(f, B, jm, k1), gp(f, A, jm, k1), rc, K_SOLID, 0, [0, 0, 0], true);
+  G.quad(gp(f, A, j1 + o, k0 - .3), gp(f, B, j1 + o, k0 - .3), gp(f, B, jm, k1), gp(f, A, jm, k1), rc, K_SOLID, 0, [0, 0, 0], true);
+  G.triOut(gp(f, i0, j0, k0), gp(f, i0, j1, k0), gp(f, i0, jm, k1 - .1), col, K_SOLID, 0, gp(f, i0 + 1, jm, k0));
+  G.triOut(gp(f, i1, j0, k0), gp(f, i1, j1, k0), gp(f, i1, jm, k1 - .1), col, K_SOLID, 0, gp(f, i1 - 1, jm, k0));
+}
+function shrine(f, ci, cj) {                                        // a company shrine: gravel court, gate, hall, two lanterns
+  gbox(f, ci - 4.5, ci + 4.5, cj - 5.5, cj + 5.5, -1, .25, COL.bone);
+  gableHall(f, ci - 2.5, ci + 2.5, cj + .5, cj + 4.5, 2.4, 1.8, DERELICT ? COL.mid : COL.bone, COL.dark);
+  torii(subFr(frame(f, ci, cj), 0, 4, 0), 3.2, 3.6);
+  gbox(f, ci - 2.2, ci - 1.6, cj - 2.4, cj - 1.8, 0, 1.4, COL.mid); gbox(f, ci + 1.6, ci + 2.2, cj - 2.4, cj - 1.8, 0, 1.4, COL.mid);
+  topLamp(f, ci - 2.15, cj - 2.35, 1.4, .5); topLamp(f, ci + 1.65, cj - 2.35, 1.4, .5);
+}
+function containers(f, i0, i1, j0, j1) {
+  const C = DERELICT ? [COL.rust, COL.mid, COL.slate, COL.dark] : [COL.red, COL.warm, COL.bone, COL.steel, COL.mid, COL.light, COL.bone];
+  gbox(f, i0, i1, j0, j1, -1, .3, COL.dark);
+  for (let a = i0 + .6; a + 2.6 <= i1 - .3; a += 2.9) for (let b = j0 + .6; b + 1.2 <= j1 - .3; b += 1.45) {
+    if (r() < .18) continue; const n = 1 + (r() * 3 | 0);
+    for (let q = 0; q < n; q++) gbox(f, a, a + 2.6, b, b + 1.2, .3 + q * 1.15, .3 + (q + 1) * 1.15 - .05, C[r() * C.length | 0]);
+  }
+}
+function pipeRack(f, i0, i1, j, k = 3.2) {                          // posts every 4 cells, three pipes on top
+  for (let x = i0; x <= i1; x += 4) { gbox(f, x, x + .3, j - .9, j - .6, -1, k, COL.mid); gbox(f, x, x + .3, j + .6, j + .9, -1, k, COL.mid); gbox(f, x, x + .3, j - .9, j + .9, k - .3, k, COL.mid); }
+  gbox(f, i0, i1 + .3, j - .7, j - .2, k, k + .5, DERELICT ? COL.rust : COL.bone); gbox(f, i0, i1 + .3, j + .1, j + .4, k, k + .3, COL.steel); gbox(f, i0, i1 + .3, j + .5, j + .8, k, k + .3, DERELICT ? COL.rust : COL.warm);
+}
+function gantryCrane(fr, span, h, len, c) {                       // two portal frames on rails, a girder, a trolley
+  for (const z of [-len / 2, len / 2]) { beam(fr, [-span / 2, -1, z], [-span / 2, h, z], .6, c); beam(fr, [span / 2, -1, z], [span / 2, h, z], .6, c); beam(fr, [-span / 2, h * .5, z], [span / 2, h * .5, z], .3, c); }
+  beam(fr, [-span / 2 - 3, h + .5, -len / 2], [span / 2 + 3, h + .5, -len / 2], .9, c); beam(fr, [-span / 2 - 3, h + .5, len / 2], [span / 2 + 3, h + .5, len / 2], .9, c);
+  lbox(fr, [span * .15, h - .2, 0], [2, 1.4, len + 1.5], COL.dark); beam(fr, [span * .15, h - 1, 0], [span * .15, h * .4, 0], .12, COL.dark);
+}
+function lattice(fr, H, w0, w1, banded) {                           // a broadcast tower, banded red and white
+  const sg = 6, wd = y => w0 + (w1 - w0) * y / H;
+  for (let y = 0; y < H; y += sg) { const a = wd(y), b = wd(Math.min(H, y + sg)), c = banded && (y / 18 | 0) % 2 === 0 ? (DERELICT ? COL.rust : COL.red) : COL.bone;
+    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([u, v], n, A) => { beam(fr, [u * a, y - (y ? 0 : 1), v * a], [u * b, y + sg, v * b], .5, c); const [u2, v2] = A[(n + 1) % 4]; beam(fr, [u * a, y, v * a], [u2 * b, y + sg, v2 * b], .2, c); });
+    if ((y / sg | 0) % 5 === 4) lbox(fr, [0, y + sg, 0], [b * 2 + 2.4, .7, b * 2 + 2.4], COL.steel);
+  }
+  beam(fr, [0, H, 0], [0, H + 16, 0], .5, COL.bone); if (!DERELICT) topLampAt(fr.L([0, H + 16.3, 0]), fr.up, .5);
+}
+function tether(fr, H) {                                            // a space elevator's lattice, rising from its anchor to a counterweight station
+  const w = 1.6;
+  for (let y = 12; y < H; y += 8) {
+    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([a, b], n, A) => { beam(fr, [a * w, y, b * w], [a * w, y + 8, b * w], .45, COL.light); const [c, d] = A[(n + 1) % 4]; beam(fr, [a * w, y, b * w], [c * w, y + 8, d * w], .22, COL.steel); });
+    if ((y / 8 | 0) % 4 === 0) lbox(fr, [0, y, 0], [w * 2 + 1.6, .8, w * 2 + 1.6], COL.bone);
+  }
+  lbox(fr, [0, H + 4, 0], [16, 8, 16], COL.light); lbox(fr, [0, H + 9, 0], [9, 3, 9], COL.bone); lbox(fr, [0, H - 1, 0], [18, 2, 3], COL.steel); lbox(fr, [0, H - 1, 0], [3, 2, 18], COL.steel);
+  [[-10, 0], [10, 0], [0, -10], [0, 10]].forEach(([x, z]) => lbox(fr, [x, H + 3, z], [5, 4, 5], COL.mid));
+}
+function dish(fr, x, z, rr, tilt, rot) {                            // a big dish on a pedestal, tilted toward the sky
+  cyl(fr, x, z, rr * .18, -1, rr * .7, COL.mid, 10);
+  const o = fr.L([x, rr * .85, z]), s = subFr(fr, x, z, rot), up = unit(add(mul(fr.up, Math.cos(tilt)), mul(s.e, Math.sin(tilt)))), e = unit(cross(s.n, up)), n = cross(e, up);
+  const tf = { o, up, e, n, L: ([a, b, c]) => add(o, add(add(mul(e, a), mul(up, b)), mul(n, c))) };
+  lathe(tf, 0, 0, [[rr * .12, 0], [rr * .55, rr * .1], [rr, rr * .32]], COL.bone, 24);
+  beam(tf, [0, 0, 0], [0, rr * .75, 0], .2, COL.mid); lbox(tf, [0, rr * .78, 0], [.7, .7, .7], COL.dark);
+}
+function sitePlate(s, f, W, uc, kb, size, kMax) {                    // the building's name: lit in the accent once open, painted before
+  flatSign(f, W, uc, kb, size, true, kMax, true, WORDS_T.length + SITES.indexOf(s), unlocked(s) ? [SIGN, 2, COL.deep] : [PAINT, 0, COL.bone]);
+}
+
+/* ---- the city: the same blocks everywhere, lit or derelict ---- */
+function tauDistricts(f, skip) {
+  /* 22 blocks a face, stretched a little so the street along a cube edge is as wide as any other (no seam) */
+  const PP = 2 * IMAX / 22, BS = PP - 2, u = BS / 12;
+  for (let ai = 0; ai < 22; ai++) for (let aj = 0; aj < 22; aj++) { const bi = -IMAX + 1 + ai * PP, bj = -IMAX + 1 + aj * PP;
+    const ci = bi + BS / 2, cj = bj + BS / 2, d = gdir(f, ci, cj);
+    if (skip(d)) continue;
+    const on = onlineAt(d), lod = lodOf(d); DERELICT = !on;
+    const g = (on ? .75 : .55) + vnoise(d, 2.2) * .7 + Math.max(0, .5 - angTo(d, HDIR)) * .8;
+    const pal = on ? [COL.light, COL.steel, COL.bone, COL.mid] : [COL.mid, COL.slate, COL.dark, COL.mid, COL.rust];
+    if (lod === 0) { if (r() < .85) gbox(f, bi + 1, bi + BS - 1, bj + 1, bj + BS - 1, -1, 1 + (r() * 4 * g | 0), pal[r() * 4 | 0]); DERELICT = false; continue; }
+    const lots = r() < .45 ? [[0, 0, 6, 12], [6, 0, 12, 12]] : r() < .6 ? [[0, 0, 12, 6], [0, 6, 6, 12], [6, 6, 12, 12]] : r() < .5 ? [[0, 0, 6, 6], [6, 0, 12, 6], [0, 6, 6, 12], [6, 6, 12, 12]] : [[0, 0, 12, 12]];
+    const tall = [];
+    for (const [a0, b0, a1, b1] of lots) {
+      const i0l = bi + a0 * u + .5, i1l = bi + a1 * u - .5, j0l = bj + b0 * u + .5, j1l = bj + b1 * u - .5, wi = i1l - i0l, wj = j1l - j0l, lc = [(i0l + i1l) / 2, (j0l + j1l) / 2];
+      const roll = r(), col = pal[r() * pal.length | 0];
+      if (roll < .36) { const H = 3 + Math.round(r() * 15 * g); building(f, i0l, i1l, j0l, j1l, H, col, lod); if (H > 10) tall.push([lc, H]); }
+      else if (roll < .5) sawHall(f, i0l, i1l, j0l, j1l, 3 + (r() * 3 | 0), lod, col);
+      else if (roll < .58) {                                       // a tank pair on a pad
+        gbox(f, i0l, i1l, j0l, j1l, -1, .4, COL.dark);
+        const fr = frame(f, lc[0], lc[1]), rr = Math.min(wi, wj) * .22;
+        const tk = (x, q, h, c) => lod > 1 ? tank(fr, x, 0, q, h, c) : (cyl(fr, x, 0, q, -1, h, c, 9), cyl(fr, x, 0, q * .7, h, h + q * .3, c, 9));
+        tk(-wi * .22, rr, 3 + r() * 4, on ? COL.bone : COL.mid); tk(wi * .22, rr * .9, 2.5 + r() * 4, on ? COL.light : COL.rust);
+        if (lod > 1) beam(fr, [-wi * .22, 2.2, 0], [wi * .22, 2.2, 0], .5, COL.mid);
+      } else if (roll < .65) {                                      // a pipe yard
+        gbox(f, i0l, i1l, j0l, j1l, -1, .3, COL.dark); pipeRack(f, i0l + .5, i1l - .5, lc[1] - wj * .2); if (wj > 7) pipeRack(f, i0l + .5, i1l - .5, lc[1] + wj * .25, 4.4);
+      } else if (roll < .73) containers(f, i0l, i1l, j0l, j1l);
+      else if (roll < .8) {                                         // a slab tower with fins (dormitories)
+        const hh = 10 + Math.round(r() * 20 * g);
+        building(f, lc[0] - 1.8, lc[0] + 1.8, j0l, j1l, hh, on ? COL.light : COL.slate, lod, { levels: 1, notch: 0, finP: .9, storey: 4 });
+        if (lod > 1) for (let w = 0; w < 3; w++) lamp(f, 'i-', lc[0] - 1.8, j0l + 1 + r() * (wj - 2), 2 + r() * (hh - 3), .5);
+      } else if (roll < .87) {                                      // a boiler hall and its chimney
+        nbox(f, i0l, i1l, j0l, j1l, -1, 4, col, lod > 1 && !DERELICT ? K_WIN : K_SOLID);
+        chimney(frame(f, i0l + 1.6, j0l + 1.6, 4), 0, 0, .9, 10 + r() * 14 * g, lod < 2);
+      } else if (roll < .9 && wi > 8 && wj > 10) shrine(f, lc[0], lc[1]);
+      else if (roll < .96) {                                        // a hall with a notched roof
+        nbox(f, i0l, i1l, j0l, j1l, -1, 3, on ? COL.slate : COL.dark, lod > 1 && !DERELICT ? K_WIN : K_SOLID);
+        for (let q = 0; q < 4; q++) { const a = i0l + q * wi / 4; gbox(f, a, a + wi / 8, j0l, j1l, 3, 4.2, on ? COL.steel : COL.rust); }
+      } else {                                                      // a yard with crates
+        gbox(f, i0l, i1l, j0l, j1l, -1, .3, COL.dark);
+        if (lod > 1) for (let c = 0; c < 5; c++) { const x = i0l + 1 + r() * (wi - 3), y = j0l + 1 + r() * (wj - 3); gbox(f, x, x + 1, y, y + 1.5, .3, 1.3 + (r() < .3 ? 1 : 0), r() < .5 ? COL.bone : COL.mid); }
+      }
+    }
+    if (lod > 1 && tall.length > 1 && r() < .5) {
+      const [A, B] = tall, k = Math.min(A[1], B[1]) * (.4 + r() * .3), w = .9;
+      const ia = Math.min(A[0][0], B[0][0]), ib = Math.max(A[0][0], B[0][0]), ja = Math.min(A[0][1], B[0][1]), jb = Math.max(A[0][1], B[0][1]);
+      if (ib - ia > jb - ja) gbox(f, ia, ib, (ja + jb) / 2 - w, (ja + jb) / 2 + w, k, k + 1.2, COL.bone, on ? K_WIN : K_SOLID); else gbox(f, (ia + ib) / 2 - w, (ia + ib) / 2 + w, ja, jb, k, k + 1.2, COL.bone, on ? K_WIN : K_SOLID);
+    }
+    if (lod > 1 && on && r() < .3) pipeRack(f, bi, bi + BS, bj - 1, 2.6);         // a rack along the street
+    DERELICT = false;
+  }
+}
+
+/* ---- the landmarks ---- */
+function siteCore() {                                               // the hero: a stepped ring round the shaft, four pylons, the cradle, pipes down
+  const f = 4, fr = frame(f, 0, 0), HR = 24, lod = L2();
+  for (let a = -36; a < 36; a += 3) for (let b = -36; b < 36; b += 3) {
+    const rr = Math.hypot(a + 1.5, b + 1.5); if (rr < HR + .8 || rr > 34) continue;
+    const t = Math.atan2(b + 1.5, a + 1.5), h = 4 + ((t / (Math.PI / 6) + 12) | 0) % 2 * 3 + (rr < HR + 4 ? 2 : 0);
+    gbox(f, a, a + 3, b, b + 3, -1.5, h, rr < HR + 4 ? COL.bone : COL.steel, lod > 1 ? K_WIN : K_SOLID);
+  }
+  for (const [a0, a1, b0, b1] of [[-42, 42, -42, -34], [-42, 42, 34, 42], [-42, -34, -34, 34], [34, 42, -34, 34]]) gbox(f, a0, a1, b0, b1, -1.5, .5, COL.dark);   // the apron, round the ring (the shaft stays open)
+  /* the shaft: windowed walls down to the core's light, lamp rings, a glowing floor */
+  const NSG = 48, D = -64;
+  for (let s = 0; s < NSG; s++) { const t0 = s / NSG * Math.PI * 2, t1 = (s + 1) / NSG * Math.PI * 2, P = (t, k) => gp(f, Math.cos(t) * HR, Math.sin(t) * HR, k);
+    for (let k = 0; k > D; k -= 4) G.quad(P(t0, k), P(t1, k), P(t1, k - 4), P(t0, k - 4), (k / 4 | 0) % 4 === 0 ? COL.mid : COL.steel, lod > 1 ? K_WIN : K_SOLID, 0, gp(f, 0, 0, k - 2), false);
+    for (const k of [-6, -22, -38, -54]) if (s % 2 === 0) { const t = (t0 + t1) / 2, p = (u, v) => gp(f, Math.cos(t + u) * (HR - .08), Math.sin(t + u) * (HR - .08), k + v); G.quad(p(-.02, 0), p(.02, 0), p(.02, .6), p(-.02, .6), COL.ink, K_LAMP, r(), gp(f, 0, 0, k), false); }
+  }
+  /* the floor: a dark grating, the core's light through it in rings and at the centre */
+  for (let a = -HR; a < HR; a += 3) for (let b = -HR; b < HR; b += 3) { const rr = Math.hypot(a + 1.5, b + 1.5); if (rr >= HR) continue; const lit = rr < 5 || (rr / 4.5 | 0) % 2 === 1;
+    G.quad(gp(f, a, b, D), gp(f, a + 3, b, D), gp(f, a + 3, b + 3, D), gp(f, a, b + 3, D), lit ? COL.ink : COL.deep, lit ? K_GLOW : K_SOLID, r(), [0, 0, 0], true); }
+  /* the core's light climbing the shaft: rings every eight cells, and eight strips running down */
+  for (let s = 0; s < NSG; s++) { const t0 = s / NSG * Math.PI * 2, t1 = (s + 1) / NSG * Math.PI * 2, P = (t, k) => gp(f, Math.cos(t) * (HR - .12), Math.sin(t) * (HR - .12), k);
+    for (let k = -8; k > D; k -= 8) G.quad(P(t0, k), P(t1, k), P(t1, k - .45), P(t0, k - .45), COL.ink, K_GLOW, r(), gp(f, 0, 0, k), false);
+    if (s % 6 === 0) { const tm = (t0 + t1) / 2, Q = (u, k) => gp(f, Math.cos(tm + u) * (HR - .14), Math.sin(tm + u) * (HR - .14), k); G.quad(Q(-.012, -2), Q(.012, -2), Q(.012, D), Q(-.012, D), COL.ink, K_GLOW, r(), gp(f, 0, 0, -30), false); }
+  }
+  /* four pylons on the diagonals, bridges to the cradle over the shaft */
+  let top = 0;
+  [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([u, v], n) => {
+    const x = u * 33, y = v * 33, H = 40 + (n % 2) * 6;
+    top = Math.max(top, building(f, x - 4.5, x + 4.5, y - 4.5, y + 4.5, H, COL.light, lod, { levels: 3, storey: 4, notch: 1, finP: .9 }));
+    beam(fr, [x * .86, 34, -y * .86], [x * .3, 34, -y * .3], 1.6, COL.steel); beam(fr, [x * .86, 31, -y * .86], [x * .3, 34, -y * .3], .6, COL.mid);
+  });
+  for (let s = 0; s < 16; s++) { const t0 = s / 16 * Math.PI * 2, t1 = (s + 1) / 16 * Math.PI * 2; beam(fr, [Math.cos(t0) * 10, 34, Math.sin(t0) * 10], [Math.cos(t1) * 10, 34, Math.sin(t1) * 10], 1.8, COL.bone); }
+  for (let p = 0; p < 6; p++) { const t = p / 6 * Math.PI * 2 + .3, x = Math.cos(t) * (7 + (p % 2) * 2.5), z = Math.sin(t) * (7 + (p % 2) * 2.5);
+    cyl(fr, x, z, p % 2 ? .8 : 1.3, D + 2, 34, p % 3 === 0 ? COL.bone : COL.steel, 12); }
+  for (let s = 0; s < 4; s++) { const t = s / 4 * Math.PI * 2 + .4; topLampAt(fr.L([Math.cos(t) * 10, 35, Math.sin(t) * 10]), fr.up, .5); }   // the axis stays clear: the way down
+  for (let a = 0; a < 12; a++) { const t = a / 12 * Math.PI * 2; topLamp(f, Math.cos(t) * 25.4 - .3, Math.sin(t) * 25.4 - .3, 9.2, .6); }
+  sitePlate(SITES[0], f, wallOf(3, -37.5, -28.5, -37.5, -28.5), -33, 8, 3.6, 38);
+  flatSign(f, wallOf(3, 28.5, 37.5, -37.5, -28.5), 33, 8, 3.6, true, 38, true, WORDS_T.indexOf('カラット'), [SIGN, 1, COL.deep]);
+  return Math.max(top, 46);
+}
+function siteFactory(s) {
+  const { f, i, j } = s, lod = L2(), fr = frame(f, i, j); DERELICT = !unlocked(s);
+  gbox(f, i - 25, i + 25, j - 23, j + 23, -1.5, .4, COL.dark);
+  sawHall(f, i - 23, i - 2, j - 21, j - 5, 7, lod, COL.light); sawHall(f, i + 1, i + 23, j - 21, j - 5, 7, lod, COL.light);
+  sawHall(f, i - 23, i + 6, j + 3, j + 21, 8, lod, COL.bone);
+  const top = building(f, i + 10, i + 23, j + 5, j + 21, 22, COL.light, lod, { levels: 2, storey: 3, notch: 1, finP: .8 });
+  chimney(fr, -6, -1, 1.7, 40); chimney(fr, -1, -1, 1.3, 31);
+  tank(fr, 16, 1, 2.6, 9, COL.bone); tank(fr, 20.5, 1, 2.2, 7, COL.light);
+  for (const x of [-12, 0, 12]) gbox(f, i + x - 1, i + x + 1, j - 5, j + 3, 5.5, 6.8, COL.bone, DERELICT ? K_SOLID : K_WIN);      // conveyor bridges between the halls
+  pipeRack(f, i - 23, i + 23, j - 23.5, 3.6);
+  sitePlate(s, f, wallOf(3, i + 10, i + 23, j + 5, j + 21), i + 16.5, 5, 3.4, top - 1);
+  DERELICT = false; return top;
+}
+function siteLogistics(s) {
+  const { f, i, j } = s, lod = L2(), fr = frame(f, i, j); DERELICT = !unlocked(s);
+  gbox(f, i - 25, i + 25, j - 23, j + 23, -1.5, .4, COL.dark);
+  for (let w = 0; w < 3; w++) gableHall(f, i - 23, i - 6, j - 21 + w * 7, j - 16 + w * 7, 5, 2, DERELICT ? COL.mid : COL.light, DERELICT ? COL.rust : COL.steel);
+  containers(f, i - 3, i + 23, j - 21, j - 2);
+  gantryCrane(subFr(fr, 10, 11.5, 0), 22, 13, 7, DERELICT ? COL.rust : COL.warm); gantryCrane(subFr(fr, 10, 2, 0), 22, 13, 7, DERELICT ? COL.rust : COL.warm);
+  const top = building(f, i - 23, i - 8, j + 2, j + 21, 16, COL.bone, lod, { levels: 2, storey: 3, notch: 1 });
+  building(f, i + 2, i + 14, j + 6, j + 18, 14, COL.steel, lod, { levels: 2, storey: 3, notch: 1, fins: false });           // the elevator's anchor
+  tether(frame(f, i + 8, j + 12, 14), FAR ? 120 : 210);
+  sitePlate(s, f, wallOf(3, i - 23, i - 8, j + 2, j + 21), i - 15.5, 4, 3, top - 1);
+  DERELICT = false; return top;
+}
+function sitePower(s) {
+  const { f, i, j } = s, lod = L2(), fr = frame(f, i, j); DERELICT = !unlocked(s);
+  gbox(f, i - 23, i + 23, j - 23, j + 23, -1.5, .4, COL.dark);
+  coolingTower(fr, -11, -10, 8.5, 26); coolingTower(fr, 9, -10, 8.5, 24);
+  const top = building(f, i - 20, i - 4, j - 21, j - 8, 18, COL.light, lod, { levels: 2, storey: 3, notch: 1, fins: false });
+  chimney(frame(f, i - 1, j - 16), 0, 0, 1.8, 46); chimney(frame(f, i + 4, j - 16), 0, 0, 1.8, 46);
+  for (let a = i + 4; a < i + 21; a += 3.4) for (let b = j - 20; b < j - 6; b += 3.4) { gbox(f, a, a + 1.6, b, b + 1.6, -1, 2.2, COL.mid); gbox(f, a + .6, a + 1, b + .6, b + 1, 2.2, 4, COL.bone); }
+  for (let a = i + 4; a < i + 21; a += 6.8) gbox(f, a, a + .3, j - 21, j - 5, 4, 4.3, COL.steel);
+  const tf = frame(f, i, j); tank(subFr(tf, 0, 0, 0), -18, -6, 2.8, 7, COL.bone); tank(tf, -12, -6, 2.8, 7, COL.bone);
+  sitePlate(s, f, wallOf(2, i - 20, i - 4, j - 21, j - 8), i - 12, 5, 3, top - 1);
+  DERELICT = false; return top;
+}
+function siteLab(s) {
+  const { f, i, j } = s, lod = L2(), fr = frame(f, i, j); DERELICT = !unlocked(s);
+  gbox(f, i - 25, i + 25, j - 25, j + 25, -1.5, .4, COL.dark);
+  const top = building(f, i - 14, i + 14, j - 14, j + 14, 30, COL.light, lod, { levels: 5, storey: 3, notch: 2, ledge: true, finP: .5, ins: 2 });
+  for (let a = 0; a < 10; a++) { const t = a / 10 * Math.PI * 2, pi = i + Math.cos(t) * 21, pj = j + Math.sin(t) * 21; gbox(f, pi - .9, pi + .9, pj - .9, pj + .9, 0, 7 + (a % 2) * 3, COL.bone); topLamp(f, pi - .3, pj - .3, 7 + (a % 2) * 3); }
+  lathe(frame(f, i, j, top), 0, 0, [[6, 0], [5.4, 2.4], [4, 4.4], [2.2, 5.6], [0, 6]], COL.bone, 24);
+  dish(fr, -19, -19, 6, .7, .8); dish(fr, 19, 19, 4.5, .6, 3.6);
+  sitePlate(s, f, wallOf(3, i - 14, i + 14, j - 14, j + 14), i - 9, 4, 3, 22);
+  DERELICT = false; return top;
+}
+function siteBroadcast(s) {
+  const { f, i, j } = s, lod = L2(); DERELICT = !unlocked(s);
+  gbox(f, i - 19, i + 19, j - 19, j + 19, -1.5, .4, COL.dark);
+  lattice(frame(f, i, j), FAR ? 70 : 108, 7, 1.4, true);
+  const top = building(f, i - 17, i - 9, j - 17, j + 4, 12, COL.light, lod, { levels: 2, storey: 3, notch: 1 });
+  building(f, i + 9, i + 17, j - 6, j + 17, 9, COL.steel, lod, { levels: 1, storey: 3, notch: 0, fins: false });
+  dish(frame(f, i + 13, j - 13), 0, 0, 3.5, .8, 2.2);
+  sitePlate(s, f, wallOf(1, i - 17, i - 9, j - 17, j + 4), j - 6, 3, 2.8, top - 1);
+  DERELICT = false; return top;
+}
+function siteSecurity(s) {                                          // the canyon's gate tower, walled, with watchtowers
+  const { f, i, j } = s, lod = L2(); DERELICT = !unlocked(s);
+  gbox(f, i - 26, i + 26, j - 26, j + 26, -1.5, .4, COL.dark);
+  for (const [a0, a1, b0, b1] of [[-25, 25, -25, -23], [-25, 25, 23, 25], [-25, -23, -23, 23], [23, 25, -23, 23]]) gbox(f, i + a0, i + a1, j + b0, j + b1, -1, 5, COL.slate);
+  for (const [u, v] of [[-24, -24], [24, -24], [24, 24], [-24, 24]]) { gbox(f, i + u - 2, i + u + 2, j + v - 2, j + v + 2, -1, 10, COL.steel); gbox(f, i + u - 2.6, i + u + 2.6, j + v - 2.6, j + v + 2.6, 10, 11.5, COL.mid); topLamp(f, i + u - .3, j + v - .3, 11.5); }
+  building(f, i - 18, i - 6, j - 18, j - 6, 20, COL.light, lod, { levels: 2, storey: 3, notch: 1 }); building(f, i + 6, i + 18, j - 18, j - 6, 20, COL.light, lod, { levels: 2, storey: 3, notch: 1 });
+  building(f, i - 18, i - 6, j + 6, j + 18, 24, COL.light, lod, { levels: 2, storey: 3, notch: 1 }); building(f, i + 6, i + 18, j + 6, j + 18, 24, COL.light, lod, { levels: 2, storey: 3, notch: 1 });
+  nbox(f, i - 18, i + 18, j - 18, j + 18, 22, 27, COL.bone, DERELICT ? K_SOLID : K_WIN, 2); gbox(f, i - 18.4, i + 18.4, j - 18.4, j + 18.4, 27, 27.6, COL.mid);
+  KB = 27; const top = 27 + building(f, i - 9, i + 9, j - 9, j + 9, 18, COL.light, lod, { levels: 3, storey: 4, notch: 2, ledge: true, finP: 1 }); KB = 0;
+  sitePlate(s, f, wallOf(3, i - 18, i - 6, j - 18, j - 6), i - 12, 4, 3, 18);
+  DERELICT = false; return top;
+}
+function siteExchange(s) {                                          // the old industrial hero: a tower with cantilevered trading floors
+  const { f, i, j } = s, lod = L2(), fr = frame(f, i, j); DERELICT = !unlocked(s);
+  gbox(f, i - 25, i + 25, j - 25, j + 25, -1.5, 1, COL.mid); gbox(f, i - 23, i + 23, j - 23, j + 23, -1.5, 3, COL.dark);
+  const top = building(f, i - 12, i + 12, j - 12, j + 12, 50, COL.light, lod, { levels: 5, storey: 4, notch: 2, ledge: true, finP: .8 });
+  [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([a, b], n) => { const k0 = 12 + n * 7, L = 11, W = 3.5, kind = DERELICT ? K_SOLID : K_WIN;
+    if (a) nbox(f, a > 0 ? i + 10 : i - 10 - L, a > 0 ? i + 10 + L : i - 10, j - W + n, j + W + n, k0, k0 + 6, COL.bone, kind);
+    else nbox(f, i - W - n, i + W - n, b > 0 ? j + 10 : j - 10 - L, b > 0 ? j + 10 + L : j - 10, k0, k0 + 6, COL.bone, kind); });
+  [[-18, -18], [18, 18], [18, -18]].forEach(([x, z], n) => tank(fr, x, z, 3.4, 11 + n * 3, n === 1 ? COL.light : COL.bone));
+  if (!DERELICT) for (let w = 0; w < 18; w++) lamp(f, 'j-', j - 12, i - 10 + (w % 9) * 2.3, 30 + (w / 9 | 0) * 1.2, .9);      // the ticker: a band of lights
+  sitePlate(s, f, wallOf(3, i - 12, i + 12, j - 12, j + 12), i + 7, 6, 3.2, 28);
+  DERELICT = false; return top;
+}
+function siteHQ(s) {                                                // the crown: a stepped base, the tower, radial fins, a ring of pylons
+  const { f, i, j } = s, lod = L2(), fr = frame(f, i, j); DERELICT = !unlocked(s);
+  gbox(f, i - 34, i + 34, j - 34, j + 34, -1.5, .4, COL.slate);
+  for (let st = 0; st < 3; st++) nbox(f, i - 28 + st * 4, i + 28 - st * 4, j - 28 + st * 4, j + 28 - st * 4, st ? st * 3 - 3 : -1.5, st * 3 + 3, st % 2 ? COL.steel : COL.mid, DERELICT ? K_SOLID : K_WIN, 1);
+  KB = 8; const top = 8 + building(f, i - 10, i + 10, j - 10, j + 10, 66, COL.light, lod, { levels: 4, storey: 4, notch: 2, ledge: true, finP: 1 }); KB = 0;
+  for (let a = 0; a < 20; a++) { const t = a / 20 * Math.PI * 2, dir = add(mul(fr.e, Math.cos(t)), mul(fr.n, Math.sin(t))), tg = cross(fr.up, dir), h = 24 + (a % 2) * 8;
+    obox(add(fr.o, add(mul(dir, 17), mul(fr.up, 8 + h / 2))), dir, fr.up, tg, [4.5, h / 2, .5], a % 2 ? COL.bone : COL.light);
+    obox(add(fr.o, add(mul(dir, 17), mul(fr.up, 8 + h + .6))), dir, fr.up, tg, [2.8, .6, .7], COL.mid); }
+  for (let a = 0; a < 16; a++) { const t = a / 16 * Math.PI * 2, pi = i + Math.cos(t) * 31, pj = j + Math.sin(t) * 31; gbox(f, pi - 1, pi + 1, pj - 1, pj + 1, 0, 8, COL.bone); topLamp(f, pi - .3, pj - .3, 8); }
+  gbox(f, i - 1, i + 1, j - 1, j + 1, top, top + 12, COL.bone); topLamp(f, i - .3, j - .3, top + 12);
+  sitePlate(s, f, wallOf(3, i - 10, i + 10, j - 10, j + 10), i - 5, 14, 3.4, top - 2);
+  DERELICT = false; return top;
+}
+function tauBuild() {
+  ALL = true; TAUW = true;
+  const sd = SITES.map(siteD), skip = d => SITES.some((s, n) => angTo(d, sd[n]) < (s.r + 4) / R), nearSite = d => SITES.some((s, n) => angTo(d, sd[n]) < (s.r + 40) / R);
+  /* full detail where the lights are on and round every landmark; the derelict rest one step down (its windows are dark anyway) */
+  LODF = d => { const hot = onlineAt(d) || nearSite(d); return LITE ? (hot ? 1 : 0) : hot ? 2 : 1; };
+  eachFace(f => tauDistricts(f, skip));
+  lanesGrid(-155, 14, 56, 9, 24, .5);
+  const top = siteCore();
+  siteFactory(SITES[1]); siteLogistics(SITES[2]); sitePower(SITES[3]); siteLab(SITES[4]); siteBroadcast(SITES[5]); siteSecurity(SITES[6]); siteExchange(SITES[7]); siteHQ(SITES[8]);
+  ALL = false; TAUW = false; LODF = null; DERELICT = false;
+  return top;
+}
 
 const PLANETS = [
 /* ---------- 01 · Monument (TUT) ---------- */
@@ -625,7 +957,11 @@ const PLANETS = [
       obox(add(Q, mul(Z, -.5)), X, Y2, Z, [5, .35, .4], COL.mid); obox(add(Q, mul(Z, -.5)), X, Y2, Z, [.35, 5, .4], COL.mid);
       if (p % 3 === 0) obox(add(Q, mul(Y2, -6.5)), X, Y2, Z, [.4, 2, .4], COL.steel);
     }
-  } }
+  } },
+/* ---------- VI · Tau Jeffy VI (secret: reached only by clicking it on the map) ---------- */
+{ id: 'tau', name: 'Tau Jeffy VI', num: 'VI', code: 'TJ-VI', vk: 'カラット', date: '', title: 'TAU JEFFY VI', secret: true, hole: .128,
+  cam: [-58, -128, 92], yaw: .2, aim: .42, far: [-26, -92], seed: 89,
+  build() { return tauBuild(); } }
 ];
 
 /* ================= timing the fly-bys to the arrival =================
@@ -642,6 +978,7 @@ function topLampAt(p, n, s = .5) { const X = unit(cross(n, [.2, .9, .3])), Z = c
 /* ================= the ground ================= */
 function ground() { const NS = FAR ? 28 : LITE ? 40 : 72; for (let f = 0; f < 6; f++) for (let a = 0; a < NS; a++) for (let b = 0; b < NS; b++) {
   const i0 = -IMAX + 2 * IMAX * a / NS, i1 = -IMAX + 2 * IMAX * (a + 1) / NS, j0 = -IMAX + 2 * IMAX * b / NS, j1 = -IMAX + 2 * IMAX * (b + 1) / NS;
+  if (PL.hole && angTo(gdir(f, (i0 + i1) / 2, (j0 + j1) / 2), HDIR) < PL.hole) continue;            // the core's shaft (Tau Jeffy VI)
   G.quad(gp(f, i0, j0, 0), gp(f, i1, j0, 0), gp(f, i1, j1, 0), gp(f, i0, j1, 0), COL.dark, K_GROUND, 0, [0, 0, 0], true);
 } }
 
@@ -694,8 +1031,8 @@ function sparkLocal() { const o = SHOT.orbit(), f = unit(sub(o.T, o.E)), rt = un
 function use(k, ht) { PL = PLANETS[k]; heroTop = ht; }
 
 /* ================= build one planet ================= */
-function buildPlanet(k, slots, lite, far) {
-  use(k, 40); SLOT = slots || {}; LITE = !!lite; FAR = !!far; PROPS = [];
+function buildPlanet(k, slots, lite, far, tau) {
+  use(k, 40); SLOT = slots || {}; LITE = !!lite; FAR = !!far; PROPS = []; if (tau) TS = tau;
   const camG = gdir(HERO.f, PL.cam[0], PL.cam[1]);
   VIS = unit(add(HDIR, gdir(4, PL.far[0] * 1.6, PL.far[1] * 1.6))); DCTR = unit(slerp(HDIR, camG, .4));
   r = rng(PL.seed); rs = rng(PL.seed + 7); JIT = 0; PK = k; G = new Geo(); LG = []; LANES = []; KB = 0; VOFF = 0;
@@ -705,12 +1042,12 @@ function buildPlanet(k, slots, lite, far) {
   const out = G.out(!FAR), tris = G.tris; G = null;
   return { k, far: FAR, heroTop, tris, ...out, lanes: FAR ? new Float32Array(0) : lanes, LG: FAR ? [] : LG, props: new Float32Array(FAR ? [] : PROPS), key: keyLocal(), sparkDir: sparkLocal() };
 }
-return { K_SOLID, WORDS, WC, WP, R, CELL, MACRO, HERO, HDIR, PLANETS, T_IN, T_DIVE, SPEED, P0, LAG, T0, sm5, seg, add, sub, mul, dot, cross, len, unit, gp, gdir, slerp, hex, FRONTS, COL,
+return { K_SOLID, WORDS, TWORDS: WORDS_TL, SITES, WC, WP, R, CELL, MACRO, HERO, HDIR, PLANETS, T_IN, T_DIVE, SPEED, P0, LAG, T0, sm5, seg, add, sub, mul, dot, cross, len, unit, gp, gdir, slerp, hex, FRONTS, COL,
   buildPlanet, view: (k, ht, name, t) => { use(k, ht); return shotAt(name, t); }, key: (k, ht) => { use(k, ht); return keyLocal(); } };
 })();
 if (typeof window === 'undefined' && typeof importScripts === 'function') {
   self.onmessage = e => {
-    const r = self.GEN.buildPlanet(e.data.k, e.data.slots, e.data.lite, e.data.far);
+    const r = self.GEN.buildPlanet(e.data.k, e.data.slots, e.data.lite, e.data.far, e.data.tau);
     self.postMessage(r, [r.P.buffer, r.N.buffer, r.C.buffer, r.O.buffer, r.I.buffer, r.lanes.buffer, r.CH.buffer, r.props.buffer]);
   };
 }

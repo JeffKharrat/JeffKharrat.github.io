@@ -2,11 +2,11 @@
    cavity wall is its memory, a keyboard of every JLPT kanji. Two views: the base view (the AI and the corporation's
    panels) and the wall view (on the gantry, looking around the wall). Clicking a key presses it and opens its file. */
 import * as THREE from '../vendor/three.module.min.js';
-import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js';
-import * as store from './store.js';
+import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=2';
+import * as store from './store.js?v=2';
 
 const $ = s => document.querySelector(s);
-const QS = new URLSearchParams(location.search), DEMO = QS.has('demo');
+const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;   // embed: opened over the site from Tau Jeffy VI
 const ACC = new THREE.Color('#4A5BFF'), WARM = new THREE.Color('#FFB347');
 const sm5 = t => { t = Math.min(1, Math.max(0, t)); return t * t * t * (t * (t * 6 - 15) + 10); };
 
@@ -309,9 +309,18 @@ void main(){ if (vU.y < uOpen) discard;
 /* ---------------- state → keys ---------------- */
 let SAVE = null, DECK = null, S = null, PROG = null;
 function certifiedSet() { const c = new Set(); if (SAVE) for (const [id, w] of Object.entries(SAVE.words)) if (w.cert) c.add(+id); return c; }
+const manualSet = () => new Set(Object.keys((SAVE && SAVE.kanji) || {}));
+/* mark or unmark a kanji as acquired by hand */
+function setManual(ks, on) {
+  SAVE.kanji = SAVE.kanji || {}; let n = 0;
+  for (const k of ks) { if (!KD.byK.has(k)) continue; if (on && !SAVE.kanji[k]) { SAVE.kanji[k] = Date.now(); n++; } if (!on && SAVE.kanji[k]) { delete SAVE.kanji[k]; n++; } }
+  if (n) { store.store(SAVE, null); applyState(); }
+  return n;
+}
 function applyState() {
   const deck = DECK || [], cert = certifiedSet();
-  S = keyStates(KD, deck, cert); PROG = progress(KD, S);
+  S = keyStates(KD, deck, cert, manualSet()); PROG = progress(KD, S);
+  summary();
   const a = WALL.aS.array, f1 = WALL.aF1.array;
   KD.list.forEach((k, i) => {
     a[i * 4] = S[i].lvl; let mask = 0; k.fa.slice(0, 6).forEach((f, j) => { if (S[i].covered.has(f.id)) mask |= 1 << j; }); a[i * 4 + 1] = mask;
@@ -350,10 +359,23 @@ canvas.addEventListener('pointermove', e => {
     const k = .0032 * VIEW.fov / 56; VIEW.yaw += dx * k; VIEW.pitch = Math.max(-.42, Math.min(.42, VIEW.pitch + dy * k));
   }
 });
-canvas.addEventListener('pointerup', e => { mouse.down = false; if (mouse.moved < 6 && VIEW.mode === 'wall' && hover >= 0) pressKey(hover); });
+canvas.addEventListener('pointerup', e => {
+  mouse.down = false; mouse.x = e.clientX; mouse.y = e.clientY; mouse.inside = true;
+  const hit = pick(); if (hit >= 0) hover = hit;                      // pick now: don't wait for the next frame's hover
+  if (!(mouse.moved < 6 && VIEW.mode === 'wall' && hit >= 0)) return;
+  if (BATCH) { const k = KD.list[hover], on = !S[hover].manual; if (on && S[hover].lvl >= 2) { toast(k.k + ' is already in memory through your words.'); return; }
+    setManual([k.k], on); press = { i: hover, t: 0 }; ripT = 0; WALL.U.uRipC.value.copy(WALL.pos[hover]); toast((on ? '取得 · ' : '取消 · ') + k.k + ' · ' + Object.keys(SAVE.kanji).length + ' marked by hand', 1400); }
+  else pressKey(hover);
+});
+/* batch mode: each click marks or unmarks a key, without opening its file */
+let BATCH = false;
+$('#b-batch').onclick = () => { BATCH = !BATCH; $('#b-batch').classList.toggle('on', BATCH); document.body.classList.toggle('batch', BATCH); if (BATCH) { closeFile(); toast('Batch mode: click the kanji you already know to mark them acquired. Click again to undo.', 4200); } };
 canvas.addEventListener('pointerleave', () => { mouse.inside = false; });
 canvas.addEventListener('wheel', e => { if (VIEW.mode !== 'wall') return; e.preventDefault(); VIEW.fov = Math.max(18, Math.min(62, VIEW.fov * (1 + Math.sign(e.deltaY) * .08))); }, { passive: false });
+const surface = () => parent.postMessage('karatto:surface', location.origin);
+if (EMBED) { const b = document.createElement('button'); b.className = 'btn'; b.id = 'b-surf'; b.innerHTML = '地上<small>Back to the surface</small>'; $('#bar').prepend(b); b.onclick = surface; }
 addEventListener('keydown', e => {
+  if (EMBED && e.key === 'Escape' && VIEW.mode === 'base' && !$('#set').classList.contains('on')) { surface(); return; }
   if (VIEW.mode !== 'wall') return;
   if (e.key === 'ArrowLeft') VIEW.yaw += .05; if (e.key === 'ArrowRight') VIEW.yaw -= .05; if (e.key === 'ArrowUp') VIEW.pitch = Math.min(.42, VIEW.pitch + .04); if (e.key === 'ArrowDown') VIEW.pitch = Math.max(-.42, VIEW.pitch - .04);
   if (e.key === 'Escape') { if ($('#file').classList.contains('on')) closeFile(); else go('base'); }
@@ -389,11 +411,22 @@ function openFile(i) {
       <div class="st">${LVJ[s.lvl]} · ${LV[s.lvl]}</div><div class="lbl" style="margin-top:4px">${k.m.join(' · ')}</div></div></div>
     <h4>Usage covered · ${Math.round(s.cov * 100)}%</h4>${k.r ? '<p class="lbl">A rare kanji: no common word uses it, so it has no usage map.</p>' : fac}
     <h4>Your words · ${words.length}</h4>${wl}
-    <h4>Readings</h4><div class="lbl">音 ${k.on.join('、') || '—'} &nbsp; 訓 ${k.kun.join('、') || '—'}</div>`;
+    <h4>Readings</h4><div class="lbl">音 ${k.on.join('、') || '—'} &nbsp; 訓 ${k.kun.join('、') || '—'}</div>
+    <div class="grp man">${s.manual ? `<span class="lbl">Marked acquired by hand · ${new Date(SAVE.kanji[k.k]).toLocaleDateString()}</span> <button class="btn" id="f-man">Undo</button>`
+      : s.lvl >= 2 ? '' : `<button class="btn" id="f-man">取得済みにする<small>I know this kanji: mark it acquired</small></button>`}</div>`;
+  const fm = $('#f-man'); if (fm) fm.onclick = () => { setManual([k.k], !s.manual); openFile(i); };
   $('#file').classList.add('on');
 }
 function closeFile() { $('#file').classList.remove('on'); }
 $('#file-x').onclick = closeFile;
+
+/* ---------------- the summary the planet reads (same origin, no kanji data needed there) ---------------- */
+function summary() {
+  const lev = {}; for (const [l, v] of Object.entries(PROG.lev)) lev[l] = { a: v.a, n: v.n, m: v.m };
+  const div = {}; for (const v of Object.values(PROG.div)) (div[v.l] = div[v.l] || [])[v.d] = Math.round(v.a / v.n * 100) / 100;
+  const counts = [0, 0, 0, 0, 0]; S.forEach(s => counts[s.lvl]++);
+  try { localStorage.setItem('karatto.summary', JSON.stringify({ t: Date.now(), tier: PROG.tier, lev, div, counts, corp: SAVE.corp })); } catch (e) {}
+}
 
 /* ---------------- the corporation's panels ---------------- */
 function ui() {
@@ -439,12 +472,18 @@ function settings() {
       <p>Paste a GitHub token that can only read and write gists. The game keeps your save in a private gist and finds it on your other PC.</p>
       <input id="s-tok" type="password" placeholder="github_pat_…" value="${tok ? '••••••••' : ''}">
       <button class="btn" id="s-save">Save token</button> <button class="btn" id="s-clear">Forget token</button></div>
+    <div class="grp"><b>Kanji you already know</b> <span class="lbl">· ${Object.keys(SAVE.kanji || {}).length} marked by hand</span>
+      <p>Paste any text: every JLPT kanji in it is marked acquired (the minimum). Words you commit to memory later take them further. Batch mode on the wall does the same one key at a time.</p>
+      <textarea id="s-kan" rows="3" placeholder="日本語、学生、先生…"></textarea>
+      <button class="btn" id="s-kan-go">Mark these acquired</button> <button class="btn" id="s-kan-clear">Clear all hand marks</button></div>
     <div class="grp"><b>Backup</b><p>A copy of your save as a file.</p><button class="btn" id="s-exp">Export save</button></div>`;
   $('#set').classList.add('on');
   $('#s-anki').onclick = async () => { try { toast('Reading the deck…', 60000); DECK = await store.loadDeckFromAnki((a, b) => toast(`Reading the deck… ${a}/${b}`, 60000)); store.store(SAVE, DECK); applyState(); toast(`Deck read: ${DECK.length} words.`); } catch (e) { toast('Anki not reachable: ' + e.message, 5000); } };
   $('#s-save').onclick = () => { const v = $('#s-tok').value.trim(); if (v && !v.startsWith('•')) { store.token.set(v); store.push(SAVE, DECK).then(() => toast('Synced to your private gist.')).catch(e => toast('GitHub refused the token: ' + e.message, 5000)); } links(); };
   $('#s-clear').onclick = () => { store.token.set(''); links(); toast('Token forgotten on this PC.'); };
   $('#s-exp').onclick = () => store.exportSave(SAVE);
+  $('#s-kan-go').onclick = () => { const ks = [...new Set([...$('#s-kan').value].filter(c => KD.byK.has(c)))]; const n = setManual(ks, true); toast(`${n} kanji marked acquired (${ks.length - n} were already).`); settings(); };
+  $('#s-kan-clear').onclick = () => { if (!confirm('Remove every hand mark? Words in memory are kept.')) return; const n = setManual(Object.keys(SAVE.kanji || {}), false); toast(n + ' hand marks removed.'); settings(); };
 }
 $('#b-set').onclick = settings; $('#set-x').onclick = () => $('#set').classList.remove('on');
 $('#b-wall').onclick = () => go('wall'); $('#b-base').onclick = () => go('base');
@@ -501,5 +540,6 @@ function frame(now) {
   ANKI_OK = await store.ankiAvailable();
   applyState();
   if (!DECK && !DEMO) toast(ANKI_OK ? 'Anki found: open Settings to read your deck.' : 'No deck yet: open Anki, then Settings → Read the deck.', 6000);
+  if (EMBED) parent.postMessage('karatto:ready', location.origin);
   window.__k = { go, pressKey, view: VIEW, state: () => ({ tier: PROG.tier, deck: (DECK || []).length }), yaw: (y, p, f) => { VIEW.yaw = y; VIEW.pitch = p || 0; if (f) VIEW.fov = f; }, sec: i => { const s = WALL.L.sections[i]; return WALL.L.angle(s.c0 + 8, 0).t; } };
 })();
