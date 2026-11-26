@@ -56,7 +56,31 @@ class Geo {
     this.tri(a, b, c, n, col, kind, seed);
   }
   get tris() { return this.ic / 3; }
-  out() { return { P: this.P.slice(0, this.vc * 3), N: this.N.slice(0, this.vc * 4), C: this.C.slice(0, this.vc * 4), O: this.O.slice(0, this.vc), I: this.I.slice(0, this.ic) }; }
+  out(chunked) {
+    const o = { P: this.P.slice(0, this.vc * 3), N: this.N.slice(0, this.vc * 4), C: this.C.slice(0, this.vc * 4), O: this.O.slice(0, this.vc) };
+    if (!chunked) { o.I = this.I.slice(0, this.ic); o.CH = new Float32Array(0); return o; }
+    /* 6 cube faces x 4 x 4; per chunk: first index, index count, centre direction, cos of its angular radius, max radius, AABB */
+    const NB = 4, NC = 6 * NB * NB, nt = this.ic / 3, I = this.I, P = this.P, id = new Uint16Array(nt), cnt = new Uint32Array(NC);
+    for (let t = 0; t < nt; t++) {
+      const v = I[t * 3] * 3, x = P[v], y = P[v + 1], z = P[v + 2], ax = Math.abs(x), ay = Math.abs(y), az = Math.abs(z);
+      let fc, u, w; if (ax >= ay && ax >= az) { fc = x > 0 ? 0 : 1; u = y / ax; w = z / ax; } else if (ay >= az) { fc = y > 0 ? 2 : 3; u = x / ay; w = z / ay; } else { fc = z > 0 ? 4 : 5; u = x / az; w = y / az; }
+      const c = fc * NB * NB + Math.min(NB - 1, (u + 1) / 2 * NB | 0) * NB + Math.min(NB - 1, (w + 1) / 2 * NB | 0); id[t] = c; cnt[c]++;
+    }
+    const st = new Uint32Array(NC); for (let c = 1; c < NC; c++) st[c] = st[c - 1] + cnt[c - 1];
+    const J = new Uint32Array(this.ic), fill = st.slice(), cx = new Float64Array(NC * 3), bb = new Float64Array(NC * 6), mx = new Float64Array(NC);
+    for (let c = 0; c < NC; c++) { bb[c * 6] = bb[c * 6 + 1] = bb[c * 6 + 2] = 1e9; bb[c * 6 + 3] = bb[c * 6 + 4] = bb[c * 6 + 5] = -1e9; }
+    for (let t = 0; t < nt; t++) { const c = id[t], d = fill[c]++ * 3;
+      for (let q = 0; q < 3; q++) { const vi = I[t * 3 + q]; J[d + q] = vi; const x = P[vi * 3], y = P[vi * 3 + 1], z = P[vi * 3 + 2], L = Math.hypot(x, y, z) || 1;
+        cx[c * 3] += x / L; cx[c * 3 + 1] += y / L; cx[c * 3 + 2] += z / L; if (L > mx[c]) mx[c] = L;
+        bb[c * 6] = Math.min(bb[c * 6], x); bb[c * 6 + 1] = Math.min(bb[c * 6 + 1], y); bb[c * 6 + 2] = Math.min(bb[c * 6 + 2], z);
+        bb[c * 6 + 3] = Math.max(bb[c * 6 + 3], x); bb[c * 6 + 4] = Math.max(bb[c * 6 + 4], y); bb[c * 6 + 5] = Math.max(bb[c * 6 + 5], z); } }
+    const list = []; for (let c = 0; c < NC; c++) if (cnt[c]) list.push(c);
+    const CH = new Float32Array(list.length * 13);
+    list.forEach((c, n) => { const L = Math.hypot(cx[c * 3], cx[c * 3 + 1], cx[c * 3 + 2]) || 1, d = [cx[c * 3] / L, cx[c * 3 + 1] / L, cx[c * 3 + 2] / L];
+      let mn = 1; for (let i = st[c] * 3; i < (st[c] + cnt[c]) * 3; i++) { const vi = J[i] * 3, x = P[vi], y = P[vi + 1], z = P[vi + 2], Lv = Math.hypot(x, y, z) || 1; mn = Math.min(mn, (x * d[0] + y * d[1] + z * d[2]) / Lv); }
+      CH.set([st[c] * 3, cnt[c] * 3, d[0], d[1], d[2], mn, mx[c], bb[c * 6], bb[c * 6 + 1], bb[c * 6 + 2], bb[c * 6 + 3], bb[c * 6 + 4], bb[c * 6 + 5]], n * 13); });
+    o.I = J; o.CH = CH; return o;
+  }
 }
 let G = null, KB = 0, VOFF = 0;                                             // the geometry being built; KB: base height everything is lifted by
 /* a grid box on face f: i, j, k ranges in cells. Tops and wide walls are split every SUB cells so they follow the curve. */
@@ -133,6 +157,7 @@ function roof(f, a0, a1, b0, b1, k, lod) {
   const p = .3, h = .7;
   gbox(f, a0, a1, b0, b0 + p, k, k + h, COL.mid); gbox(f, a0, a1, b1 - p, b1, k, k + h, COL.mid);
   gbox(f, a0, a0 + p, b0 + p, b1 - p, k, k + h, COL.mid); gbox(f, a1 - p, a1, b0 + p, b1 - p, k, k + h, COL.mid);
+  if (lod >= 1 && !FAR) roofProps(f, a0, a1, b0, b1, k, lod);
   if (lod < 2) return;
   const n = 1 + (r() * 3 | 0);
   for (let m = 0; m < n; m++) {
@@ -195,8 +220,8 @@ function lanesGrid(start, pitch, seg, k0, k1, p, along = ['i', 'j']) {
 const HERO = { f: 4, i: 0, j: 0 }, HDIR = gdir(4, 0, 0);
 let VIS = HDIR, DCTR = HDIR, LG = [];
 const seen = d => dot(d, VIS) > -.12;
-let LITE = false;                                                   // small screens: no full-detail districts, far fewer triangles
-const lodOf = d => { const a = angTo(d, DCTR); return LITE ? (a < .55 ? 1 : 0) : (a < .5 ? 2 : a < .95 ? 1 : 0); };
+let LITE = false, FAR = false;                                                   // small screens: no full-detail districts, far fewer triangles
+const lodOf = d => { if (FAR) return 0; const a = angTo(d, DCTR); return LITE ? (a < .55 ? 1 : 0) : (a < .64 ? 2 : a < 1.05 ? 1 : 0); };   // far: the planet seen from afar, blocks only
 const PAINT = hex('#14161B');
 let SLOT = {};
 /* a sign on the hero's j- wall at jw, centred (ic, kc), width w; PAINT signs sit on a solid bone panel. The quad's texture
@@ -207,6 +232,24 @@ function plateJ(item, jw, ic, kc, w, col) {
   const j = col === PAINT ? jw - .43 : jw - .08, P = (i, k) => gp(f, i, j, k + KB);
   const a = P(ic - w / 2, kc - hgt / 2), b = P(ic + w / 2, kc - hgt / 2), c = P(ic + w / 2, kc + hgt / 2), d = P(ic - w / 2, kc + hgt / 2);
   LG.push({ item, pts: [a, b, c, d], col, n: unit(cross(sub(b, a), sub(d, a))) });
+}
+
+/* ================= props: small rooftop equipment, instanced (types: 0 AC unit, 1 water tank, 2 antenna, 3 duct, 4 dish) =================
+   Their own random stream (rs): the buildings are unchanged. Kept clear of the parapet. */
+let PROPS = [];
+function prop(t, f, i, j, k, s = 1, rot = 0) {
+  const o = gp(f, i, j, k + KB), up = gdir(f, i, j), e0 = unit(sub(gp(f, i + 1, j, k + KB), o)), n0 = cross(up, e0);
+  const e = add(mul(e0, Math.cos(rot)), mul(n0, Math.sin(rot)));
+  PROPS.push(t, o[0], o[1], o[2], up[0], up[1], up[2], e[0], e[1], e[2], s);
+}
+function roofProps(f, a0, a1, b0, b1, k, lod) {
+  const W = a1 - a0, D = b1 - b0; if (W < 3 || D < 3) return;
+  const n = Math.min(9, Math.round(W * D / (lod > 1 ? 7 : 14) * rs())), rot = (rs() * 4 | 0) * Math.PI / 2;
+  for (let m = 0; m < n; m++) {
+    const q = rs(), t = q < .5 ? 0 : q < .66 ? 3 : q < .8 ? 1 : q < .93 ? 2 : 4;
+    const i = a0 + 1 + rs() * (W - 2), j = b0 + 1 + rs() * (D - 2);
+    prop(t, f, i, j, k, t === 1 ? .8 + rs() * .5 : t === 2 ? .7 + rs() * .8 : .8 + rs() * .4, rot + (t === 4 ? rs() * 6 : 0));
+  }
 }
 
 /* ================= Japanese signage: words drawn in the atlas, put up on the city's buildings =================
@@ -344,7 +387,7 @@ const PLANETS = [
     topLamp(f, -27.8, 4, 41.2); topLamp(f, 27.2, -1, 35.2);
     for (let a = 0; a < 12; a++) { const t = a / 12 * Math.PI * 2, pi = Math.cos(t) * 33, pj = Math.sin(t) * 33; gbox(f, pi - 1, pi + 1, pj - 1, pj + 1, 0, 9 + (a % 3) * 3, COL.bone); topLamp(f, pi - .3, pj - .3, 9 + (a % 3) * 3); }
     gbox(f, -4, 4, -70, -36, -1, .3, COL.slate); for (let y = -68; y < -37; y += 5) { gbox(f, -5.5, -5, y, y + .5, 0, 3, COL.bone); gbox(f, 5, 5.5, y, y + .5, 0, 3, COL.bone); }
-    plateJ('n01', -26, -6, 8, 11, PAINT); plateJ('code', -26, 7, 3.4, 6, PAINT); plateJ('vk', -6, -27.5, 28, 2.8, PAINT);
+    plateJ('code', -26, 7, 3.4, 6, PAINT); plateJ('vk', -6, -27.5, 28, 2.8, PAINT);
     return top;
   },
   /* the fly-by: the orbital ring, which the camera dives through */
@@ -381,7 +424,7 @@ const PLANETS = [
     beam(fr, [-27, 0, 20], [-27, 24, 20], 1.2, COL.steel); beam(fr, [-21, 0, 20], [-21, 24, 20], 1.2, COL.steel); beam(fr, [-27, 24, 20], [6, 24, 20], 1.6, COL.steel);
     for (let x = -26; x < 4; x += 3) beam(fr, [x, 24, 20], [x + 1.5, 21.5, 20], .3, COL.steel);
     gbox(f, -1, 1, 4, 6, top, top + 10, COL.bone); topLamp(f, -.3, 4.7, top + 10);
-    plateJ('n01', -15, -5, 9, 12, PAINT); plateJ('code', -15, 7, 6.5, 7, PAINT); plateJ('vk', -12, 7, 38, 3.2, PAINT);
+    plateJ('code', -15, 7, 6.5, 7, PAINT); plateJ('vk', -12, 7, 38, 3.2, PAINT);
     return top;
   },
   /* the fly-by: a space elevator beside the dive. A lattice tether rises from an anchor block to a counterweight station;
@@ -424,6 +467,7 @@ const PLANETS = [
         if (q < .22) for (let v = 0; v < 3; v++) gbox(f, bi + 1 + v * 1.6, bi + 2 + v * 1.6, bj + 1.5, bj + 4.5, h + .3, h + 1.1, COL.dark);
         else if (q < .34) { const H = 5 + r() * 10; KB = h - 1; building(f, bi + .8, bi + 5.2, bj + .8, bj + 5.2, H, COL.light, 2, { levels: 2, notch: 0, storey: 3 }); KB = 0; }
         else if (q < .42) topLamp(f, ci - .3, cj - .3, h + .3);
+        if (h >= 2 && rs() < .5) roofProps(f, bi + 1.2, bi + 4.8, bj + 1.2, bj + 4.8, h + .3, 2);
         if (h >= 3 && rs() < .45) flatSign(f, wallOf(rs() * 4 | 0, bi, bi + 6, bj, bj + 6), bi + 3 + (rs() - .5) * 2, Math.max(.2, h - 2.4), 2, false, h - .2);   // a sign on the block
       }
     } });
@@ -441,7 +485,7 @@ const PLANETS = [
     for (let v = 0; v < 6; v++) gbox(f, -12 + v * 4, -10 + v * 4, -22, -18, 12, 15, COL.dark);
     for (let w = 0; w < 14; w++) lamp(f, 'j-', -14, -12 + (w % 7) * 3.6, 16 + (w / 7 | 0) * 5, .6);
     gbox(f, -1, 1, -1, 1, top, top + 10, COL.bone); topLamp(f, -.3, -.3, top + 10);
-    plateJ('n01', -14, -4, 25, 12, PAINT); plateJ('code', -14, 7, 21, 7, PAINT); plateJ('vk', -33, 20, 6.5, 2.4, hex('#9AA1B0'));
+    plateJ('code', -14, 7, 21, 7, PAINT); plateJ('vk', -33, 20, 6.5, 2.4, hex('#9AA1B0'));
     return top;
   },
   /* the fly-by: three satellites the camera drops past, each built just before it gets there */
@@ -501,7 +545,7 @@ const PLANETS = [
     nbox(f, -22, 22, -22, 22, 24, 30, COL.bone, K_WIN, 2); gbox(f, -22.4, 22.4, -22.4, 22.4, 30, 30.6, COL.mid);
     KB = 29.6; const top = 29.6 + building(f, -12, 12, -12, 12, 22, COL.light, 2, { levels: 3, storey: 4, notch: 2, ledge: true, finP: 1 }); KB = 0;
     gbox(f, -1, 1, -1, 1, top, top + 9, COL.bone); topLamp(f, -.3, -.3, top + 9);
-    plateJ('n01', -22, -11, 27, 10, PAINT); plateJ('code', -22, 9, 27, 7, PAINT); plateJ('vk', -22, -15, 12, 2.4, PAINT);
+    plateJ('code', -22, 9, 27, 7, PAINT); plateJ('vk', -22, -15, 12, 2.4, PAINT);
     return top;
   },
   /* the fly-by: a field of cube debris the camera falls through, kept out of the reading view */
@@ -561,7 +605,7 @@ const PLANETS = [
       obox(add(fr.o, add(mul(dir, 18), mul(fr.up, h + .6))), dir, fr.up, tg, [3, .6, .7], COL.mid);
     }
     gbox(f, -1, 1, -1, 1, top, top + 10, COL.bone); topLamp(f, -.3, -.3, top + 10);
-    plateJ('n01', -11, -4, 8, 8, PAINT); plateJ('code', -11, 5, 6, 6, PAINT); plateJ('vk', -11, 6, 26, 2, PAINT);
+    plateJ('code', -11, 5, 6, 6, PAINT); plateJ('vk', -11, 6, 26, 2, PAINT);
     return top;
   },
   /* the fly-by: a belt of square mirror panels around the planet that the dive cuts through */
@@ -594,7 +638,7 @@ function timedOff(Q) {
 function topLampAt(p, n, s = .5) { const X = unit(cross(n, [.2, .9, .3])), Z = cross(X, n); G.quad(add(p, add(mul(X, -s), mul(Z, -s))), add(p, add(mul(X, s), mul(Z, -s))), add(p, add(mul(X, s), mul(Z, s))), add(p, add(mul(X, -s), mul(Z, s))), COL.ink, K_LAMP, r(), sub(p, n), true); }
 
 /* ================= the ground ================= */
-function ground() { const NS = LITE ? 40 : 72; for (let f = 0; f < 6; f++) for (let a = 0; a < NS; a++) for (let b = 0; b < NS; b++) {
+function ground() { const NS = FAR ? 28 : LITE ? 40 : 72; for (let f = 0; f < 6; f++) for (let a = 0; a < NS; a++) for (let b = 0; b < NS; b++) {
   const i0 = -IMAX + 2 * IMAX * a / NS, i1 = -IMAX + 2 * IMAX * (a + 1) / NS, j0 = -IMAX + 2 * IMAX * b / NS, j1 = -IMAX + 2 * IMAX * (b + 1) / NS;
   G.quad(gp(f, i0, j0, 0), gp(f, i1, j0, 0), gp(f, i1, j1, 0), gp(f, i0, j1, 0), COL.dark, K_GROUND, 0, [0, 0, 0], true);
 } }
@@ -648,23 +692,23 @@ function sparkLocal() { const o = SHOT.orbit(), f = unit(sub(o.T, o.E)), rt = un
 function use(k, ht) { PL = PLANETS[k]; heroTop = ht; }
 
 /* ================= build one planet ================= */
-function buildPlanet(k, slots, lite) {
-  use(k, 40); SLOT = slots || {}; LITE = !!lite;
+function buildPlanet(k, slots, lite, far) {
+  use(k, 40); SLOT = slots || {}; LITE = !!lite; FAR = !!far; PROPS = [];
   const camG = gdir(HERO.f, PL.cam[0], PL.cam[1]);
   VIS = unit(add(HDIR, gdir(4, PL.far[0] * 1.6, PL.far[1] * 1.6))); DCTR = unit(slerp(HDIR, camG, .4));
   r = rng(PL.seed); rs = rng(PL.seed + 7); PK = k; G = new Geo(); LG = []; LANES = []; KB = 0; VOFF = 0;
   ground(); heroTop = PL.build(); KB = 0;
   if (PL.orbital) { r = rng(PL.seed + 99); PL.orbital(); VOFF = 0; }
   const lanes = new Float32Array(LANES.length * 7); LANES.forEach(([a, b, L], n) => lanes.set([...a, ...b, L], n * 7));
-  const out = G.out(), tris = G.tris; G = null;
-  return { k, heroTop, tris, ...out, lanes, LG, key: keyLocal(), sparkDir: sparkLocal() };
+  const out = G.out(!FAR), tris = G.tris; G = null;
+  return { k, far: FAR, heroTop, tris, ...out, lanes: FAR ? new Float32Array(0) : lanes, LG: FAR ? [] : LG, props: new Float32Array(FAR ? [] : PROPS), key: keyLocal(), sparkDir: sparkLocal() };
 }
-return { WORDS, WC, WP, R, CELL, MACRO, HERO, HDIR, PLANETS, T_IN, T_DIVE, SPEED, P0, LAG, T0, sm5, seg, add, sub, mul, dot, cross, len, unit, gp, gdir, slerp, hex, FRONTS, COL,
+return { K_SOLID, WORDS, WC, WP, R, CELL, MACRO, HERO, HDIR, PLANETS, T_IN, T_DIVE, SPEED, P0, LAG, T0, sm5, seg, add, sub, mul, dot, cross, len, unit, gp, gdir, slerp, hex, FRONTS, COL,
   buildPlanet, view: (k, ht, name, t) => { use(k, ht); return shotAt(name, t); }, key: (k, ht) => { use(k, ht); return keyLocal(); } };
 })();
 if (typeof window === 'undefined' && typeof importScripts === 'function') {
   self.onmessage = e => {
-    const r = self.GEN.buildPlanet(e.data.k, e.data.slots, e.data.lite);
-    self.postMessage(r, [r.P.buffer, r.N.buffer, r.C.buffer, r.O.buffer, r.I.buffer, r.lanes.buffer]);
+    const r = self.GEN.buildPlanet(e.data.k, e.data.slots, e.data.lite, e.data.far);
+    self.postMessage(r, [r.P.buffer, r.N.buffer, r.C.buffer, r.O.buffer, r.I.buffer, r.lanes.buffer, r.CH.buffer, r.props.buffer]);
   };
 }

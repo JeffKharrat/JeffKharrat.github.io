@@ -49,8 +49,14 @@ const camera = new THREE.PerspectiveCamera(34, 1, .5, 40000);
 const VS = `
 attribute vec4 aNS; attribute vec4 aCK; attribute float aOff;
 varying vec3 vP; varying vec3 vN; varying vec3 vCol; varying float vKind; varying float vSeed; varying float vOff;
-void main(){ vP = position; vN = aNS.xyz; vCol = aCK.rgb; vKind = floor(aCK.a * 255. + .5); vSeed = aNS.w * .5 + .5; vOff = aOff;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`;
+void main(){
+#ifdef USE_INSTANCING
+  vec4 lp = instanceMatrix * vec4(position, 1.); vN = normalize(mat3(instanceMatrix) * aNS.xyz);
+#else
+  vec4 lp = vec4(position, 1.); vN = aNS.xyz;
+#endif
+  vP = lp.xyz; vCol = aCK.rgb; vKind = floor(aCK.a * 255. + .5); vSeed = aNS.w * .5 + .5; vOff = aOff;
+  gl_Position = projectionMatrix * modelViewMatrix * lp; }`;
 const FS = `
 precision highp float;
 uniform float uR, uCell, uM, uProg, uLag, uMode, uTime;
@@ -130,6 +136,23 @@ void main(){
       float band = wall * step(4., mod(cid.z, 5.)) * step(1., cid.z) * (win ? 0. : 1.);
       vec3 alb = vCol * (.95 + .09 * hash(cid + D * 31.)) * (1. - .16 * band);
       col = solidC(alb, L, gl) * cool + alb * SPKC * Ls * .8 + SPKC * sheen * .5;
+      float near = 1. - smoothstep(.11, .24, px);
+      if (near > 0.) {
+        bool fA = abs(dot(n, tA)) > abs(dot(n, tB));
+        vec2 c2 = wall > .5 ? (fA ? vec2(g.y, g.z) : vec2(g.x, g.z)) : g.xy, f2 = fract(c2);
+        float hs = hash(vec3(floor(c2), 9. + floor(vCol.x * 30.)) + D * 13. + n * 3.), det = 0.;
+        float box = step(.16, f2.x) * step(f2.x, .84) * step(.16, f2.y) * step(f2.y, .84);
+        if (wall > .5 && !win) {
+          if (hs < .08) det = box * step(.5, fract(f2.y * 3.));                                  // a vent grille
+          else if (hs < .22) det = (1. - smoothstep(0., .035, abs(f2.x - .5))) * .8;               // a panel seam
+          else if (hs < .26) det = step(.32, f2.x) * step(f2.x, .68) * step(.3, f2.y) * step(f2.y, .74) * .7;   // a hatch
+        } else if (wall < .5) {
+          vec2 sb = fract(c2 * 2.); det = (1. - smoothstep(0., .05, min(min(sb.x, 1. - sb.x), min(sb.y, 1. - sb.y)))) * .3;   // roof plates
+          if (hs < .05) det = max(det, box * step(.5, fract(f2.x * 3.)));                       // a roof grille
+        }
+        col = mix(col, col * .52, det * near);
+      }
+      if (wall > .5) col *= mix(.68, 1., smoothstep(-.5, 2.4, g.z));                              // grime at the foot of walls
       /* windows: each wall cell a recessed opening, seen with parallax (the back of the recess shifts with the view) */
       if (win && wall > .5) {
         bool faceA = abs(dot(n, tA)) > abs(dot(n, tB));
@@ -176,6 +199,25 @@ const UT = { value: 0 };
 const planetUniforms = () => ({ uR: { value: R }, uCell: { value: 1 }, uM: { value: MACRO }, uProg: { value: -9 }, uLag: { value: LAG }, uMode: { value: 1 }, uTime: UT,
   uOrigin: { value: V3(HDIR) }, uKey: { value: new THREE.Vector3(0, 1, 0) }, uAcc: { value: new THREE.Color(FRONTS[0][1]) }, uCamL: { value: new THREE.Vector3() }, uSpk: { value: new THREE.Vector3(0, 1, 0) } });
 const freeCPU = function () { this.array = null; };
+/* ?debug in the address: frames per second and triangles drawn, top right of the stage */
+const DBG = /[?&]debug\b/.test(location.search) ? (() => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;right:8px;top:8px;z-index:5;font:12px/1.4 monospace;color:#B4F000;background:rgba(0,0,0,.6);padding:4px 7px;pointer-events:none;white-space:pre'; box.appendChild(d); return { d, n: 0, t: performance.now() }; })() : null;
+/* prop shapes (instanced): built once, in cells, base at 0, up = y; colour per part */
+const PROP_G = (() => {
+  const C = GEN.COL, mk = parts => {
+    const P = [], N = [], K = [];
+    parts.forEach(([geo, col, x, y, z]) => { const g = geo.toNonIndexed(); g.translate(x, y, z); const p = g.attributes.position.array, n = g.attributes.normal.array;
+      for (let i = 0; i < p.length; i += 3) { P.push(p[i], p[i + 1], p[i + 2]); N.push(n[i], n[i + 1], n[i + 2], .2); K.push(col[0], col[1], col[2], GEN.K_SOLID / 255); } });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('aNS', new THREE.Float32BufferAttribute(N, 4));
+    g.setAttribute('aCK', new THREE.Float32BufferAttribute(K, 4)); g.setAttribute('aOff', new THREE.Float32BufferAttribute(new Float32Array(P.length / 3), 1)); return g; };
+  const B = (w, h, d) => new THREE.BoxGeometry(w, h, d), Cy = (r, h, s = 10) => new THREE.CylinderGeometry(r, r, h, s);
+  return [
+    mk([[B(1.5, .9, 1.1), C.light, 0, .45, 0], [Cy(.38, .08, 12), C.dark, -.3, .94, 0], [B(.12, .5, .12), C.mid, .55, 1.15, .3]]),                       // AC unit
+    mk([[Cy(.85, 1.5, 12), C.bone, 0, 1.45, 0], [Cy(.9, .1, 12), C.mid, 0, 2.25, 0], ...[[-.5, -.5], [.5, -.5], [-.5, .5], [.5, .5]].map(([x, z]) => [B(.12, .7, .12), C.dark, x, .35, z])]),   // water tank on legs
+    mk([[B(.12, 4.2, .12), C.bone, 0, 2.1, 0], [B(1.3, .08, .08), C.bone, 0, 3.1, 0], [B(.9, .08, .08), C.bone, 0, 3.7, 0], [B(.3, .3, .3), C.dark, 0, .15, 0]]),   // antenna
+    mk([[B(.55, .55, 2.6), C.steel, 0, .5, 0], [B(.55, .7, .55), C.steel, 0, .35, -1.3], [B(.7, .15, .7), C.dark, 0, .78, 1.1]]),                       // duct
+    mk([[Cy(.08, .9, 6), C.mid, 0, .45, 0], [new THREE.CylinderGeometry(.75, .2, .35, 14), C.bone, 0, 1.05, 0]]),                                       // dish
+  ];
+})();
 
 /* ================= the signs' atlas ================= */
 const AW = 2048, AH = 2048, atlas = document.createElement('canvas'); atlas.width = AW; atlas.height = AH;
@@ -250,8 +292,29 @@ function onPlanet(res) {
   const g = new THREE.BufferGeometry(), at = (a, n, norm) => { const A = new THREE.BufferAttribute(a, n, norm); A.onUpload(freeCPU); return A; };
   g.setAttribute('position', at(res.P, 3)); g.setAttribute('aNS', at(res.N, 4, true)); g.setAttribute('aCK', at(res.C, 4, true)); g.setAttribute('aOff', at(res.O, 1));
   g.setIndex(at(res.I, 1)); g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), R * 4.6);
-  P.mesh = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: P.U, vertexShader: VS, fragmentShader: FS, side: THREE.DoubleSide, extensions: { derivatives: true } }));
-  P.group.add(P.mesh);
+  P.mat = P.mat || new THREE.ShaderMaterial({ uniforms: P.U, vertexShader: VS, fragmentShader: FS, side: THREE.DoubleSide, extensions: { derivatives: true } });
+  if (res.far) {                                                       // the planet as seen from afar: one cheap mesh
+    P.far = new THREE.Mesh(g, P.mat); P.group.add(P.far); P.farTris = res.tris;
+    if (!P.ready) planetCommon(P, res);
+    kick(); return;
+  }
+  /* the planet up close: its triangles in chunks (each culled against the view and the horizon), sharing one set of buffers */
+  P.chunks = []; const CH = res.CH;
+  for (let c = 0; c < CH.length; c += 13) {
+    const cg = new THREE.BufferGeometry(); for (const k in g.attributes) cg.setAttribute(k, g.attributes[k]); cg.setIndex(g.index); cg.setDrawRange(CH[c], CH[c + 1]);
+    const bx = new THREE.Box3(new THREE.Vector3(CH[c + 7], CH[c + 8], CH[c + 9]), new THREE.Vector3(CH[c + 10], CH[c + 11], CH[c + 12])); cg.boundingSphere = bx.getBoundingSphere(new THREE.Sphere());
+    const m = new THREE.Mesh(cg, P.mat); m.userData = { d: new THREE.Vector3(CH[c + 2], CH[c + 3], CH[c + 4]), a: Math.acos(Math.min(1, CH[c + 5])), h: Math.acos(Math.min(1, R / CH[c + 6])), tris: CH[c + 1] / 3 };
+    P.chunks.push(m); P.group.add(m);
+  }
+  /* props: one instanced mesh per shape */
+  P.props = []; const pr = res.props, cnt = [0, 0, 0, 0, 0];
+  for (let i = 0; i < pr.length; i += 11) cnt[pr[i]]++;
+  PROP_G.forEach((pg, t) => { if (!cnt[t]) return; const im = new THREE.InstancedMesh(pg, P.mat, cnt[t]); let n = 0;
+    const M = new THREE.Matrix4(), up = new THREE.Vector3(), e = new THREE.Vector3(), z = new THREE.Vector3();
+    for (let i = 0; i < pr.length; i += 11) { if (pr[i] !== t) continue; up.set(pr[i + 4], pr[i + 5], pr[i + 6]); e.set(pr[i + 7], pr[i + 8], pr[i + 9]); z.crossVectors(e, up).normalize(); const sc = pr[i + 10];
+      M.makeBasis(e.clone().multiplyScalar(sc), up.clone().multiplyScalar(sc), z.multiplyScalar(sc)).setPosition(pr[i + 1], pr[i + 2], pr[i + 3]); im.setMatrixAt(n++, M); }
+    im.instanceMatrix.needsUpdate = true; im.frustumCulled = false; im.userData.tris = pg.attributes.position.count / 3 * cnt[t]; P.props.push(im); P.group.add(im); });
+  P.full = true;
   const Pp = [], UV = [], Cc = [], NN = [], SS = [];
   res.LG.forEach(q => { const S = SLOT[q.item[0] === '@' ? q.item : P.k + ':' + q.item]; if (!S) return; const u0 = S.x / AW, u1 = (S.x + S.w) / AW, v0 = 1 - (S.y + S.h) / AH, v1 = 1 - S.y / AH, uv = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
     [0, 1, 2, 0, 2, 3].forEach(i => { Pp.push(...q.pts[i]); UV.push(...uv[i]); Cc.push(...q.col); NN.push(...q.n); SS.push(q.g || 0, q.city || 0); }); });
@@ -277,6 +340,9 @@ void main(){ float a = texture2D(uTex, vUv).a; if (a < .4) discard;
   gl_FragColor = vec4(c * on, 1.); }` }));
   P.labels.frustumCulled = false; P.group.add(P.labels);
   P.cars = carsMesh(P, res.lanes); P.group.add(P.cars);
+  if (!P.ready) planetCommon(P, res); else { vis(P, P.fr.on && P.fr.mode === 1 ? (P.fr.prog - LAG > -.1 ? 1 : 0) : 1); kick(); }
+}
+function planetCommon(P, res) {
   P.halo = new THREE.Mesh(HALO_G, new THREE.ShaderMaterial({ uniforms: { uC: { value: P.C }, uSpkW: { value: CORE.clone().sub(P.C).normalize() } }, vertexShader: HALO_VS, fragmentShader: HALO_FS,
     side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   P.halo.position.copy(P.C); P.halo.renderOrder = 2; scene.add(P.halo);
@@ -653,11 +719,20 @@ function frame(now) {
   STARS.position.copy(E);
   stepFronts(dt);
   PLS.forEach(P => P.U.uCamL.value.copy(E).sub(P.C).applyQuaternion(P.Qi));
+  /* detail: the planet we are at (or travelling from or to) up close, in chunks culled against the horizon; every other one its far mesh */
+  const det = [cur, mv && mv.a, mv && mv.b];
+  PLS.forEach(P => { const near = !!P.full && det.includes(P.k + 1);
+    if (P.far) P.far.visible = !near || !P.chunks;
+    if (P.chunks) { const c = P.U.uCamL.value, Dc = c.length() || 1, hz = Dc > R ? Math.acos(R / Dc) : Math.PI;
+      P.chunks.forEach(m => { const u = m.userData; m.visible = near && Math.acos(Math.max(-1, Math.min(1, (c.x * u.d.x + c.y * u.d.y + c.z * u.d.z) / Dc))) < hz + u.a + u.h + .06; }); }
+    if (P.props) P.props.forEach(m => { m.visible = near; }); if (P.labels) P.labels.visible = near; if (P.cars) P.cars.visible = near; });
   if (PLS.some(P => P.fr.on && P.fr.mode === 1 && P.C.distanceTo(E) < R * 8) && clock > nextShear) { doShear(); nextShear = clock + 1.4 + Math.random() * 2.4; }
   const mapA = mv ? (mv.a === 0 ? 1 - sm5(mv.t / 1.2) : mv.b === 0 ? sm5((mv.t - mv.tt * .6) / (mv.tt * .4)) : 0) : cur === 0 ? 1 : 0;
   MAPU.uA.value = mapA;
   if (shearN > 0) shearN--; else postM.uniforms.uBand.value.z = 0;
-  renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.setRenderTarget(null); renderer.render(postS, postC);
+  renderer.setRenderTarget(rt); renderer.render(scene, camera);
+  if (DBG) { DBG.n++; const tn = performance.now(); if (tn - DBG.t > 500) { DBG.d.textContent = (DBG.n * 1000 / (tn - DBG.t)).toFixed(0) + ' fps\n' + (renderer.info.render.triangles / 1000).toFixed(0) + 'k tris\n' + renderer.info.render.calls + ' calls'; DBG.n = 0; DBG.t = tn; } }
+  renderer.setRenderTarget(null); renderer.render(postS, postC);
   fx.setTransform(1, 0, 0, 1, 0, 0); fx.clearRect(0, 0, fxc.width, fxc.height); fx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const sp = coreLight((!mv && cur === 6) || (mv && mv.b === 6 && mv.t > mv.tt * .5), clock);
   if (sp && cur === 6) cap.style.transform = 'translate(' + Math.round(sp[0]) + 'px,' + Math.round(sp[1] + 110) + 'px) translateX(-50%)';
@@ -671,15 +746,17 @@ function begin() {
   const fonts = document.fonts ? Promise.race([Promise.all([document.fonts.load("800 80px Tektur", '0123456789-ARKTUMCZGHS'), document.fonts.load("400 80px 'Dela Gothic One'", '研究室書割りの街回転台撮影舞台階段教' + GEN.WORDS.join(''))]), new Promise(r => setTimeout(r, 3000))]) : Promise.resolve();
   fonts.then(() => {
     drawAtlas(); atlasTex.needsUpdate = true; resize(); hud(0); setSnap();
-    const queue = [0, 1, 2, 3, 4], slots = PLANETS.map((_, k) => slotsFor(k));
-    let worker = null, kNow = -1;
-    const next = () => { if (!queue.length) return; const k = kNow = queue.shift();
-      if (worker) worker.postMessage({ k, slots: slots[k], lite: LITE });
-      else setTimeout(() => { onPlanet(GEN.buildPlanet(k, slots[k], LITE)); next(); }, 30); };
+    /* every planet's far mesh first (the map fills in quickly), then the close-up builds, the stop we are heading for first */
+    const queue = [0, 1, 2, 3, 4].map(k => ({ k, far: 1 })), slots = PLANETS.map((_, k) => slotsFor(k)), todo = [0, 1, 2, 3, 4];
+    let worker = null, kNow = null;
+    const pickFull = () => { if (!todo.length) return null; const t = isPl(want) ? want - 1 : isPl(cur) ? cur - 1 : 0; let i = todo.indexOf(t); if (i < 0) i = 0; return { k: todo.splice(i, 1)[0], far: 0 }; };
+    const next = () => { const job = kNow = queue.length ? queue.shift() : pickFull(); if (!job) return;
+      if (worker) worker.postMessage({ k: job.k, slots: slots[job.k], lite: LITE, far: job.far });
+      else setTimeout(() => { onPlanet(GEN.buildPlanet(job.k, slots[job.k], LITE, job.far)); next(); }, 30); };
     try {
       worker = new Worker(document.querySelector('script[src*="about-gen.js"]').src);
       worker.onmessage = e => { onPlanet(e.data); next(); };
-      worker.onerror = e => { e.preventDefault && e.preventDefault(); worker = null; if (kNow >= 0) queue.unshift(kNow); next(); };   // no worker: build here, one planet a tick
+      worker.onerror = e => { e.preventDefault && e.preventDefault(); worker = null; if (kNow) (kNow.far ? queue.unshift(kNow) : todo.unshift(kNow.k)); next(); };   // no worker: build here, one planet a tick
     } catch (e) { worker = null; }
     next(); kick();
   });
@@ -687,6 +764,7 @@ function begin() {
 /* hooks for still renders */
 window.__about = {
   ready: () => PLS.filter(p => p.ready).length,
+  full: () => PLS.filter(p => p.full).length,
   pose: s => { mv = null; ROCKS.clear(); cur = want = s; restT = 4; PLS.forEach(P => { if (P.ready) setBuilt(P); }); panels(isPl(s) ? s - 1 : -1); cap.classList.toggle('on', s === 6); hud(s); kick(); },
   move: (a, b, t) => { mv = null; cur = a; want = b; restT = 4; base = (() => { const p = restPose(a); return { E: p.E.clone(), q: lookQ(p.E, p.T, p.up) }; })(); PLS.forEach(P => { if (P.ready) setBuilt(P); }); startMove(b); if (mv) mv.t = t; kick(); },
   hover: (x, y) => { mouse.px = x; mouse.py = y; kick(); },
