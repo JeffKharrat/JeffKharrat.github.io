@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>カラット</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+1+Code:wght@300..700&family=Tektur:wdth,wght@75..100,400..900&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#07080B; --panel:rgba(14,16,20,.9); --line:#343945; --ink:#E9EBF0; --ink2:#9AA1B0; --dim:#5A606C; --acc:#4A5BFF; --warm:#FFB347; --red:#FF5A3D;
+  --mono:"M PLUS 1 Code", ui-monospace, monospace; --disp:"Tektur", sans-serif; --jp:"Dela Gothic One", sans-serif; }
+* { box-sizing:border-box; }
+html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:400 14px/1.5 var(--mono); overflow:hidden; }
+canvas#k3 { position:fixed; inset:0; width:100%; height:100%; display:block; cursor:default; }
+.ui { position:fixed; pointer-events:none; }
+.ui > * { pointer-events:auto; }
+.pnl { background:var(--panel); border:1px solid var(--line); position:relative; }
+.ui.pnl { position:fixed; }
+.pnl::before { content:""; position:absolute; left:-1px; top:-1px; width:.55rem; height:.55rem; background:var(--acc); }
+.lbl { font:500 11px/1.3 var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--ink2); }
+/* the corporation, top left */
+#corp { left:24px; top:22px; width:min(360px, calc(100vw - 48px)); padding:16px 18px 14px; }
+#corp .name { font:400 34px/1 var(--jp); letter-spacing:.04em; }
+#corp .tier { margin-top:6px; font:600 13px/1.3 var(--disp); letter-spacing:.06em; }
+#corp .bar { height:8px; margin:12px 0 4px; background:#1B1E25; border:1px solid var(--line); position:relative; overflow:hidden; }
+#corp .bar i { position:absolute; inset:0 auto 0 0; background:repeating-linear-gradient(90deg, var(--acc) 0 6px, transparent 6px 8px); }
+#corp .row { display:flex; justify-content:space-between; }
+/* resources, top right */
+#res { right:24px; top:22px; display:flex; gap:8px; }
+#res .pnl { padding:8px 12px 7px; min-width:92px; }
+#res b { display:block; font:600 18px/1.2 var(--disp); }
+/* left column: directives, audits, links */
+#side { left:24px; top:198px; width:min(360px, calc(100vw - 48px)); display:flex; flex-direction:column; gap:8px; }
+#side .pnl { padding:12px 16px; }
+#side ul { margin:6px 0 0; padding:0; list-style:none; }
+#side li { padding:5px 0; border-top:1px solid #23272F; font-size:13px; }
+#side li:first-child { border-top:0; }
+.dot { display:inline-block; width:7px; height:7px; margin-right:7px; background:var(--dim); vertical-align:1px; }
+.dot.ok { background:#B4F000; } .dot.warn { background:var(--warm); } .dot.bad { background:var(--red); }
+/* bottom bar */
+#bar { left:50%; bottom:22px; transform:translateX(-50%); display:flex; gap:8px; }
+.btn { font:600 13px/1 var(--disp); letter-spacing:.06em; color:var(--ink); background:rgba(22,25,32,.92); border:1px solid var(--line); padding:11px 16px; cursor:pointer; }
+.btn:hover { border-color:var(--acc); }
+.btn.on { border-color:var(--acc); color:#fff; }
+.btn small { display:block; font:500 10px/1.2 var(--mono); color:var(--ink2); margin-top:3px; letter-spacing:.04em; }
+/* wall view: section jump bar */
+#jump { left:50%; top:18px; transform:translateX(-50%); display:none; gap:6px; }
+#jump .btn { padding:8px 12px; min-width:84px; text-align:left; }
+#jump .btn i { display:block; height:3px; margin-top:6px; background:#1B1E25; position:relative; }
+#jump .btn i s { position:absolute; inset:0 auto 0 0; background:var(--acc); }
+body.wall #corp, body.wall #side, body.wall #res { display:none; }
+body.wall #jump { display:flex; }
+/* the kanji's file */
+#file { right:24px; top:84px; bottom:84px; width:min(420px, calc(100vw - 48px)); padding:20px 22px; overflow:auto; display:none; }
+#file.on { display:block; }
+#file .big { font:400 96px/1 var(--jp); }
+#file .head { display:flex; gap:18px; align-items:flex-end; }
+#file .meta { padding-bottom:6px; }
+#file .st { font:600 14px/1.3 var(--disp); margin-top:4px; }
+#file h4 { margin:18px 0 6px; font:600 12px/1.3 var(--disp); letter-spacing:.1em; color:var(--ink2); text-transform:uppercase; }
+.fa { display:grid; grid-template-columns:110px 1fr 44px; gap:6px 10px; align-items:center; padding:6px 0; border-top:1px solid #23272F; }
+.fa .r { font:500 15px/1.2 var(--mono); }
+.fa .w { height:6px; background:#1B1E25; position:relative; }
+.fa .w s { position:absolute; inset:0 auto 0 0; background:var(--dim); }
+.fa.cov .w s { background:var(--acc); }
+.fa .ex { grid-column:1 / -1; font-size:12px; color:var(--ink2); }
+.fa .ex span { color:var(--ink); }
+.wd { padding:6px 0; border-top:1px solid #23272F; display:flex; gap:10px; }
+.wd b { font:500 16px/1.3 var(--mono); min-width:96px; }
+.wd .s { margin-left:auto; font-size:11px; color:var(--ink2); }
+.x { position:absolute; right:10px; top:8px; background:none; border:0; color:var(--ink2); font:20px var(--mono); cursor:pointer; }
+/* settings */
+#set { left:50%; top:50%; transform:translate(-50%,-50%); width:min(520px, calc(100vw - 32px)); padding:22px; display:none; }
+#set.on { display:block; }
+#set input { width:100%; background:#0E1014; border:1px solid var(--line); color:var(--ink); font:13px var(--mono); padding:9px 10px; margin:6px 0 10px; }
+#set p { color:var(--ink2); font-size:12.5px; margin:6px 0; }
+#set .grp { padding:12px 0; border-top:1px solid #23272F; }
+#toast { left:50%; top:22px; transform:translateX(-50%); padding:10px 16px; display:none; font-size:13px; }
+#toast.on { display:block; }
+#hint { left:50%; bottom:80px; transform:translateX(-50%); color:var(--ink2); font-size:12px; display:none; }
+body.wall #hint { display:block; }
+@media (max-width:760px) { #res { top:auto; bottom:78px; right:12px; left:12px; flex-wrap:wrap; } #side { display:none; } #corp { left:12px; top:12px; width:calc(100vw - 24px); } #file { left:12px; right:12px; width:auto; } #jump { left:8px; right:8px; transform:none; justify-content:center; } #jump .btn { min-width:0; padding:8px 10px; } #jump .tn { display:none; } }
+</style>
+</head>
+<body>
+<canvas id="k3"></canvas>
+<div class="ui pnl" id="corp">
+  <div class="lbl">Mega corporation</div>
+  <div class="name">カラット</div>
+  <div class="tier" id="tier">—</div>
+  <div class="bar"><i id="famebar" style="width:0%"></i></div>
+  <div class="row lbl"><span id="famelv">Level 1</span><span id="divn">—</span></div>
+</div>
+<div class="ui" id="res">
+  <div class="pnl"><span class="lbl">資金 Funds</span><b id="r-funds">¥0</b></div>
+  <div class="pnl"><span class="lbl">名声 Fame</span><b id="r-fame">0</b></div>
+  <div class="pnl"><span class="lbl">データ Data</span><b id="r-data">0</b></div>
+  <div class="pnl"><span class="lbl">安定度 Stability</span><b id="r-stab">60</b></div>
+</div>
+<div class="ui" id="side">
+  <div class="pnl"><div class="lbl">取締役会の指令 · The board's directives</div><ul id="dirs"></ul></div>
+  <div class="pnl"><div class="lbl">記憶 · Memory</div><ul id="mem"></ul></div>
+  <div class="pnl"><div class="lbl">接続 · Links</div><ul id="links"></ul></div>
+</div>
+<div class="ui" id="jump"></div>
+<div class="ui" id="bar">
+  <button class="btn" id="b-wall">記憶の壁<small>Memory wall</small></button>
+  <button class="btn" id="b-base" style="display:none">中枢<small>Back to the core</small></button>
+  <button class="btn" id="b-set">設定<small>Settings</small></button>
+</div>
+<div class="ui" id="hint">Drag to look around · scroll to zoom · click a key to open its file</div>
+<div class="ui pnl" id="file"><button class="x" id="file-x">×</button><div id="file-c"></div></div>
+<div class="ui pnl" id="set"><button class="x" id="set-x">×</button><div id="set-c"></div></div>
+<div class="ui pnl" id="toast"></div>
+<script type="module" src="../js/karatto/core.js?v=1"></script>
+</body>
+</html>
