@@ -480,7 +480,7 @@ void main(){ vec3 n = normalize(vN); float L = max(dot(n, vL), 0.);
       for (let i = 0; i < n; i++) {
         const s = .14 + rr2() * .74, p = bez(m, s), tg = bez(m, Math.min(1, s + .01)).sub(p).normalize();
         const a1 = new THREE.Vector3().crossVectors(tg, Y).normalize(), a2 = new THREE.Vector3().crossVectors(tg, a1);
-        const size = 3 + Math.pow(rr2(), 2.2) * 26, ang = rr2() * Math.PI * 2, d = 24 + size * 1.6 + Math.pow(rr2(), 1.3) * 260;
+        const size = 3 + Math.pow(rr2(), 2.2) * 26, ang = rr2() * Math.PI * 2, d = 10 + size * 1.6 + Math.pow(rr2(), 1.3) * 260;
         if (isPl(m.b) && p.distanceTo(PLS[m.b - 1].C) < R * 2.2) continue;
         if (isPl(m.a) && p.distanceTo(PLS[m.a - 1].C) < R * 2.2) continue;
         p.addScaledVector(a1, Math.cos(ang) * d).addScaledVector(a2, Math.sin(ang) * d);
@@ -709,8 +709,8 @@ function frame(now) {
   }
   base = { E: E.clone(), q: q.clone() };
   shipUpdate(dt);
-  if (window.__shipCam) { const c = window.__shipCam, d = new THREE.Vector3(Math.sin(c.yaw) * Math.cos(c.pitch), Math.sin(c.pitch), Math.cos(c.yaw) * Math.cos(c.pitch)).applyQuaternion(SHIP.q);
-    E = SHIP.pos.clone().addScaledVector(d, c.dist); q = lookQ(E, SHIP.pos, new THREE.Vector3(0, 1, 0).applyQuaternion(SHIP.q)); }
+  if (window.__shipCam && isPl(cur)) { const c = window.__shipCam, o = FLEET[cur - 1][c.n || 0].g, d = new THREE.Vector3(Math.sin(c.yaw) * Math.cos(c.pitch), Math.sin(c.pitch), Math.cos(c.yaw) * Math.cos(c.pitch)).applyQuaternion(o.quaternion);
+    E = o.position.clone().addScaledVector(d, c.dist); q = lookQ(E, o.position, new THREE.Vector3(0, 1, 0).applyQuaternion(o.quaternion)); }
   /* the mouse: a little parallax */
   mouse.sx += (mouse.x - mouse.sx) * Math.min(1, dt0 * 2.5); mouse.sy += (mouse.y - mouse.sy) * Math.min(1, dt0 * 2.5);
   if (!reduce.matches) { const rgt = new THREE.Vector3(1, 0, 0).applyQuaternion(q), up = new THREE.Vector3(0, 1, 0).applyQuaternion(q), k = Math.min(cur === 0 && !mv ? 9000 : 300, 300); E.addScaledVector(rgt, -mouse.sx * k * .025).addScaledVector(up, mouse.sy * k * .018); }
@@ -864,64 +864,53 @@ void main(){ float p = fract(aS.x + uTime * (1.2 + uThr * 2.6)); vec3 q = positi
   vec4 mv = modelViewMatrix * vec4(q, 1.); gl_PointSize = clamp(uFoc * .5 * uSc / -mv.z, 1., 7.) * uPx; gl_Position = projectionMatrix * mv; }`,
     fragmentShader: `precision highp float; uniform vec3 uAcc; varying float vA; void main(){ if (vA < .02) discard; gl_FragColor = vec4(uAcc * 1.3 * vA, 1.); }` }));
   ex.frustumCulled = false;
-  const grp = new THREE.Group(); grp.add(mesh, ex); grp.visible = false; scene.add(grp);
-  const S = 1.25; grp.scale.setScalar(S); ex.material.uniforms.uSc.value = S;
-  return { grp, U, S, pos: new THREE.Vector3(), q: new THREE.Quaternion(), mat: 0, prevF: null, bank: 0 };
+  return { mesh, ex, U };
 })();
 
-/* where the ship sits: parked upper right of a reading view (in the free sky, inside whatever window the screen uses),
-   nose across the frame toward the hero; at the spark, close and lower right, nose toward the star */
+/* ships in orbit: nine small copies of the ship around each planet, three to a lane, on lanes tilted apart, each crossing the reading
+   view's sky (the orbit passes a point above the city, moving across the frame). Engines in that planet's accent; they
+   appear once the planet's build has passed. Shown only with the planet's close-up. */
 const shipQ = (F, up) => lookQ(F, new THREE.Vector3(), up);
-function parkPose(s) {
-  const rp = restPose(s), E = rp.E, f = rp.T.clone().sub(E).normalize(), r = new THREE.Vector3().crossVectors(f, rp.up).normalize(), u = new THREE.Vector3().crossVectors(r, f);
-  const sp = s === 6, W = WINR && isPl(s) ? WINR : WIN0, D = sp ? 62 : 215, fx = sp ? .76 : .86, fy = sp ? .7 : .3;
-  const tx = W.l + fx * (W.r - W.l), ty = W.t - fy * (W.t - W.b);
-  const pos = E.clone().addScaledVector(f, D).addScaledVector(r, tx * D).addScaledVector(u, ty * D);
-  const F = sp ? CORE.clone().sub(pos).normalize().addScaledVector(r, -.35).normalize() : r.clone().multiplyScalar(-.86).addScaledVector(f, -.5).addScaledVector(u, -.06).normalize();
-  return { pos, q: shipQ(F, u) };
+const SHS = .24, FILL = { value: new THREE.Vector3(0, 1, 0) };
+const FLEET = PLS.map(P => [0, 1, 2, 3, 4, 5, 6, 7, 8].map(n => {
+  const m = SHIP.mesh.material.clone(); Object.assign(m.uniforms, { uTime: UT, uAcc: P.U.uAcc, uFill: FILL }); m.uniforms.uMat.value = 0; m.uniforms.uThr.value = .6; m.uniforms.uSpk.value = CORE;
+  const e = SHIP.ex.material.clone(); Object.assign(e.uniforms, { uTime: UT, uFoc: CARU.uFoc, uPx: CARU.uPx, uThr: m.uniforms.uThr, uAcc: P.U.uAcc, uMat: m.uniforms.uMat }); e.uniforms.uSc.value = SHS;
+  const g = new THREE.Group(), sm = new THREE.Mesh(SHIP.mesh.geometry, m), se = new THREE.Points(SHIP.ex.geometry, e);
+  sm.frustumCulled = se.frustumCulled = false; g.add(sm, se); g.scale.setScalar(SHS); g.visible = false; scene.add(g);
+  return { g, m, n, a: null, b: null, r: 0, w: 0, ph: 0, dir: 1 };
+}));
+/* lay the orbits once the planet sits in place: through a point ~140 units in front of the reading camera, 15% above
+   centre, each ship's plane turned a little about it, opposite directions for variety */
+function layOrbits(P) {
+  const rp = restPose(P.k + 1), f = rp.T.clone().sub(rp.E).normalize(), rt = new THREE.Vector3().crossVectors(f, rp.up).normalize(), u = new THREE.Vector3().crossVectors(rt, f);
+  FLEET[P.k].forEach(o => {
+    const L = o.n % 3, sl = o.n / 3 | 0;                                   // lane, slot on the lane
+    const Q = rp.E.clone().addScaledVector(f, 120 + L * 45).addScaledVector(u, 14 + L * 9).addScaledVector(rt, (L - 1) * 25), a = Q.clone().sub(P.C);
+    o.r = a.length(); a.normalize(); const nrm = new THREE.Vector3().crossVectors(a, rt).normalize().applyAxisAngle(a, (L - 1) * .35);
+    o.a = a; o.b = new THREE.Vector3().crossVectors(nrm, a).normalize(); o.dir = L === 1 ? -1 : 1;
+    o.w = (16 + L * 5) / o.r; o.ph = -L * 1.3 - .25 + sl * Math.PI * 2 / 3;     // ~16-26 units/s; three per lane, lanes staggered
+  });
 }
-/* in flight the ship rides with the camera: its pose is blended in the camera's own frame, from where it was parked
-   (relative to that stop's reading camera) to just ahead and below centre, and on arrival to where it parks (relative to
-   the next reading camera, which is where the dive ends). It banks into turns. */
-const toRel = (P, E, q) => { const qi = q.clone().invert(); return { p: P.pos.clone().sub(E).applyQuaternion(qi), q: qi.multiply(P.q) }; };
-const restCam = s => { const r = restPose(s); return { E: r.E, q: lookQ(r.E, r.T, r.up) }; };
-const relPark = s => { const c = restCam(s); return toRel(parkPose(s), c.E, c.q); };
-function chaseRel(dt) {
-  const f = new THREE.Vector3(0, 0, -1).applyQuaternion(base.q), u = new THREE.Vector3(0, 1, 0).applyQuaternion(base.q);
-  if (SHIP.prevF && dt > 0) { const yaw = SHIP.prevF.clone().cross(f).dot(u) / dt; SHIP.bank += (cl(-yaw * .9, -.6, .6) - SHIP.bank) * Math.min(1, dt * 3); }
-  SHIP.prevF = f.clone();
-  const F = new THREE.Vector3(0, 0, -1), up = new THREE.Vector3(0, 1, 0).applyAxisAngle(F, SHIP.bank + Math.sin(clock * 1.3) * .03);
-  return { p: new THREE.Vector3(0, -13 + Math.sin(clock * 1.7) * .3, -60), q: shipQ(F, up) };
-}
-const blendR = (A, B, w) => ({ p: A.p.clone().lerp(B.p, w), q: A.q.clone().slerp(B.q, w) });
 function shipUpdate(dt) {
-  let tgt = null, mat = 1, thr = .15, acc = null;
-  if (mv) {
-    const m = mv, a = m.a, b = m.b; let r = chaseRel(dt); thr = 1;
-    if (isPl(a) || a === 6) { const w = sm5(cl(m.t / (m.tt * .5))); r = blendR(relPark(a), r, w); thr = .15 + .85 * w; }
-    if (isPl(b) || b === 6) { const t0 = m.tt - m.ovl - (b === 6 ? .6 : 0), w = sm5(cl((m.t - t0) / (b === 6 ? 1.2 : 3.0))); r = blendR(r, relPark(b), w); thr = thr * (1 - w) + .15 * w; }
-    mat = a === 0 && b === 0 ? 0 : a === 0 ? cl(m.t / 1.4) : b === 0 ? 1 - cl(m.t / (m.tt * .7)) : 1;
-    tgt = { pos: r.p.clone().applyQuaternion(base.q).add(base.E), q: base.q.clone().multiply(r.q) };
-    SHIP.mat = mat; acc = isPl(b) ? PLS[b - 1].U.uAcc.value : isPl(a) ? PLS[a - 1].U.uAcc.value : null;
-  } else {
-    SHIP.prevF = null; SHIP.bank *= .9;
-    if (cur !== 0) { tgt = parkPose(cur); const u = new THREE.Vector3(0, 1, 0).applyQuaternion(tgt.q);
-      tgt.pos.addScaledVector(u, Math.sin(clock * .7) * .9 * sm5(restT / 2)); tgt.q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.sin(clock * .5) * .04 * sm5(restT / 2))); }
-    SHIP.mat += ((cur !== 0 ? 1 : 0) - SHIP.mat) * Math.min(1, dt * 1.5); acc = isPl(cur) ? PLS[cur - 1].U.uAcc.value : null;
-  }
-  if (tgt) { SHIP.pos.copy(tgt.pos); SHIP.q.copy(tgt.q); }
-  SHIP.grp.visible = SHIP.mat > .01; SHIP.grp.position.copy(SHIP.pos); SHIP.grp.quaternion.copy(SHIP.q);
-  SHIP.U.uMat.value = SHIP.mat; SHIP.U.uThr.value += (thr - SHIP.U.uThr.value) * Math.min(1, dt * 3 + (window.__frozen ? 1 : 0));
-  if (acc) SHIP.U.uAcc.value.copy(acc); else SHIP.U.uAcc.value.set('#E9EBF0');
-  SHIP.U.uFill.value.set(0, 1, 0).applyQuaternion(base.q);
+  const det = [cur, mv && mv.a, mv && mv.b];
+  FILL.value.set(0, 1, 0).applyQuaternion(base.q);
+  PLS.forEach(P => FLEET[P.k].forEach(o => {
+    const near = P.ready && det.includes(P.k + 1); o.g.visible = near && o.m.uniforms.uMat.value > .01; if (!near) return;
+    if (!o.a) layOrbits(P);
+    const F = P.fr, tgt = F.on && F.mode === 1 ? cl((F.prog - LAG - .3) / .25) : 1;
+    o.m.uniforms.uMat.value += (tgt - o.m.uniforms.uMat.value) * Math.min(1, dt * 2 + (window.__frozen ? 1 : 0)); if (Math.abs(tgt - o.m.uniforms.uMat.value) < .01) o.m.uniforms.uMat.value = tgt; o.g.visible = o.m.uniforms.uMat.value > .01;
+    const th = o.ph + clock * o.w * o.dir, c = Math.cos(th), s = Math.sin(th);
+    const pos = P.C.clone().addScaledVector(o.a, o.r * c).addScaledVector(o.b, o.r * s), tan = o.a.clone().multiplyScalar(-s).addScaledVector(o.b, c).multiplyScalar(o.dir);
+    o.g.position.copy(pos); o.g.quaternion.copy(shipQ(tan, pos.clone().sub(P.C).normalize()));
+  }));
 }
 
 /* hooks for still renders */
 window.__about = {
   ready: () => PLS.filter(p => p.ready).length,
   full: () => PLS.filter(p => p.full).length,
-  ship: () => ({ vis: SHIP.grp.visible, mat: SHIP.mat, d: +SHIP.pos.distanceTo(camera.position).toFixed(1), ndc: SHIP.pos.clone().project(camera).toArray().map(v => +v.toFixed(2)) }),
-  pose: s => { mv = null; ROCKS.clear(); cur = want = s; SHIP.mat = s ? 1 : 0; restT = 4; PLS.forEach(P => { if (P.ready) setBuilt(P); }); panels(isPl(s) ? s - 1 : -1); cap.classList.toggle('on', s === 6); hud(s); kick(); },
+  ship: () => FLEET.map(L => L.map(o => o.g.visible ? o.g.position.clone().project(camera).toArray().map(v => +v.toFixed(2)) : null)),
+  pose: s => { mv = null; ROCKS.clear(); cur = want = s; restT = 4; PLS.forEach(P => { if (P.ready) setBuilt(P); }); panels(isPl(s) ? s - 1 : -1); cap.classList.toggle('on', s === 6); hud(s); kick(); },
   move: (a, b, t) => { mv = null; cur = a; want = b; restT = 4; base = (() => { const p = restPose(a); return { E: p.E.clone(), q: lookQ(p.E, p.T, p.up) }; })(); PLS.forEach(P => { if (P.ready) setBuilt(P); }); startMove(b); if (mv) mv.t = t; kick(); },
   hover: (x, y) => { mouse.px = x; mouse.py = y; kick(); },
   uni: (k, name, a) => { PLS[k].U[name].value.fromArray(a); kick(); },
