@@ -712,6 +712,11 @@ function frame(now) {
   mouse.sx += (mouse.x - mouse.sx) * Math.min(1, dt0 * 2.5); mouse.sy += (mouse.y - mouse.sy) * Math.min(1, dt0 * 2.5);
   if (!reduce.matches) { const rgt = new THREE.Vector3(1, 0, 0).applyQuaternion(q), up = new THREE.Vector3(0, 1, 0).applyQuaternion(q), k = Math.min(cur === 0 && !mv ? 9000 : 300, 300); E.addScaledVector(rgt, -mouse.sx * k * .025).addScaledVector(up, mouse.sy * k * .018); }
   camera.position.copy(E); camera.quaternion.copy(q); camera.updateMatrixWorld();
+  /* the near plane follows the distance to the nearest surface: depth precision where it is needed (kept small in flight,
+     where asteroids pass close) */
+  let dm = E.distanceTo(CORE) - 60; PLS.forEach(P => { dm = Math.min(dm, E.distanceTo(P.C) - R - 70); });
+  const nr = Math.min(Math.max(.5, dm * .08), mv ? 6 : 400);
+  if (Math.abs(nr - camera.near) > camera.near * .02) { camera.near = nr; camera.updateProjectionMatrix(); }
   if (WINR) {
     const o = mv ? (isPl(mv.b) ? sm5((mv.t - (mv.tt - mv.ovl)) / 1.6) : isPl(mv.a) ? 1 - sm5(mv.t / .9) : 0) : isPl(cur) ? 1 : 0, n = camera.near, f = (k) => (WIN0[k] + (WINR[k] - WIN0[k]) * o) * n;
     camera.projectionMatrix.makePerspective(f('l'), f('r'), f('t'), f('b'), n, camera.far); camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();

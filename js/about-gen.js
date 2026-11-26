@@ -82,10 +82,12 @@ class Geo {
     o.I = J; o.CH = CH; return o;
   }
 }
-let G = null, KB = 0, VOFF = 0;                                             // the geometry being built; KB: base height everything is lifted by
+let G = null, KB = 0, VOFF = 0, JIT = 0;                                             // the geometry being built; KB: base height everything is lifted by
 /* a grid box on face f: i, j, k ranges in cells. Tops and wide walls are split every SUB cells so they follow the curve. */
 function gbox(f, i0, i1, j0, j1, k0, k1, col, kind = K_SOLID, o = {}) {
   if (i1 - i0 < .05 || j1 - j0 < .05 || k1 - k0 < .02) return;
+  /* every box a hair bigger by its own amount, so no two faces ever share a plane (no z-fighting where boxes meet) */
+  JIT = (JIT + .6180339887) % 1; const ej = .004 + .014 * JIT; i0 -= ej; i1 += ej; j0 -= ej; j1 += ej; k0 -= ej; k1 += ej;
   k0 += KB; k1 += KB;
   const si = Math.max(1, Math.ceil((i1 - i0) / SUB)), sj = Math.max(1, Math.ceil((j1 - j0) / SUB)), seed = o.seed || 0;
   const I = t => i0 + (i1 - i0) * t / si, J = t => j0 + (j1 - j0) * t / sj, ctr = gp(f, (i0 + i1) / 2, (j0 + j1) / 2, (k0 + k1) / 2), O = [0, 0, 0];
@@ -696,7 +698,7 @@ function buildPlanet(k, slots, lite, far) {
   use(k, 40); SLOT = slots || {}; LITE = !!lite; FAR = !!far; PROPS = [];
   const camG = gdir(HERO.f, PL.cam[0], PL.cam[1]);
   VIS = unit(add(HDIR, gdir(4, PL.far[0] * 1.6, PL.far[1] * 1.6))); DCTR = unit(slerp(HDIR, camG, .4));
-  r = rng(PL.seed); rs = rng(PL.seed + 7); PK = k; G = new Geo(); LG = []; LANES = []; KB = 0; VOFF = 0;
+  r = rng(PL.seed); rs = rng(PL.seed + 7); JIT = 0; PK = k; G = new Geo(); LG = []; LANES = []; KB = 0; VOFF = 0;
   ground(); heroTop = PL.build(); KB = 0;
   if (PL.orbital) { r = rng(PL.seed + 99); PL.orbital(); VOFF = 0; }
   const lanes = new Float32Array(LANES.length * 7); LANES.forEach(([a, b, L], n) => lanes.set([...a, ...b, L], n * 7));
