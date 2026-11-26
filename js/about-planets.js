@@ -18,8 +18,7 @@ const LOGOS = ['media/logos/path-tut.png', 'media/logos/path-mc.png', 'media/log
 const LITE = innerWidth < 760 || (navigator.deviceMemory && navigator.deviceMemory <= 4);
 const reduce = matchMedia('(prefers-reduced-motion: reduce)');
 const hdr = document.getElementById('hdr'), panelsEl = [...box.querySelectorAll('.run-p')], cap = document.getElementById('run-sp'), hudN = document.getElementById('run-n'), hudT = document.getElementById('run-t');
-const tl = document.getElementById('run-tl'), old = document.getElementById('run-cv');
-if (old) old.hidden = true;
+const tl = document.getElementById('run-tl');
 [...tl.querySelectorAll('[data-run]')].forEach(b => { b.dataset.stop = +b.dataset.run + 1; b.removeAttribute('data-run'); });
 const TL = [...tl.querySelectorAll('button')];
 
@@ -179,18 +178,26 @@ const planetUniforms = () => ({ uR: { value: R }, uCell: { value: 1 }, uM: { val
 const freeCPU = function () { this.array = null; };
 
 /* ================= the signs' atlas ================= */
-const atlas = document.createElement('canvas'); atlas.width = 2048; atlas.height = 1024;
+const AW = 2048, AH = 2048, atlas = document.createElement('canvas'); atlas.width = AW; atlas.height = AH;
 const actx = atlas.getContext('2d'), SLOT = {};
 let ax = 0, ay = 0, rowH = 0;
-const slot = (name, w, h) => { if (ax + w > 2048) { ax = 0; ay += rowH + 4; rowH = 0; } SLOT[name] = { x: ax, y: ay, w, h }; ax += w + 4; rowH = Math.max(rowH, h); return SLOT[name]; };
+const slot = (name, w, h) => { if (ax + w > AW) { ax = 0; ay += rowH + 4; rowH = 0; } SLOT[name] = { x: ax, y: ay, w, h }; ax += w + 4; rowH = Math.max(rowH, h); return SLOT[name]; };
 function drawAtlas() {
-  actx.clearRect(0, 0, 2048, 1024); ax = ay = rowH = 0; actx.fillStyle = '#fff'; actx.textBaseline = 'middle';
+  actx.clearRect(0, 0, AW, AH); ax = ay = rowH = 0; actx.fillStyle = '#fff'; actx.textBaseline = 'middle';
   PLANETS.forEach((Pl, k) => {
     actx.textAlign = 'start'; actx.font = "800 300px Tektur"; let s = slot(k + ':n01', Math.ceil(actx.measureText(Pl.num).width + 30), 300); actx.fillText(Pl.num, s.x + 15, s.y + 160);
     actx.font = "800 90px Tektur"; s = slot(k + ':code', Math.ceil(actx.measureText(Pl.code).width + 20), 100); actx.fillText(Pl.code, s.x + 10, s.y + 54);
     const ch = [...Pl.vk], c = 110; s = slot(k + ':vk', c, c * ch.length); actx.font = "400 96px 'Dela Gothic One'"; actx.textAlign = 'center';
     ch.forEach((g, i) => actx.fillText(g, s.x + c / 2, s.y + c * i + c / 2 + 6));
   });
+  /* the city's words: vertical (a column, the long-vowel bar turned) and horizontal */
+  const { WORDS, WC, WP } = GEN; actx.font = "400 " + (WC - 10) + "px 'Dela Gothic One'"; actx.textAlign = 'center';
+  WORDS.forEach((w, n) => { const ch = [...w];
+    let s = slot('@v' + n, WC + WP, WC * ch.length + WP);
+    ch.forEach((g, i) => { const x = s.x + (WC + WP) / 2, y = s.y + WP / 2 + WC * i + WC / 2 + 4;
+      if (g === 'ー') { actx.save(); actx.translate(x, y - 4); actx.rotate(Math.PI / 2); actx.fillText(g, 0, 4); actx.restore(); } else actx.fillText(g, x, y); });
+    s = slot('@h' + n, WC * ch.length + WP, WC + WP);
+    ch.forEach((g, i) => actx.fillText(g, s.x + WP / 2 + WC * i + WC / 2, s.y + (WC + WP) / 2 + 4)); });
 }
 const atlasTex = new THREE.CanvasTexture(atlas); atlasTex.anisotropy = 8;
 const slotsFor = k => { const o = {}; ['n01', 'code', 'vk'].forEach(n => { const S = SLOT[k + ':' + n]; o[n] = { w: S.w, h: S.h }; }); return o; };
@@ -245,15 +252,29 @@ function onPlanet(res) {
   g.setIndex(at(res.I, 1)); g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), R * 4.6);
   P.mesh = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: P.U, vertexShader: VS, fragmentShader: FS, side: THREE.DoubleSide, extensions: { derivatives: true } }));
   P.group.add(P.mesh);
-  const Pp = [], UV = [], Cc = [], NN = [];
-  res.LG.forEach(q => { const S = SLOT[P.k + ':' + q.item]; if (!S) return; const u0 = S.x / 2048, u1 = (S.x + S.w) / 2048, v0 = 1 - (S.y + S.h) / 1024, v1 = 1 - S.y / 1024, uv = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
-    [0, 1, 2, 0, 2, 3].forEach(i => { Pp.push(...q.pts[i]); UV.push(...uv[i]); Cc.push(...q.col); NN.push(...q.n); }); });
+  const Pp = [], UV = [], Cc = [], NN = [], SS = [];
+  res.LG.forEach(q => { const S = SLOT[q.item[0] === '@' ? q.item : P.k + ':' + q.item]; if (!S) return; const u0 = S.x / AW, u1 = (S.x + S.w) / AW, v0 = 1 - (S.y + S.h) / AH, v1 = 1 - S.y / AH, uv = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
+    [0, 1, 2, 0, 2, 3].forEach(i => { Pp.push(...q.pts[i]); UV.push(...uv[i]); Cc.push(...q.col); NN.push(...q.n); SS.push(q.g || 0, q.city || 0); }); });
   const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(Pp, 3)); lg.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2));
-  lg.setAttribute('aCol', new THREE.Float32BufferAttribute(Cc, 3)); lg.setAttribute('normal', new THREE.Float32BufferAttribute(NN, 3));
-  P.labels = new THREE.Mesh(lg, new THREE.ShaderMaterial({ uniforms: { uTex: { value: atlasTex }, uVis: { value: 0 }, uKey: P.U.uKey }, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
-    vertexShader: `attribute vec3 aCol; varying vec2 vUv; varying vec3 vC; varying vec3 vN; void main(){ vUv = uv; vC = aCol; vN = normal; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
-    fragmentShader: `precision highp float; uniform sampler2D uTex; uniform float uVis; uniform vec3 uKey; varying vec2 vUv; varying vec3 vC; varying vec3 vN;
-void main(){ float a = texture2D(uTex, vUv).a; if (a < .4 || uVis < .5) discard; float L = abs(dot(normalize(vN), uKey)); gl_FragColor = vec4(vC * (.24 + .76 * L), 1.); }` }));
+  lg.setAttribute('aCol', new THREE.Float32BufferAttribute(Cc, 3)); lg.setAttribute('aS', new THREE.Float32BufferAttribute(SS, 2)); lg.setAttribute('normal', new THREE.Float32BufferAttribute(NN, 3));
+  /* signs: the hero's plates appear with the hero (uVis); the city's light up one by one once the solid front has passed
+     them (the same order as the buildings), with a short flicker, lit white or in the accent, or painted */
+  P.labels = new THREE.Mesh(lg, new THREE.ShaderMaterial({ uniforms: { uTex: { value: atlasTex }, uVis: { value: 0 }, uKey: P.U.uKey, uProg: P.U.uProg, uLag: P.U.uLag, uMode: P.U.uMode,
+      uOrigin: P.U.uOrigin, uAcc: P.U.uAcc, uR: P.U.uR, uCell: P.U.uCell, uM: P.U.uM }, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    vertexShader: `uniform vec3 uOrigin; uniform float uR, uCell, uM; attribute vec3 aCol; attribute vec2 aS; varying vec2 vUv, vS; varying vec3 vC, vN; varying float vOrd, vSd;
+void main(){ vUv = uv; vC = aCol; vN = normal; vS = aS; float cr = uCell / uR;
+  vOrd = acos(clamp(dot(normalize(position), uOrigin), -1., 1.)) - min(40., length(position) - uR) * cr * 1.5 + cr * uM * 1.7 + .02;
+  vSd = fract(sin(dot(floor(position * .5), vec3(12.9, 78.2, 37.7))) * 43758.5);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
+    fragmentShader: `precision highp float; uniform sampler2D uTex; uniform float uVis, uProg, uLag, uMode; uniform vec3 uKey, uAcc; varying vec2 vUv, vS; varying vec3 vC, vN; varying float vOrd, vSd;
+void main(){ float a = texture2D(uTex, vUv).a; if (a < .4) discard;
+  float on = 1.;
+  if (vS.y < .5) { if (uVis < .5) discard; }
+  else if (uMode > .5) { float e = uProg - uLag - vOrd - vSd * .05; if (e < 0.) discard;
+    if (e < .08) on = fract(sin(floor(e * 160.) * 7.13 + vSd * 91.) * 4375.85) < .55 ? .2 : 1.; }      // the neon catching
+  float L = abs(dot(normalize(vN), uKey));
+  vec3 c = vS.x > 1.5 ? uAcc * 1.15 : vS.x > .5 ? vC : vC * (.24 + .76 * L);
+  gl_FragColor = vec4(c * on, 1.); }` }));
   P.labels.frustumCulled = false; P.group.add(P.labels);
   P.cars = carsMesh(P, res.lanes); P.group.add(P.cars);
   P.halo = new THREE.Mesh(HALO_G, new THREE.ShaderMaterial({ uniforms: { uC: { value: P.C }, uSpkW: { value: CORE.clone().sub(P.C).normalize() } }, vertexShader: HALO_VS, fragmentShader: HALO_FS,
@@ -647,7 +668,7 @@ function frame(now) {
 /* ================= start: fonts, atlas, the worker builds the planets ================= */
 function begin() {
   if (started) return; started = true;
-  const fonts = document.fonts ? Promise.race([Promise.all([document.fonts.load("800 80px Tektur", '0123456789-ARKTUMCZGHS'), document.fonts.load("400 80px 'Dela Gothic One'", '研究室書割りの街回転台撮影舞台階段教')]), new Promise(r => setTimeout(r, 3000))]) : Promise.resolve();
+  const fonts = document.fonts ? Promise.race([Promise.all([document.fonts.load("800 80px Tektur", '0123456789-ARKTUMCZGHS'), document.fonts.load("400 80px 'Dela Gothic One'", '研究室書割りの街回転台撮影舞台階段教' + GEN.WORDS.join(''))]), new Promise(r => setTimeout(r, 3000))]) : Promise.resolve();
   fonts.then(() => {
     drawAtlas(); atlasTex.needsUpdate = true; resize(); hud(0); setSnap();
     const queue = [0, 1, 2, 3, 4], slots = PLANETS.map((_, k) => slotsFor(k));

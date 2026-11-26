@@ -176,6 +176,7 @@ function building(f, i0, i1, j0, j1, H, col, lod, o = {}) {
     if (l < nL - 1) { a0 += ins; a1 -= ins; b0 += ins; b1 -= ins; if (a1 - a0 < 2.5 || b1 - b0 < 2.5) break; }
   }
   if (o.roof !== false) roof(f, a0, a1, b0, b1, k, lod);
+  if (lod >= 1) citySigns(f, i0, i1, j0, j1, k, a0, a1, b0, b1, notch);
   return k;
 }
 
@@ -206,6 +207,61 @@ function plateJ(item, jw, ic, kc, w, col) {
   const j = col === PAINT ? jw - .43 : jw - .08, P = (i, k) => gp(f, i, j, k + KB);
   const a = P(ic - w / 2, kc - hgt / 2), b = P(ic + w / 2, kc - hgt / 2), c = P(ic + w / 2, kc + hgt / 2), d = P(ic - w / 2, kc + hgt / 2);
   LG.push({ item, pts: [a, b, c, d], col, n: unit(cross(sub(b, a), sub(d, a))) });
+}
+
+/* ================= Japanese signage: words drawn in the atlas, put up on the city's buildings =================
+   Their own random stream (rs), so the buildings come out exactly as before. Item '@v<n>' / '@h<n>': word n, vertical or
+   horizontal; the atlas draws each word in cells of WC px with WP px of padding, so the aspect is known here. */
+const WORDS_C = ['営業中', '立入禁止', '非常口', '高圧注意', '出口', '駐車場', '東口', '喫茶', '電気', '薬', '湯', '安全第一', '整備中', '回送', 'リグ', '関節', 'ボーン', 'アニメ'];
+const WORDS_P = [['研究棟', '図書館', '講義棟', '八王子', '学食', '実験室'], ['第二工場', '背景美術', '小道具', '組立', '出荷口', '資材置場'],
+  ['回転台', '試写室', '模型', '撮影中', '第一棟', '音響'], ['撮影所', 'スタジオ', '照明', '美術部', '編集室', '本番中'], ['階段教室', '卒業制作', '学生寮', '作画', '巴里', '講評']];
+const WORDS = [...WORDS_C, ...WORDS_P.flat()], WC = 80, WP = 16;
+const wAsp = (n, v) => v ? (WC * n + WP) / (WC + WP) : (WC + WP) / (WC * n + WP);       // height / width of a word's slot
+const SIGN = hex('#F3EEDF');
+let rs = Math.random, PK = 0;
+/* a text quad from grid corners (bottom-left, bottom-right, top-right, top-left as seen from outside); flipped if it faces in */
+function signQ(f, item, A, B, C, D, outG, col, g) {
+  const P = q => gp(f, q[0], q[1], q[2] + KB); let a = P(A), b = P(B), c = P(C), d = P(D);
+  const o = sub(gp(f, outG[0] + A[0], outG[1] + A[1], A[2]), gp(f, A[0], A[1], A[2]));
+  let n = unit(cross(sub(b, a), sub(d, a))); if (dot(n, o) < 0) { [a, b, c, d] = [b, a, d, c]; n = mul(n, -1); }
+  LG.push({ item, pts: [a, b, c, d], col, n, g, city: 1 });
+}
+/* a wall of a box: u along it, d out from it; M maps (u, d, k) to the grid, O is the outward step, U the step along u */
+const wallOf = (sd, I0, I1, J0, J1) => sd === 0 ? { u0: J0, u1: J1, M: (u, d, k) => [I1 + d, u, k], O: [1, 0, 0], U: [0, 1, 0] }
+  : sd === 1 ? { u0: J0, u1: J1, M: (u, d, k) => [I0 - d, u, k], O: [-1, 0, 0], U: [0, 1, 0] }
+  : sd === 2 ? { u0: I0, u1: I1, M: (u, d, k) => [u, J1 + d, k], O: [0, 1, 0], U: [1, 0, 0] } : { u0: I0, u1: I1, M: (u, d, k) => [u, J0 - d, k], O: [0, -1, 0], U: [1, 0, 0] };
+const signWord = () => { const pw = WORDS_P[PK]; return rs() < .55 ? WORDS_C.length + PK * 6 + (rs() * pw.length | 0) : rs() * WORDS_C.length | 0; };
+const signLook = () => { const x = rs(); return x < .55 ? [SIGN, 1, COL.deep] : x < .75 ? [SIGN, 2, COL.deep] : [PAINT, 0, COL.bone]; };   // lit white, lit accent, painted on bone
+function wbox(f, W, uA, uB, dA, dB, kA, kB, col) { const p = W.M(uA, dA, 0), q = W.M(uB, dB, 0); gbox(f, Math.min(p[0], q[0]), Math.max(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[1], q[1]), kA, kB, col); }
+/* a sign flat on a wall, centred at uc, bottom at kb; size is the width (vertical) or the height (horizontal). Returns its height or 0 */
+function flatSign(f, W, uc, kb, size, vert, kMax, back = true, n = signWord(), lk = signLook()) {
+  const L = WORDS[n].length; let tw = vert ? size : size / wAsp(L, 0), th = vert ? size * wAsp(L, 1) : size;
+  const room = W.u1 - W.u0 - 1; if (tw > room) { th *= room / tw; tw = room; } if (kb + th > kMax || th < .8) return 0;
+  const [col, g, bk] = back ? lk : [PAINT, 0, 0], d = back ? .26 : .05;
+  uc = Math.max(W.u0 + .5 + tw / 2, Math.min(W.u1 - .5 - tw / 2, uc));
+  if (back) wbox(f, W, uc - tw / 2 - .25, uc + tw / 2 + .25, 0, .22, kb - .22, kb + th + .22, bk);
+  signQ(f, (vert ? '@v' : '@h') + n, W.M(uc - tw / 2, d, kb), W.M(uc + tw / 2, d, kb), W.M(uc + tw / 2, d, kb + th), W.M(uc - tw / 2, d, kb + th), W.O, col, g);
+  return th;
+}
+/* a blade sign standing out from a wall at uc, lettered on both faces */
+function bladeSign(f, W, uc, kb, tw, kMax) {
+  const n = signWord(), [col, g, bk] = signLook(), th = tw * wAsp(WORDS[n].length, 1), bh = th + .45; if (kb + bh > kMax) return;
+  wbox(f, W, uc - .2, uc + .2, 0, tw + .7, kb, kb + bh, bk); wbox(f, W, uc - .08, uc + .08, 0, .45, kb - .6, kb, COL.mid);
+  const bl = (u, out) => signQ(f, '@v' + n, W.M(u, .35, kb + .22), W.M(u, .35 + tw, kb + .22), W.M(u, .35 + tw, kb + .22 + th), W.M(u, .35, kb + .22 + th), out, col, g);
+  bl(uc + .22, W.U); bl(uc - .22, W.U.map(x => -x));
+}
+function citySigns(f, i0, i1, j0, j1, top, a0, a1, b0, b1, notch) {
+  if (f === HERO.f && Math.abs((i0 + i1) / 2 - HERO.i) < 23 && Math.abs((j0 + j1) / 2 - HERO.j) < 23) return;   // the hero's own plates stay alone
+  if (rs() < .85 && top > 7) {                                     // 1. a blade at a corner of the base
+    const W = wallOf(rs() * 4 | 0, i0, i1, j0, j1), inset = 1.4 + notch;
+    if (W.u1 - W.u0 > 2 * inset) bladeSign(f, W, rs() < .5 ? W.u0 + inset : W.u1 - inset, 2.5 + rs() * Math.max(0, top * .4), 3.2, top - 1);
+  }
+  if (rs() < .5 && top > 12) {                                    // 2. a vertical banner flat on the wall
+    const W = wallOf(rs() * 4 | 0, i0, i1, j0, j1); flatSign(f, W, W.u0 + rs() * (W.u1 - W.u0), 3 + rs() * top * .3, 3.6, true, top - 1);
+  }
+  if (rs() < .55 && top > 6) {                                     // 3. a horizontal sign along the top of the upper wall
+    const W = wallOf(rs() * 4 | 0, a0, a1, b0, b1), th = Math.min(3, top * .22); flatSign(f, W, (W.u0 + W.u1) / 2, top - th - .8, th, false, top);
+  }
 }
 
 /* a district: blocks of lots filled with kit buildings, B's city */
@@ -368,6 +424,7 @@ const PLANETS = [
         if (q < .22) for (let v = 0; v < 3; v++) gbox(f, bi + 1 + v * 1.6, bi + 2 + v * 1.6, bj + 1.5, bj + 4.5, h + .3, h + 1.1, COL.dark);
         else if (q < .34) { const H = 5 + r() * 10; KB = h - 1; building(f, bi + .8, bi + 5.2, bj + .8, bj + 5.2, H, COL.light, 2, { levels: 2, notch: 0, storey: 3 }); KB = 0; }
         else if (q < .42) topLamp(f, ci - .3, cj - .3, h + .3);
+        if (h >= 3 && rs() < .45) flatSign(f, wallOf(rs() * 4 | 0, bi, bi + 6, bj, bj + 6), bi + 3 + (rs() - .5) * 2, Math.max(.2, h - 2.4), 2, false, h - .2);   // a sign on the block
       }
     } });
     lanesGrid(-154 + 20.5, 21, 42, 6, 14, .5); for (const f of [4, 2, 5, 3]) { lane(f, 'j', -7, -150, -40, 16); lane(f, 'j', 7, -150, -40, 16); }
@@ -375,7 +432,8 @@ const PLANETS = [
       const d = gdir(f, 0, a + 3); if (!seen(d) || angTo(d, HDIR) < .2) continue;
       const hh = 9 + ((a / 6 | 0) % 3 === 0 ? 5 : 0), lod = lodOf(d);
       nbox(f, -3, 3, a, a + 5, -1, hh, COL.light, lod > 1 ? K_WIN : K_SOLID, lod > 1 ? 1 : 0); gbox(f, -4.2, 4.2, a, a + 5, -1, 4, COL.mid);
-      if (lod > 1) { gbox(f, -3.3, 3.3, a + .5, a + 1, hh - 1.5, hh - 1, COL.bone); gbox(f, -.4, .4, a + 1, a + 4, hh, hh + 1.2, COL.dark); }
+      if (lod > 1) { gbox(f, -3.3, 3.3, a + .5, a + 1, hh - 1.5, hh - 1, COL.bone); gbox(f, -.4, .4, a + 1, a + 4, hh, hh + 1.2, COL.dark);
+        if (rs() < .5) flatSign(f, wallOf(rs() < .5 ? 0 : 1, -3, 3, a, a + 5), a + 2.5, 4.4, 2.6, true, hh - 1.6); }       // banners down the spine
     }
     const f = 4;
     for (let s = 0; s < 4; s++) nbox(f, -33 + s * 3, 33 - s * 3, -33 + s * 3, 33 - s * 3, s ? s * 3 - 3 : -1.5, s * 3 + 3, s % 2 ? COL.steel : COL.mid, K_WIN, 1);
@@ -422,6 +480,9 @@ const PLANETS = [
           gbox(f, i0 - 2, i1 + 2, j0 - 2, j1 + 2, -1.5, 2, COL.mid);                    // the terrace at the canyon floor
           KB = ph - .5; district(f, i0 + 2, i1 - 2, j0 + 2, j1 - 2, .45, 8, 6, (ff, ci, cj) => ff === 4 && Math.abs(ci) < 27 && Math.abs(cj) < 27, [COL.light, COL.bone, COL.steel]); KB = 0;
           for (let x = i0; x < i1; x += 4) if (r() < .5) lamp(f, 'j-', j0 - 2, x, 2.1, .6);
+          for (let sd = 0; sd < 4; sd++) { const W = wallOf(sd, i0, i1, j0, j1);                   // the canyon walls lined with signs
+            for (let u = W.u0 + 3 + rs() * 6; u < W.u1 - 3; u += 7 + rs() * 9) { const q = rs();
+              if (q < .4) flatSign(f, W, u, 2.5 + rs() * 2, 2.6, true, ph - .6); else if (q < .7) bladeSign(f, W, u, 2.5 + rs() * 2, 2.6, ph - .4); } }
         } else gbox(f, i0, i1, j0, j1, -1.5, ph, COL.steel, lod ? K_WIN : K_SOLID);
       }
       /* bridges across the canyons and lights along their floors */
@@ -474,6 +535,9 @@ const PLANETS = [
           gbox(f, I - .6, I + .6, J, J + 40, -1, H - 1, col);
           for (let a = J; a < J + 40; a += 4) gbox(f, I - .6, I + .6, a, a + 2, H - 1, H, col);
           for (let y = 5; y < H - 2; y += 5) gbox(f, I - .9, I + .9, J, J + 40, y, y + .4, COL.mid);
+          if (H > 12 && rs() < .6) { const uc = J + 4 + rs() * 32, n = signWord(), lk = signLook(), paint = rs() < .6;   // painted on both faces of the fin, as on a hull
+            for (const sd of [0, 1]) flatSign(f, wallOf(sd, I - .6, I + .6, J, J + 40), uc, 3, 3.8, true, H - 1.5, !paint, n, lk); }
+          if (H > 12 && rs() < .7) for (const sd of [3, 2]) flatSign(f, wallOf(sd, I - 1.9, I + 1.9, J, J + 40), I, 2 + rs() * 3, 2.7, true, H - .8);   // plates on the fin's ends, facing down the rows
           gbox(f, I - 2, I + 2, J, J + 40, -1, 1, COL.dark);
           if (r() < .3) building(f, I + 2.6, I + 6.4, J + 6 + r() * 26, J + 10 + r() * 26, 3 + r() * 5, COL.steel, 2, { levels: 1, notch: 0, storey: 3, fins: false });
           if (r() < .5) gbox(f, I + 3, I + 3.8, J, J + 40, .6, 1.4, COL.bone);
@@ -588,14 +652,14 @@ function buildPlanet(k, slots, lite) {
   use(k, 40); SLOT = slots || {}; LITE = !!lite;
   const camG = gdir(HERO.f, PL.cam[0], PL.cam[1]);
   VIS = unit(add(HDIR, gdir(4, PL.far[0] * 1.6, PL.far[1] * 1.6))); DCTR = unit(slerp(HDIR, camG, .4));
-  r = rng(PL.seed); G = new Geo(); LG = []; LANES = []; KB = 0; VOFF = 0;
+  r = rng(PL.seed); rs = rng(PL.seed + 7); PK = k; G = new Geo(); LG = []; LANES = []; KB = 0; VOFF = 0;
   ground(); heroTop = PL.build(); KB = 0;
   if (PL.orbital) { r = rng(PL.seed + 99); PL.orbital(); VOFF = 0; }
   const lanes = new Float32Array(LANES.length * 7); LANES.forEach(([a, b, L], n) => lanes.set([...a, ...b, L], n * 7));
   const out = G.out(), tris = G.tris; G = null;
   return { k, heroTop, tris, ...out, lanes, LG, key: keyLocal(), sparkDir: sparkLocal() };
 }
-return { R, CELL, MACRO, HERO, HDIR, PLANETS, T_IN, T_DIVE, SPEED, P0, LAG, T0, sm5, seg, add, sub, mul, dot, cross, len, unit, gp, gdir, slerp, hex, FRONTS, COL,
+return { WORDS, WC, WP, R, CELL, MACRO, HERO, HDIR, PLANETS, T_IN, T_DIVE, SPEED, P0, LAG, T0, sm5, seg, add, sub, mul, dot, cross, len, unit, gp, gdir, slerp, hex, FRONTS, COL,
   buildPlanet, view: (k, ht, name, t) => { use(k, ht); return shotAt(name, t); }, key: (k, ht) => { use(k, ht); return keyLocal(); } };
 })();
 if (typeof window === 'undefined' && typeof importScripts === 'function') {
