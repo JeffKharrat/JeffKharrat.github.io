@@ -156,7 +156,8 @@ game({
   end(api) {
     phase = 'idle'; T.el.style.display = 'none'; K.el.style.display = 'none'; $('#hk-q').innerHTML = '';
     const res = { nodes: run.nodes, vaults: run.vaults, core: outcome === 'core', traced: outcome === 'traced', out: outcome !== 'core' && outcome !== 'traced' };
-    const L1 = api.preview ? { yen: 0, data: 0 } : lootOf(api.SAVE, TGT, ctxOf(api), res), R = RIVALS[TGT]; api.G.yen = L1.yen;    // their money, booked with the run's result, l = LINES[TGT][res.core ? 'win' : res.traced ? 'lose' : 'out'];
+    const L1 = api.preview ? { yen: 0, data: 0 } : lootOf(api.SAVE, TGT, ctxOf(api), res), R = RIVALS[TGT], l = LINES[TGT][res.core ? 'win' : res.traced ? 'lose' : 'out'];
+    api.G.yen = L1.yen;                                                  // their money, booked with the run's result
     return { title: res.core ? '中枢侵害 · CORE BREACHED' : res.traced ? '逆探知 · TRACED' : '離脱 · JACKED OUT', rows: [['nodes broken', res.nodes, 'y'], ['vaults', res.vaults], ['data taken', api.preview ? '—' : L1.data, res.core ? 'y' : '']],
       effect: { target: TGT, ...res }, extra: `<div class="note"><b class="kj" style="color:${R.col}">${R.ai}</b> <span class="kj">${rb(l.jp)}</span><br><span class="m">${esc(l.en)}</span>${res.traced ? '<br><b class="r">They traced you: expect an answer at your next visit (a breach, sabotage or a price war).</b>' : ''}</div>` };
   },
