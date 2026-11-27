@@ -412,7 +412,7 @@ void main(){
 /* ================= fronts ================= */
 let acc = 0;
 function startFront(P, mode, origin, speed, maxV) {
-  acc++; const c = P.k === TAU ? FRONTS[acc % 4 ? 3 : 0] : FRONTS[acc % 4];   // Tau Jeffy VI: yellow, now and then the AI's blue
+  acc++; const c = P.k === TAU ? FRONTS[3] : FRONTS[acc % 4];   // Tau Jeffy VI: always yellow
   Object.assign(P.fr, { on: true, prog: mode ? P0 - T0 * speed : -.02, speed, maxV, mode, drive: false });
   P.U.uMode.value = mode; P.U.uOrigin.value.set(...origin); P.U.uAcc.value.set(c[1]);
   if (mode) vis(P, 0);
@@ -459,7 +459,7 @@ const MAPU = { uA: { value: 1 } };
 /* ================= the original spark (as on the old walkway) ================= */
 (() => {
   let s = 7; const rr = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296, P = [], C = [], M = [];
-  const ACC = [[.29, .36, 1], [1, .35, .24], [.71, .94, 0], [1, .77, 0]];
+  const ACC = [[.29, .36, 1], [1, .35, .24], [.71, .94, 0], [1, .9, 0]];
   for (let i = 0; i < 2600; i++) {
     const u = rr(), v = rr(), r = 1.2 + Math.pow(rr(), 1.8) * 24, th = Math.PI * 2 * u, ph = Math.acos(2 * v - 1);
     P.push(CORE.x + r * Math.sin(ph) * Math.cos(th) * SS, CORE.y + r * Math.cos(ph) * .7 * SS, CORE.z + r * Math.sin(ph) * Math.sin(th) * SS);
@@ -965,7 +965,7 @@ function shipUpdate(dt) {
    shaft; the core opens over the page in a frame: /karatto/?embed=1). A landmark under the cursor is outlined with corner
    brackets and named; a click flies to it. The planet's state (which districts are lit, which buildings are open) comes
    from the summary the core writes in this browser (karatto.summary); after a visit to the core it is rebuilt if it moved. */
-const SITES = GEN.SITES, SH = { core: 54, factory: 42, logistics: 36, power: 48, lab: 40, broadcast: 76, security: 48, exchange: 54, hq: 86 };
+const SITES = GEN.SITES, SH = { core: 62, factory: 42, logistics: 36, power: 48, lab: 40, broadcast: 76, security: 48, exchange: 54, hq: 86 };
 const TV = { view: 'read', yaw: 0, pitch: .3, dist: R * 4.8, site: 0, from: null, t: 1, dur: 1.6, hov: -1, drag: null, diveT: 0, opened: false, built: '' };
 const TIER_N = ['町工場', '中小企業', '中堅企業', '大企業', '財閥'], TIER_E = ['Backstreet workshop', 'Small enterprise', 'Mid-size firm', 'Large corporation', 'Zaibatsu'];
 function tauSummary() { try { return JSON.parse(localStorage.getItem('karatto.summary')) || null; } catch (e) { return null; } }
@@ -982,7 +982,7 @@ const poseQ = p => ({ E: p.E, q: lookQ(p.E, p.T, p.up) });
    dist, th (the height looked at). Each faces the building's name plate, the hero element against the sky, the horizon
    in the upper third; the reading window already holds the subject right of the panel. */
 const SHOTS = {
-  core: { az: -62, el: 34, dist: 132, th: 16 }, factory: { az: -58, el: 22, dist: 104, th: 13 }, logistics: { az: -118, el: 17, dist: 112, th: 22 },
+  core: { az: -62, el: 30, dist: 150, th: 24 }, factory: { az: -58, el: 22, dist: 104, th: 13 }, logistics: { az: -118, el: 17, dist: 112, th: 22 },
   power: { az: 42, el: 21, dist: 118, th: 17 }, lab: { az: -52, el: 20, dist: 134, th: 16 }, broadcast: { az: 205, el: 12, dist: 230, th: 46 },
   security: { az: -118, el: 20, dist: 144, th: 20 }, exchange: { az: -72, el: 18, dist: 144, th: 23 }, hq: { az: -96, el: 17, dist: 196, th: 34 } };
 function tauPose(v) {
@@ -997,7 +997,9 @@ function tauPose(v) {
     const off = GEN.add(GEN.mul(GEN.add(GEN.mul(e, Math.cos(az)), GEN.mul(n, Math.sin(az))), Math.cos(el) * sh.dist), GEN.mul(d, Math.sin(el) * sh.dist)), T = GEN.mul(d, R + sh.th);
     return { E: W(GEN.add(T, off)), T: W(T), up: L(d) };
   }
-  if (v === 'dive') { const d = GEN.HDIR, u = TV.diveT; return { E: W(GEN.mul(d, R + 92 - 150 * u * u)), T: W(GEN.mul(d, R - 150)), up: L([0, 1, 0]) }; }
+  if (v === 'dive' || v === 'rise') {                                 // straight down the core's axis: over the halo, through the rings, into the shaft
+    const s = SITES[0], d = GEN.gdir(s.f, s.i, s.j), n = GEN.unit(GEN.sub(GEN.gdir(s.f, s.i, s.j + 1), d)), u = TV.diveT, e = u < .5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u);
+    const h = R + 96 - 152 * e; return { E: W(GEN.mul(d, h)), T: W(GEN.mul(d, h - 60)), up: L(n) }; }
   const rp = restPose(SEC); return { E: rp.E.clone(), T: rp.T.clone(), up: rp.up.clone() };
 }
 /* moves between views: the camera's position and the point it looks at each travel round the planet's centre (never
@@ -1017,6 +1019,7 @@ function tauBlend(F, Tp, w) {
 }
 function setView(v, n) {
   if (!PLS[TAU].ready || (v === TV.view && (v !== 'site' || n === TV.site))) return;
+  const was = TV.view;
   TV.from = TV.cur ? { E: TV.cur.E.clone(), T: TV.cur.T.clone(), up: TV.cur.up.clone() } : tauPose(TV.view);
   if (v === 'globe' && TV.view !== 'globe') { const dl = TV.from.E.clone().sub(PLS[TAU].C).applyQuaternion(PLS[TAU].Qi).normalize(); TV.yaw = Math.atan2(dl.x, dl.z); TV.pitch = cl(Math.asin(dl.y), -1.2, 1.2); TV.dist = R * 4.8; }
   if (n !== undefined) TV.site = n;
@@ -1024,13 +1027,14 @@ function setView(v, n) {
   TV.view = v; TV.hov = -1;
   /* the length of the move: from the angle flown over the planet and the change of altitude */
   const to = tauPose(v), th = Math.max(angAt(TV.from.T, to.T), angAt(TV.from.E, to.E)), alt = Math.abs(Math.log(TV.from.E.distanceTo(PLS[TAU].C) / to.E.distanceTo(PLS[TAU].C)));
-  TV.bump = R * th * .75; TV.dur = v === 'dive' ? 1.8 : 1.2 + th * 1.15 + alt * .9; TV.t = 0;
+  TV.bump = was === 'rise' ? 0 : R * th * .75; TV.dur = v === 'dive' ? 2 : 1.2 + th * 1.15 + alt * .9; TV.t = 0;
   tauPanel(); kick();
 }
 function tauCam(E0, q0, dt) {
   dt *= window.__tauFast || 1;                                         // (still renders run the moves faster)
-  if (TV.view === 'dive' && TV.t >= 1) TV.diveT = Math.min(1, TV.diveT + dt / 2.4);
-  if (TV.view === 'dive' && TV.diveT > .5 && !TV.opened) { TV.opened = true; openCore(); }
+  if (TV.view === 'dive' && TV.t >= 1) TV.diveT = Math.min(1, TV.diveT + dt / 2.6);
+  if (TV.view === 'dive' && TV.diveT > .66 && !TV.opened) { TV.opened = true; openCore(); }
+  if (TV.view === 'rise') { TV.diveT = Math.max(0, TV.diveT - dt / 2.6); if (TV.diveT <= 0) setView('site', 0); }   // up the shaft, then out to the core's shot
   let p;
   if (TV.view === 'read') { const rp = restPose(SEC); p = { E: E0.clone(), T: rp.T.clone(), up: rp.up.clone() }; } else p = tauPose(TV.view);
   if (TV.t < 1 && TV.from) { TV.t = Math.min(1, TV.t + dt / TV.dur); p = tauBlend(TV.from, p, ease(TV.t)); }
@@ -1051,7 +1055,7 @@ function siteBox(n) {
   return ok > 4 && x1 > 0 && y1 > 0 && x0 < W && y0 < H ? [x0, y0, x1, y1] : null;
 }
 function tauLabels() {
-  if (!PLS[TAU].full || TV.view === 'dive' || inCore) { TV.hov = -1; return; }
+  if (!PLS[TAU].full || TV.view === 'dive' || TV.view === 'rise' || inCore) { TV.hov = -1; return; }
   const st = tauState(), ac = accent(), boxes = SITES.map((_, n) => TV.t < 1 || (TV.view === 'site' && TV.site === n) ? null : siteBox(n));
   let hv = -1, ba = 1e12;
   if (mouse.px >= 0 && !TV.drag) boxes.forEach((B, n) => { if (!B) return; const pad = 10; if (mouse.px > B[0] - pad && mouse.px < B[2] + pad && mouse.py > B[1] - pad && mouse.py < B[3] + pad) { const a = (B[2] - B[0]) * (B[3] - B[1]); if (a < ba) { ba = a; hv = n; } } });
@@ -1079,7 +1083,7 @@ function tauClick() {
   return true;
 }
 /* the planet in the hand: drag to turn it (from any view), wheel to come closer or further */
-canvas.addEventListener('pointerdown', e => { if (cur === SEC && !mv && TV.view !== 'dive' && TV.t >= 1) TV.drag = { x: e.clientX, y: e.clientY, m: 0 }; });
+canvas.addEventListener('pointerdown', e => { if (cur === SEC && !mv && TV.view !== 'dive' && TV.view !== 'rise' && TV.t >= 1) TV.drag = { x: e.clientX, y: e.clientY, m: 0 }; });
 addEventListener('pointermove', e => {
   if (!TV.drag) return; const dx = e.clientX - TV.drag.x, dy = e.clientY - TV.drag.y; TV.drag.x = e.clientX; TV.drag.y = e.clientY; TV.drag.m += Math.abs(dx) + Math.abs(dy);
   if (TV.view !== 'globe') { if (TV.drag.m > 10) setView('globe'); return; }
@@ -1123,7 +1127,7 @@ function openCore(src = CORE_URL) { loadCore(src); coreEl.classList.add('on'); d
 function closeCore() {
   if (!coreEl) return; const el = coreEl, wasCore = el.dataset.src === CORE_URL; coreEl = null; inCore = false;
   el.classList.remove('on', 'ready'); document.documentElement.classList.remove('tau-in'); setTimeout(() => el.remove(), 800);
-  if (wasCore) { TV.diveT = 1; TV.from = tauPose('dive'); TV.view = 'site'; TV.site = 0; TV.t = 0; TV.dur = 2.8; TV.bump = 0; }   // back up the shaft
+  if (wasCore) { TV.diveT = 1; TV.view = 'rise'; TV.site = 0; TV.t = 1; TV.from = null; }      // back up the shaft, vertically
   if (JSON.stringify(tauState()) !== TV.built) { dropFull(PLS[TAU]); wakeBuild(); }                                 // the city follows the memory
   tauPanel(); kick();
 }

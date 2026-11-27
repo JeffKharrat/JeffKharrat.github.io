@@ -5,7 +5,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=2';
 import * as store from './store.js?v=2';
 import { files, updateFlags } from './evidence.js';
-import { openAudit } from './audit.js?v=1';
+import { openAudit } from './audit.js?v=2';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;   // embed: opened over the site from Tau Jeffy VI
@@ -283,8 +283,8 @@ void main(){ vec3 d = normalize(vP); vec2 g = vec2(atan(d.x, d.z), asin(d.y)) / 
   /* tier plaques above each section */
   L.sections.forEach((s, i) => {
     const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 192; const x = cv.getContext('2d');
-    const T = TIERS[i]; x.fillStyle = '#E9EBF0'; x.font = '400 104px "Dela Gothic One", sans-serif'; x.textBaseline = 'middle'; x.fillText('N' + s.lv, 16, 100);
-    x.font = '400 64px "Dela Gothic One", sans-serif'; x.fillText(T.name, 230, 82); x.fillStyle = '#9AA1B0'; x.font = '500 30px "M PLUS 1 Code", monospace'; x.fillText(T.en.toUpperCase() + ' · ' + (KD.meta.levels[s.lv].n) + ' KANJI', 232, 150);
+    const T = TIERS[i]; x.fillStyle = '#E9EBF0'; x.font = '700 104px Tektur, sans-serif'; x.textBaseline = 'middle'; x.fillText('N' + s.lv, 16, 100);
+    x.font = '600 64px "M PLUS 1", sans-serif'; x.fillText(T.name, 230, 82); x.fillStyle = '#9AA1B0'; x.font = '500 30px "M PLUS 1 Code", monospace'; x.fillText(T.en.toUpperCase() + ' · ' + (KD.meta.levels[s.lv].n) + ' KANJI', 232, 150);
     const tex = new THREE.CanvasTexture(cv), w = 30, h = w * 192 / 1024;
     const pl = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
     const tc = L.angle(s.c0, 0).t - 15 / RC, p = half + .06, d = dir(tc, p).multiplyScalar(RC - 3);
@@ -546,7 +546,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   KD = await loadKanji('../data/karatto/kanji.json');
   const chars = KD.list.map(k => k.k).join('');
-  if (document.fonts) await Promise.race([Promise.all([document.fonts.load('500 37px "M PLUS 1 Code"', chars), document.fonts.load('400 64px "Dela Gothic One"', '町工場中小企業堅大財閥')]), new Promise(r => setTimeout(r, 6000))]);
+  if (document.fonts) await Promise.race([Promise.all([document.fonts.load('500 37px "M PLUS 1 Code"', chars), document.fonts.load('500 64px "M PLUS 1"', '町工場中小企業堅大財閥')]), new Promise(r => setTimeout(r, 6000))]);
   buildWall();
   const L0 = await store.load(); SAVE = L0.save; DECK = L0.deck; SRC = L0.source;
   if (DEMO) { const d = demoDeck(); DECK = d.deck; SAVE = { ...SAVE, words: d.words }; }

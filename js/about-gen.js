@@ -24,8 +24,8 @@ const angTo = (d, e) => Math.acos(Math.min(1, Math.max(-1, dot(d, e))));
 /* ================= palette ================= */
 const hex = h => [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255];
 const COL = { light: hex('#C9CDD6'), mid: hex('#5A606C'), dark: hex('#2F333C'), bone: hex('#E7E7E2'), slate: hex('#3A3F4A'), steel: hex('#8A909C'), ink: hex('#E9EBF0'), deep: hex('#22252C'),
-  red: hex('#B8432E'), warm: hex('#D9962F'), rust: hex('#5E463B') };                 // the last three: Tau Jeffy VI only (chimney bands, cranes, rust)
-const FRONTS = [['blue', '#4A5BFF'], ['red', '#FF5A3D'], ['lime', '#B4F000'], ['yellow', '#FFC400']];
+  red: hex('#B8432E'), warm: hex('#D8BE2A'), rust: hex('#5E463B') };                 // the last three: Tau Jeffy VI only (chimney bands, cranes, rust)
+const FRONTS = [['blue', '#4A5BFF'], ['red', '#FF5A3D'], ['lime', '#B4F000'], ['yellow', '#FFE600']];
 const K_SOLID = 0, K_GROUND = 1, K_LAMP = 2, K_WIN = 3, K_GLOW = 4;            // K_GLOW: the core's light (Tau Jeffy VI)
 
 /* ================= the builder ================= */
@@ -541,43 +541,99 @@ function tauDistricts(f, skip) {
 }
 
 /* ---- the landmarks ---- */
-function siteCore() {                                               // the hero: a stepped ring round the shaft, four pylons, the cradle, pipes down
-  const f = 4, fr = frame(f, 0, 0), HR = 24, lod = L2();
-  for (let a = -36; a < 36; a += 3) for (let b = -36; b < 36; b += 3) {
-    const rr = Math.hypot(a + 1.5, b + 1.5); if (rr < HR + .8 || rr > 34) continue;
-    const t = Math.atan2(b + 1.5, a + 1.5), h = 4 + ((t / (Math.PI / 6) + 12) | 0) % 2 * 3 + (rr < HR + 4 ? 2 : 0);
-    gbox(f, a, a + 3, b, b + 3, -1.5, h, rr < HR + 4 ? COL.bone : COL.steel, lod > 1 ? K_WIN : K_SOLID);
+/* the hero: the core's aperture. A round plaza stepping down to the shaft, eight pylons leaning in to a crown ring, a halo
+   ring high over the axis (the way down passes through both), the shaft ribbed and ringed with the core's light. Everything
+   follows the planet's curve (built along its radii), so nothing leans against the city round it. */
+function siteCore() {
+  const f = 4, HR = 24, D = -64, lod = L2(), TAU2 = Math.PI * 2, O = [0, 0, 0];
+  const Q = (t, rr, h) => gp(f, Math.cos(t) * rr, Math.sin(t) * rr, h);                // a point on the site in polar form, h along the radius
+  const ax = h => gp(f, 0, 0, h);
+  const wbeam = (A, B, t, col, kind = K_SOLID) => { const Z = unit(sub(B, A)), U = unit(add(A, B)), X = unit(Math.abs(dot(Z, U)) > .95 ? cross(cross(Z, [.3, .9, .2]), Z) : cross(U, Z)), Y = cross(Z, X);
+    obox(mul(add(A, B), .5), X, Y, Z, [t / 2, t / 2, len(sub(B, A)) / 2], col, kind); };
+  const lamp = (p, dn, sz) => { if (!DERELICT) topLampAt(p, dn ? mul(unit(p), -1) : unit(p), sz); };
+  /* an annulus r0..r1 from h0 to h1: top, outer and inner faces; col(s) per segment; skip(s) leaves gaps */
+  const band = (r0, r1, h0, h1, n, col, kind = K_SOLID, skip = () => false, faces = 7) => {
+    for (let k = 0; k < n; k++) { if (skip(k)) continue; const t0 = k / n * TAU2, t1 = (k + 1) / n * TAU2, c = typeof col === 'function' ? col(k) : col, cm = ax((h0 + h1) / 2);
+      if (faces & 1) G.quad(Q(t0, r0, h1), Q(t1, r0, h1), Q(t1, r1, h1), Q(t0, r1, h1), c, kind, 0, O, true);
+      if (faces & 2) G.quad(Q(t0, r1, h0), Q(t1, r1, h0), Q(t1, r1, h1), Q(t0, r1, h1), c, kind, 0, cm, true);
+      if (faces & 4) G.quad(Q(t0, r0, h0), Q(t1, r0, h0), Q(t1, r0, h1), Q(t0, r0, h1), c, kind, 0, cm, false);
+      if (skip(k - 1) || skip(k + 1)) for (const [t, o] of [[t0, skip(k - 1)], [t1, skip(k + 1)]]) if (o) G.quad(Q(t, r0, h0), Q(t, r1, h0), Q(t, r1, h1), Q(t, r0, h1), c, kind, 0, Q(t0 / 2 + t1 / 2, (r0 + r1) / 2, (h0 + h1) / 2), true);
+    }
+  };
+  /* ground pad under the whole site (the square's corners), kept below the plaza */
+  for (const [a0, a1, b0, b1] of [[-42, 42, -42, -34], [-42, 42, 34, 42], [-42, -34, -34, 34], [34, 42, -34, 34]]) gbox(f, a0, a1, b0, b1, -1.5, .15, COL.dark);
+  /* the plaza: a raised collar at the rim, a step, a floor with radial joints, a parapet with four gates */
+  const gate = k => [0, 12, 24, 36].some(g => ((k - g + 48) % 48) < 2 || ((g - k + 48) % 48) <= 1);
+  band(HR, 27, -1.5, 1.6, 48, COL.bone);
+  band(27, 31, -1.5, .8, 48, k => k % 2 ? COL.steel : COL.mid);
+  band(31, 40, -1.5, .35, 48, k => (k >> 1) % 2 ? COL.steel : COL.dark, K_SOLID, () => false, 3);
+  band(40, 41.8, -1.5, 2.6, 48, COL.light, K_SOLID, gate);
+  band(40.3, 41.5, 2.6, 3, 48, COL.steel, K_SOLID, gate, 1);
+  for (let k = 0; k < 48; k++) { const t = (k + .5) / 48 * TAU2;
+    if (k % 2 === 0) lamp(Q(t, 25.5, 1.62), false, .32);
+    if (k % 4 === 1) lamp(Q(t, 35.5, .37), false, .36);
+    if (gate(k) && k % 2 === 0) { lamp(Q(t, 41, 3.05), false, .3); }
   }
-  for (const [a0, a1, b0, b1] of [[-42, 42, -42, -34], [-42, 42, 34, 42], [-42, -34, -34, 34], [34, 42, -34, 34]]) gbox(f, a0, a1, b0, b1, -1.5, .5, COL.dark);   // the apron, round the ring (the shaft stays open)
-  /* the shaft: windowed walls down to the core's light, lamp rings, a glowing floor */
-  const NSG = 48, D = -64;
-  for (let s = 0; s < NSG; s++) { const t0 = s / NSG * Math.PI * 2, t1 = (s + 1) / NSG * Math.PI * 2, P = (t, k) => gp(f, Math.cos(t) * HR, Math.sin(t) * HR, k);
-    for (let k = 0; k > D; k -= 4) G.quad(P(t0, k), P(t1, k), P(t1, k - 4), P(t0, k - 4), (k / 4 | 0) % 4 === 0 ? COL.mid : COL.steel, lod > 1 ? K_WIN : K_SOLID, 0, gp(f, 0, 0, k - 2), false);
-    for (const k of [-6, -22, -38, -54]) if (s % 2 === 0) { const t = (t0 + t1) / 2, p = (u, v) => gp(f, Math.cos(t + u) * (HR - .08), Math.sin(t + u) * (HR - .08), k + v); G.quad(p(-.02, 0), p(.02, 0), p(.02, .6), p(-.02, .6), COL.ink, K_LAMP, r(), gp(f, 0, 0, k), false); }
+  /* the core's light, a thin ring on the rim's inner edge (seen from above) */
+  for (let k = 0; k < 96; k++) { const t0 = k / 96 * TAU2, t1 = (k + 1) / 96 * TAU2; G.quad(Q(t0, HR - .02, 1.63), Q(t1, HR - .02, 1.63), Q(t1, HR + .45, 1.63), Q(t0, HR + .45, 1.63), COL.ink, K_GLOW, r(), O, true); }
+  /* the shaft: windowed walls down to the core's light, ribs, lamp rings, light rings, a glowing floor */
+  const NSG = 48;
+  for (let k = 0; k < NSG; k++) { const t0 = k / NSG * TAU2, t1 = (k + 1) / NSG * TAU2;
+    for (let h = 0; h > D; h -= 4) G.quad(Q(t0, HR, h), Q(t1, HR, h), Q(t1, HR, h - 4), Q(t0, HR, h - 4), (h / 4 | 0) % 4 === 0 ? COL.mid : COL.steel, lod > 1 ? K_WIN : K_SOLID, 0, ax(h - 2), false);
+    for (let h = -8; h > D; h -= 8) G.quad(Q(t0, HR - .12, h), Q(t1, HR - .12, h), Q(t1, HR - .12, h - .45), Q(t0, HR - .12, h - .45), COL.ink, K_GLOW, r(), ax(h), false);
+    for (const h of [-5, -21, -37, -53]) if (k % 2 === 0) { const t = (t0 + t1) / 2; G.quad(Q(t - .02, HR - .08, h), Q(t + .02, HR - .08, h), Q(t + .02, HR - .08, h + .6), Q(t - .02, HR - .08, h + .6), COL.ink, K_LAMP, r(), ax(h), false); }
   }
-  /* the floor: a dark grating, the core's light through it in rings and at the centre */
-  for (let a = -HR; a < HR; a += 3) for (let b = -HR; b < HR; b += 3) { const rr = Math.hypot(a + 1.5, b + 1.5); if (rr >= HR) continue; const lit = rr < 5 || (rr / 4.5 | 0) % 2 === 1;
-    G.quad(gp(f, a, b, D), gp(f, a + 3, b, D), gp(f, a + 3, b + 3, D), gp(f, a, b + 3, D), lit ? COL.ink : COL.deep, lit ? K_GLOW : K_SOLID, r(), [0, 0, 0], true); }
-  /* the core's light climbing the shaft: rings every eight cells, and eight strips running down */
-  for (let s = 0; s < NSG; s++) { const t0 = s / NSG * Math.PI * 2, t1 = (s + 1) / NSG * Math.PI * 2, P = (t, k) => gp(f, Math.cos(t) * (HR - .12), Math.sin(t) * (HR - .12), k);
-    for (let k = -8; k > D; k -= 8) G.quad(P(t0, k), P(t1, k), P(t1, k - .45), P(t0, k - .45), COL.ink, K_GLOW, r(), gp(f, 0, 0, k), false);
-    if (s % 6 === 0) { const tm = (t0 + t1) / 2, Q = (u, k) => gp(f, Math.cos(tm + u) * (HR - .14), Math.sin(tm + u) * (HR - .14), k); G.quad(Q(-.012, -2), Q(.012, -2), Q(.012, D), Q(-.012, D), COL.ink, K_GLOW, r(), gp(f, 0, 0, -30), false); }
+  for (let k = 0; k < 16; k++) {                                      // ribs: a flat pilaster every 22.5°, faces toward the axis
+    const t = k / 16 * TAU2, w = .45 / HR, a = HR - .7;
+    G.quad(Q(t - w, a, 1.6), Q(t + w, a, 1.6), Q(t + w, a, D), Q(t - w, a, D), COL.dark, K_SOLID, 0, ax(-30), false);
+    for (const s of [-1, 1]) G.quad(Q(t + s * w, a, 1.6), Q(t + s * w, HR, 1.6), Q(t + s * w, HR, D), Q(t + s * w, a, D), COL.dark, K_SOLID, 0, Q(t - s * w * 3, a, -30), false);
   }
-  /* four pylons on the diagonals, bridges to the cradle over the shaft */
-  let top = 0;
-  [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([u, v], n) => {
-    const x = u * 33, y = v * 33, H = 40 + (n % 2) * 6;
-    top = Math.max(top, building(f, x - 4.5, x + 4.5, y - 4.5, y + 4.5, H, COL.light, lod, { levels: 3, storey: 4, notch: 1, finP: .9 }));
-    beam(fr, [x * .86, 34, -y * .86], [x * .3, 34, -y * .3], 1.6, COL.steel); beam(fr, [x * .86, 31, -y * .86], [x * .3, 34, -y * .3], .6, COL.mid);
-  });
-  for (let s = 0; s < 16; s++) { const t0 = s / 16 * Math.PI * 2, t1 = (s + 1) / 16 * Math.PI * 2; beam(fr, [Math.cos(t0) * 10, 34, Math.sin(t0) * 10], [Math.cos(t1) * 10, 34, Math.sin(t1) * 10], 1.8, COL.bone); }
-  for (let p = 0; p < 6; p++) { const t = p / 6 * Math.PI * 2 + .3, x = Math.cos(t) * (7 + (p % 2) * 2.5), z = Math.sin(t) * (7 + (p % 2) * 2.5);
-    cyl(fr, x, z, p % 2 ? .8 : 1.3, D + 2, 34, p % 3 === 0 ? COL.bone : COL.steel, 12); }
-  for (let s = 0; s < 4; s++) { const t = s / 4 * Math.PI * 2 + .4; topLampAt(fr.L([Math.cos(t) * 10, 35, Math.sin(t) * 10]), fr.up, .5); }   // the axis stays clear: the way down
-  for (let a = 0; a < 12; a++) { const t = a / 12 * Math.PI * 2; topLamp(f, Math.cos(t) * 25.4 - .3, Math.sin(t) * 25.4 - .3, 9.2, .6); }
-  sitePlate(SITES[0], f, wallOf(3, -37.5, -28.5, -37.5, -28.5), -33, 8, 3.6, 38);
-  flatSign(f, wallOf(3, 28.5, 37.5, -37.5, -28.5), 33, 8, 3.6, true, 38, true, WORDS_T.indexOf('カラット'), [SIGN, 1, COL.deep]);
-  return Math.max(top, 46);
+  /* the floor: concentric rings of the core's light through a dark grating, a bright eye at the centre */
+  const RINGS = [0, 3.2, 4.2, 7, 7.6, 11, 11.5, 15.5, 16, 20, 20.6, HR];
+  for (let q = 0; q < RINGS.length - 1; q++) { const lit = q % 2 === 0, n = q < 2 ? 24 : 48;
+    for (let k = 0; k < n; k++) { const t0 = k / n * TAU2, t1 = (k + 1) / n * TAU2, grate = !lit && k % 2;
+      G.quad(Q(t0, RINGS[q], D), Q(t1, RINGS[q], D), Q(t1, RINGS[q + 1], D), Q(t0, RINGS[q + 1], D), lit ? COL.ink : grate ? COL.dark : COL.deep, lit ? K_GLOW : K_SOLID, r(), O, true); } }
+  for (let k = 0; k < 12; k++) { const t = k / 12 * TAU2; wbeam(Q(t, 4.3, D + .3), Q(t, HR - .8, D + .3), .5, COL.dark); }      // radial floor beams
+  /* eight pylons leaning in from the plaza to the crown ring: a footing, a shaft, three collars, a lamp on top */
+  const CR = 29.5, CH = 42, PB = 33.5;
+  for (let p = 0; p < 8; p++) {
+    const t = (p + .5) / 8 * TAU2, A = Q(t, PB, .3), B = Q(t, CR + .6, CH + 1.2), at = u => add(A, mul(sub(B, A), u));
+    wbeam(Q(t, PB, -1), Q(t, PB, 5), 4, COL.dark); wbeam(Q(t, PB, 5), Q(t, PB, 6.2), 3.2, COL.steel);
+    wbeam(A, B, 2.2, p % 2 ? COL.light : COL.bone);
+    for (const u of [.3, .55, .8]) wbeam(at(u - .012), at(u + .012), 3, COL.steel);
+    wbeam(at(.12), at(.16), 2.6, COL.mid);
+    lamp(Q(t, CR + .6, CH + 2.45), false, .45);
+  }
+  /* the crown ring and its inner ring, spokes between them, lamps above and below */
+  for (let k = 0; k < 48; k++) { const t0 = k / 48 * TAU2, t1 = (k + 1) / 48 * TAU2, tm = (t0 + t1) / 2;
+    wbeam(Q(t0, CR, CH), Q(t1, CR, CH), 2.6, COL.bone); wbeam(Q(t0, CR - 3, CH - 1.2), Q(t1, CR - 3, CH - 1.2), 1.1, COL.steel);
+    if (k % 6 === 3) wbeam(Q(tm, CR - 3, CH - 1.2), Q(tm, CR, CH), .9, COL.mid);
+    wbeam(Q(t0, CR + .3, CH - 4), Q(t1, CR + .3, CH - 4), .9, COL.steel);                          // the truss: a lower chord, diagonals
+    wbeam(Q(k % 2 ? t0 : t1, CR + .2, CH - 4), Q(k % 2 ? t1 : t0, CR + .1, CH - 1), .45, COL.mid);
+    if (k % 3 === 0) lamp(Q(tm, CR, CH - 1.32), true, .42);
+    if (k % 4 === 2) lamp(Q(tm, CR, CH + 1.32), false, .3);
+  }
+  /* the halo: a ring high over the axis on four V struts, fins round it */
+  const HRo = 14, HH = 58;
+  for (let k = 0; k < 32; k++) { const t0 = k / 32 * TAU2, t1 = (k + 1) / 32 * TAU2, tm = (t0 + t1) / 2;
+    wbeam(Q(t0, HRo, HH), Q(t1, HRo, HH), 2, COL.light); wbeam(Q(t0, HRo + .2, HH + 1.25), Q(t1, HRo + .2, HH + 1.25), .55, COL.bone);
+    if (k % 2 === 0) lamp(Q(tm, HRo, HH - 1.02), true, .38);
+    if (k % 4 === 0) wbeam(Q(tm, HRo + 1, HH), Q(tm, HRo + 3.2, HH - .3), .55, COL.steel);
+  }
+  for (let s = 0; s < 4; s++) { const t = s / 4 * TAU2 + Math.PI / 4;
+    for (const d of [-.13, .13]) wbeam(Q(t + d, CR, CH + 1.2), Q(t, HRo + .4, HH - .8), 1.1, COL.steel);
+    wbeam(Q(t, CR - 2, CH + 6), Q(t, CR - 2, CH + 6.6), .1, COL.steel);
+  }
+  /* four service blocks in the square's corners, outside the parapet: the name plate, the AI's name, a dish, tanks */
+  const t1 = building(f, 31, 40, -40, -31, 15, COL.light, lod, { levels: 2, storey: 3, notch: 1, finP: .8 });
+  const t2 = building(f, -40, -31, 31, 40, 13, COL.bone, lod, { levels: 2, storey: 3, notch: 1, finP: .7 });
+  building(f, -40, -31, -40, -31, 10, COL.steel, lod, { levels: 1, storey: 3, notch: 1, fins: false });
+  if (!FAR) dish(frame(f, -35.5, -35.5, 10), 0, 0, 3.4, .55, 2.4);
+  gbox(f, 31, 40, 31, 40, -1.5, .9, COL.dark);
+  if (!FAR) { const tf = frame(f, 35.5, 35.5, .9); tank(tf, -2, -2, 2.1, 7, COL.bone); tank(tf, 2.2, 1.8, 1.8, 5.5, COL.light); }
+  sitePlate(SITES[0], f, wallOf(3, 31, 40, -40, -31), 35.5, 4, 3.2, t1 - 1);
+  flatSign(f, wallOf(2, -40, -31, 31, 40), -35.5, 4, 3, true, t2 - 1, true, WORDS_T.indexOf('カラット'), [SIGN, 1, COL.deep]);
+  return HH + 3;
 }
 function siteFactory(s) {
   const { f, i, j } = s, lod = L2(), fr = frame(f, i, j); DERELICT = !unlocked(s);

@@ -12,115 +12,127 @@ import { SKILLS, SKILL_J, files, commit, snooze, record, claimsLeft, useClaim, s
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const SK_EN = { meaning: 'Meaning', reading: 'Reading', recall: 'Recall', context: 'Context', listen: 'Listening' };
 const CSS = `
-#au { position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center; background:#040507; }
-#au.on { display:flex; animation:auF .35s ease-out both; }
+#au { position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center; background:#020203; }
+#au.on { display:flex; animation:auF .3s ease-out both; }
 @keyframes auF { from { opacity:0; } to { opacity:1; } }
 #au * { box-sizing:border-box; }
-#au .stg { position:relative; width:1280px; height:720px; flex:none; overflow:hidden; transform-origin:center; font:400 13px/1.45 "M PLUS 1 Code", monospace; color:#E9EBF0;
-  background:linear-gradient(#0B0D12 0, #10131A 58%, #0A0B0E 58.1%, #0E1015 100%); }
-/* the room: blinds, the light through them, the lamp, the desk edge */
-#au .blind { position:absolute; left:930px; top:66px; width:320px; height:250px; background:repeating-linear-gradient(#2A2618 0 9px, #0B0C10 9px 14px); box-shadow:0 0 0 6px #14171D; opacity:.8; }
-#au .blind::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg, rgba(255,196,0,.0), rgba(255,210,120,.18) 60%, rgba(255,196,0,0)); }
-#au .rays { position:absolute; inset:0; pointer-events:none; background:repeating-linear-gradient(-28deg, rgba(255,214,120,.035) 0 22px, transparent 22px 44px); -webkit-mask:linear-gradient(115deg, transparent 30%, #000 60%, transparent 95%); mask:linear-gradient(115deg, transparent 30%, #000 60%, transparent 95%); animation:auR 18s linear infinite; }
-@keyframes auR { to { background-position:88px 0; } }
-#au .lampg { position:absolute; left:330px; top:120px; width:600px; height:600px; pointer-events:none; background:radial-gradient(closest-side, rgba(255,205,120,.13), rgba(255,196,0,0)); }
-#au .edge { position:absolute; left:0; right:0; top:417px; height:3px; background:#232833; }
-#au .sign { position:absolute; left:320px; top:74px; font:400 120px/1 "Dela Gothic One"; color:rgba(233,235,240,.035); letter-spacing:.05em; pointer-events:none; }
+#au { --y:#FFE600; --red:#FF3B30; --ai:#4A5BFF; --ink:#ECEEF2; --mute:#8A909C; --line:#24282F; --line2:#383D46; --kj:"M PLUS 1", sans-serif; --mono:"M PLUS 1 Code", monospace; --num:Tektur, sans-serif; }
+#au .stg { position:relative; width:1280px; height:720px; flex:none; overflow:hidden; transform-origin:center; font:400 12.5px/1.45 var(--mono); color:var(--ink); background:#050506; }
+/* the room: a grid, a scan line, registration marks, the big glyph */
+#au .grid { position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px); background-size:40px 40px; }
+#au .scan { position:absolute; left:0; right:0; height:120px; top:-120px; background:linear-gradient(transparent, rgba(255,230,0,.05), transparent); animation:auScan 7s linear infinite; pointer-events:none; }
+@keyframes auScan { to { top:720px; } }
+#au .glyph { position:absolute; left:340px; top:120px; font:700 300px/1 var(--kj); color:transparent; -webkit-text-stroke:1px rgba(255,255,255,.035); pointer-events:none; letter-spacing:-.04em; }
+#au .crt { position:absolute; inset:0; pointer-events:none; z-index:9; background:repeating-linear-gradient(transparent 0 2px, rgba(0,0,0,.07) 2px 3px); }
+#au .reg { position:absolute; width:14px; height:14px; border-color:rgba(255,255,255,.25); border-style:solid; }
+#au .lb { font:500 9.5px/1.3 var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--mute); }
+#au .kj { font-family:var(--kj); font-weight:500; }
+#au .key { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:19px; padding:0 4px; border:1px solid var(--line2); font:700 10px var(--mono); color:#C9CDD6; }
+#au .bc { display:inline-block; width:70px; height:11px; background:repeating-linear-gradient(90deg, currentColor 0 1px, transparent 1px 3px, currentColor 3px 5px, transparent 5px 6px, currentColor 6px 7px, transparent 7px 10px); opacity:.45; vertical-align:middle; }
+#au .pnl { position:absolute; background:rgba(6,7,8,.92); border:1px solid var(--line2); clip-path:polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%); }
+#au .ph { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 12px; border-bottom:1px solid var(--line); font:700 9.5px var(--mono); letter-spacing:.16em; color:var(--mute); white-space:nowrap; }
+#au .ph b { color:#000; background:var(--y); padding:2px 6px; font-weight:700; }
 /* top */
-#au .top { position:absolute; left:0; right:0; top:0; height:52px; display:flex; align-items:center; gap:18px; padding:0 20px; border-bottom:1px solid #262B35; background:rgba(8,9,12,.85); z-index:3; }
-#au .ttl { font:400 20px "Dela Gothic One"; }
-#au .lb { font:500 11px/1.3 "M PLUS 1 Code", monospace; letter-spacing:.12em; text-transform:uppercase; color:#9AA1B0; }
-#au .tabs { display:flex; gap:4px; margin-left:12px; }
-#au .tab { background:transparent; border:1px solid #2F3541; color:#9AA1B0; padding:7px 12px; font:500 12px "M PLUS 1 Code"; cursor:pointer; }
-#au .tab b { font:400 14px "Dela Gothic One"; color:#E9EBF0; margin-right:6px; font-weight:400; }
-#au .tab.on { border-color:#FFC400; color:#E9EBF0; background:rgba(255,196,0,.06); }
-#au .tab i { font-style:normal; display:inline-block; min-width:18px; padding:0 5px; margin-left:6px; background:#FFC400; color:#111; font-weight:700; text-align:center; }
-#au .x { margin-left:auto; background:transparent; border:1px solid #3A4150; color:#9AA1B0; padding:6px 10px; font:500 11px "M PLUS 1 Code"; cursor:pointer; }
-#au .x:hover { color:#E9EBF0; border-color:#FFC400; }
-#au .key { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; padding:0 4px; border:1px solid #4A5160; font:700 10.5px "M PLUS 1 Code"; color:#C9CDD6; }
-/* the cabinet */
-#au .cab { position:absolute; left:22px; top:72px; width:280px; bottom:22px; background:linear-gradient(90deg, #12151B, #171B22); border:1px solid #2A2F3A; padding:12px 0 12px 12px; display:flex; flex-direction:column; z-index:2; }
-#au .cab .hd { display:flex; justify-content:space-between; padding-right:12px; margin-bottom:8px; }
-#au .list { overflow:auto; flex:1; padding-right:8px; display:flex; flex-direction:column; gap:5px; }
-#au .fo { position:relative; display:flex; align-items:center; gap:10px; padding:7px 10px 7px 14px; background:#C9B98F; color:#1B1810; cursor:pointer; transition:transform .2s, background .2s; clip-path:polygon(0 0, 46% 0, 50% 5px, 100% 5px, 100% 100%, 0 100%); padding-top:11px; }
-#au .fo:nth-child(2n) { background:#C2B184; }
-#au .fo b { font:400 19px/1.1 "Dela Gothic One"; font-weight:400; }
-#au .fo span { font-size:11px; color:#4A4230; }
-#au .fo .pp { margin-left:auto; display:flex; gap:2px; }
-#au .fo .pp s { width:6px; height:10px; background:rgba(27,24,16,.18); }
-#au .fo .pp s.on { background:#1B1810; }
-#au .fo.sel { transform:translateX(14px); background:#E8DDBE; }
-#au .fo.done { opacity:.35; }
-#au .empty { color:#9AA1B0; font-size:12px; padding:10px 12px 0 0; }
-/* the dossier on the desk */
-#au .desk { position:absolute; left:334px; top:76px; width:572px; height:620px; z-index:2; }
-#au .paper { position:absolute; inset:0; background:#ECE5D1; color:#1B1810; padding:26px 30px 22px; transform:rotate(-.8deg); box-shadow:0 30px 60px rgba(0,0,0,.6), 0 2px 0 #D6CDB4;
-  background-image:linear-gradient(rgba(27,24,16,.05) 1px, transparent 1px); background-size:100% 26px; transition:transform .5s cubic-bezier(.3,1.2,.4,1), opacity .4s; }
-#au .paper.in { animation:auIn .5s cubic-bezier(.2,1.1,.4,1) both; }
-#au .paper.out { transform:translate(560px,-260px) rotate(14deg) scale(.3); opacity:0; transition:transform .55s cubic-bezier(.6,0,.8,.4), opacity .5s .1s; }
-#au .paper.back { transform:translate(-600px,40px) rotate(-10deg); opacity:0; transition:transform .45s ease-in, opacity .4s; }
-@keyframes auIn { from { transform:translate(-520px,30px) rotate(-9deg); opacity:0; } to { transform:rotate(-.8deg); opacity:1; } }
-#au .clip { position:absolute; left:206px; top:-12px; width:18px; height:54px; border:3px solid #8E949E; border-radius:9px; }
-#au .ph { display:flex; justify-content:space-between; font:700 11px "M PLUS 1 Code"; letter-spacing:.1em; border-bottom:2px solid #1B1810; padding-bottom:6px; }
-#au .subj { display:flex; align-items:flex-end; gap:22px; margin:18px 0 6px; min-height:112px; }
-#au .subj ruby { font:400 76px/1 "Dela Gothic One"; ruby-position:over; }
-#au .subj rt { font:500 16px "M PLUS 1 Code"; letter-spacing:.12em; color:#5A513C; }
-#au .subj.hide rt { visibility:hidden; }
-#au .mean { font:500 16px/1.4 "M PLUS 1 Code"; max-width:520px; }
-#au .mean.hide { filter:blur(7px); user-select:none; }
-#au .src { font-size:11px; color:#6A6048; margin-top:4px; }
-#au table { width:100%; border-collapse:collapse; margin-top:14px; font-size:12px; }
-#au th { text-align:left; font:700 10px "M PLUS 1 Code"; letter-spacing:.1em; color:#6A6048; border-bottom:1px solid #1B1810; padding:4px 0; }
-#au td { padding:5px 0; border-bottom:1px solid rgba(27,24,16,.15); }
-#au td .pp { display:flex; gap:3px; } #au td .pp s { width:14px; height:12px; border:1px solid rgba(27,24,16,.4); }
-#au td .pp s.on { background:#1B1810; border-color:#1B1810; } #au td .pp s.today { box-shadow:0 0 0 2px #FFC400; }
-#au td.ms { color:#B23A22; }
-#au .find { margin-top:14px; padding:10px 12px; border-left:4px solid #4A5BFF; background:rgba(74,91,255,.08); font-size:12.5px; }
-#au .find b { font:700 10px "M PLUS 1 Code"; letter-spacing:.12em; color:#3242C8; display:block; margin-bottom:2px; }
-/* hanko */
-#au .hanko { position:absolute; right:40px; bottom:40px; width:136px; height:136px; border:6px solid #C8341F; border-radius:50%; color:#C8341F; display:flex; flex-direction:column; align-items:center; justify-content:center;
-  font:400 40px/1 "Dela Gothic One"; transform:rotate(-14deg); opacity:.88; mix-blend-mode:multiply; animation:auH .32s cubic-bezier(.2,1.6,.4,1) both; }
-#au .hanko small { font:700 9px "M PLUS 1 Code"; letter-spacing:.12em; margin-top:6px; }
-#au .hanko.grey { color:#5C5A52; border-color:#5C5A52; }
-@keyframes auH { from { transform:rotate(-30deg) scale(2.4); opacity:0; } 60% { opacity:.95; } to { transform:rotate(-14deg) scale(1); opacity:.88; } }
-#au .desk.thud { animation:auT .25s; }
-@keyframes auT { 30% { transform:translateY(3px); } }
-/* the spot check slip */
-#au .slip { position:absolute; left:20px; right:20px; bottom:18px; background:#FFF8DF; border:2px solid #1B1810; border-top:8px solid #FFC400; padding:14px 16px; color:#1B1810; transform:rotate(1.2deg); animation:auS .4s cubic-bezier(.2,1.3,.4,1) both; box-shadow:0 14px 30px rgba(0,0,0,.35); }
-@keyframes auS { from { transform:translateY(80px) rotate(4deg); opacity:0; } to { transform:rotate(1.2deg); opacity:1; } }
-#au .slip h5 { margin:0 0 8px; font:400 18px "Dela Gothic One"; display:flex; justify-content:space-between; align-items:baseline; }
-#au .slip h5 span { font:700 10px "M PLUS 1 Code"; letter-spacing:.12em; color:#6A6048; }
-#au .slip input { width:100%; font:500 22px "M PLUS 1 Code"; padding:8px 10px; border:2px solid #1B1810; background:#fff; color:#1B1810; outline:none; }
-#au .slip .echo { font:500 26px "M PLUS 1 Code"; min-height:36px; margin-top:6px; letter-spacing:.06em; }
-#au .slip .echo i { color:#9A8F72; font-style:normal; }
+#au .top { position:absolute; left:0; right:0; top:0; height:50px; display:flex; align-items:center; gap:14px; padding:0 18px; border-bottom:1px solid var(--line); background:#030304; z-index:3; }
+#au .tag { background:var(--y); color:#000; font:700 10px var(--mono); letter-spacing:.12em; padding:3px 6px; }
+#au .ttl { font:600 19px var(--kj); }
+#au .tabs { display:flex; gap:0; margin-left:10px; border:1px solid var(--line2); }
+#au .tab { background:transparent; border:0; border-right:1px solid var(--line2); color:var(--mute); padding:7px 14px; font:700 10px var(--mono); letter-spacing:.12em; cursor:pointer; }
+#au .tab:last-child { border-right:0; }
+#au .tab b { font:600 14px var(--kj); color:var(--ink); margin-right:8px; letter-spacing:0; }
+#au .tab.on { background:var(--y); color:#000; } #au .tab.on b { color:#000; }
+#au .tab i { font-style:normal; display:inline-block; min-width:20px; padding:0 5px; margin-left:8px; background:#000; color:var(--y); text-align:center; }
+#au .tab.on i { background:#000; }
+#au .x { margin-left:auto; background:transparent; border:1px solid var(--line2); color:var(--mute); padding:6px 10px; font:700 10px var(--mono); letter-spacing:.12em; cursor:pointer; }
+#au .x:hover { color:#000; background:var(--y); border-color:var(--y); }
+/* the queue */
+#au .cab { left:20px; top:68px; width:282px; bottom:20px; display:flex; flex-direction:column; z-index:2; }
+#au .list { overflow:auto; flex:1; padding:6px 0; }
+#au .fo { display:grid; grid-template-columns:34px 1fr auto; align-items:center; gap:8px; padding:6px 12px 6px 10px; border-left:3px solid transparent; cursor:pointer; border-bottom:1px solid #111317; }
+#au .fo .n { font:700 10px var(--num); color:var(--mute); }
+#au .fo b { font:500 18px/1.15 var(--kj); } #au .fo b small { font:400 10.5px var(--mono); color:var(--mute); margin-left:8px; }
+#au .fo .pp { display:flex; gap:2px; } #au .fo .pp s { width:5px; height:11px; background:#22252B; } #au .fo .pp s.on { background:var(--y); }
+#au .fo:hover { background:#0D0E10; }
+#au .fo.sel { border-left-color:var(--y); background:linear-gradient(90deg, rgba(255,230,0,.12), transparent); }
+#au .fo.done { opacity:.32; }
+#au .empty { color:var(--mute); font-size:11.5px; padding:14px; line-height:1.6; }
+/* the record */
+#au .desk { position:absolute; left:322px; top:68px; width:582px; height:632px; z-index:2; }
+#au .paper { position:absolute; inset:0; background:rgba(6,7,8,.94); border:1px solid var(--line2); clip-path:polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 22px 100%, 0 calc(100% - 22px)); overflow:hidden;
+  transition:transform .5s cubic-bezier(.6,0,.4,1), opacity .4s, clip-path .4s; }
+#au .paper.in { animation:auIn .45s cubic-bezier(.2,1,.3,1) both; }
+@keyframes auIn { 0% { clip-path:inset(50% 0 50% 0); opacity:0; } 60% { clip-path:inset(0); opacity:1; } 70% { opacity:.6; } 100% { opacity:1; } }
+#au .paper.out { animation:auOut .6s cubic-bezier(.7,0,.8,.3) both; }
+@keyframes auOut { 0% { transform:none; } 35% { transform:scaleY(.015); opacity:1; } 100% { transform:translate(560px,-210px) scale(.02,.015); opacity:0; } }
+#au .paper.back { transform:translateX(-640px); opacity:0; }
+#au .rec { padding:16px 24px 0; }
+#au .subj { display:flex; align-items:flex-end; gap:24px; margin:10px 0 2px; min-height:128px; }
+#au .subj .big { font:500 96px/1 var(--kj); letter-spacing:.02em; }
+#au .subj .rd { font:500 22px var(--kj); color:var(--y); letter-spacing:.1em; padding-bottom:10px; }
+#au .hide .rd, #au .hide .mean { filter:blur(9px); opacity:.5; user-select:none; }
+#au .mean { font:500 15px/1.4 var(--mono); max-width:530px; min-height:21px; }
+#au .src { font:500 9.5px var(--mono); letter-spacing:.12em; color:var(--mute); margin-top:8px; text-transform:uppercase; }
+#au table { width:100%; border-collapse:collapse; margin-top:16px; font-size:11.5px; }
+#au th { text-align:left; font:700 9px var(--mono); letter-spacing:.16em; color:var(--mute); border-bottom:1px solid var(--line2); padding:5px 0; }
+#au td { padding:6px 0; border-bottom:1px solid #121418; }
+#au td .code { font:700 9px var(--mono); letter-spacing:.14em; color:var(--mute); display:inline-block; width:34px; }
+#au td .pp { display:flex; gap:3px; } #au td .pp s { width:18px; height:12px; background:#15171B; border:1px solid #23262C; }
+#au td .pp s.on { background:var(--y); border-color:var(--y); } #au td .pp s.today { outline:1px solid var(--ink); outline-offset:1px; }
+#au td.ms { color:var(--red); }
+/* stamps */
+#au .band { position:absolute; left:-10px; right:-10px; top:46%; padding:12px 34px; background:var(--y); color:#000; display:flex; justify-content:space-between; align-items:center; transform:rotate(-4deg); animation:auBand .35s cubic-bezier(.2,1.4,.4,1) both; z-index:4; }
+#au .band b { font:700 44px/1 var(--kj); } #au .band span { font:700 11px var(--mono); letter-spacing:.2em; text-align:right; }
+#au .band.grey { background:#2A2D33; color:var(--ink); }
+#au .band::before, #au .band::after { content:''; position:absolute; left:0; right:0; height:4px; background:repeating-linear-gradient(-45deg, #000 0 6px, transparent 6px 12px); opacity:.5; }
+#au .band::before { top:4px; } #au .band::after { bottom:4px; }
+@keyframes auBand { 0% { clip-path:inset(0 100% 0 0); } 100% { clip-path:inset(0); } }
+#au .desk.thud { animation:auT .3s steps(3); }
+@keyframes auT { 33% { transform:translate(3px,-2px); filter:hue-rotate(40deg); } 66% { transform:translate(-2px,1px); } }
+/* verification */
+#au .slip { position:absolute; left:0; right:0; bottom:0; background:#0A0A07; border-top:1px solid var(--y); padding:0 24px 18px; animation:auS .35s cubic-bezier(.2,1.2,.4,1) both; z-index:3; }
+@keyframes auS { from { transform:translateY(100%); } to { transform:none; } }
+#au .slip h5 { margin:0 -24px 12px; padding:6px 24px; font:700 10px var(--mono); letter-spacing:.16em; color:#000; display:flex; justify-content:space-between; background:repeating-linear-gradient(-45deg, var(--y) 0 14px, #E0CB00 14px 28px); }
+#au .slip h5 b { font:600 13px/1 var(--kj); }
+#au .slip .inp { display:flex; align-items:center; gap:10px; border:1px solid var(--line2); padding:0 12px; background:#000; }
+#au .slip .inp span { font:700 18px var(--mono); color:var(--y); }
+#au .slip input { flex:1; font:500 22px var(--mono); padding:10px 0; border:0; background:transparent; color:var(--ink); outline:none; caret-color:var(--y); }
+#au .slip .echo { font:500 30px var(--kj); min-height:44px; margin-top:8px; letter-spacing:.06em; }
+#au .slip .echo i { color:var(--mute); font-style:normal; font-family:var(--mono); font-size:22px; }
 #au .opts { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-#au .opt { text-align:left; background:#fff; border:2px solid #1B1810; padding:10px 12px; font:500 13px "M PLUS 1 Code"; color:#1B1810; cursor:pointer; display:flex; gap:10px; align-items:center; }
-#au .opt .key { border-color:#1B1810; color:#1B1810; }
-#au .opt:hover { background:#FFF0B8; }
-#au .opt.good { background:#FFE27A; } #au .opt.bad { background:#F7B8A8; }
-#au .res { font:700 13px "M PLUS 1 Code"; margin-top:8px; }
-/* the right side: the AI, the actions */
-#au .side { position:absolute; left:936px; top:330px; width:322px; bottom:22px; display:flex; flex-direction:column; gap:10px; z-index:2; }
-#au .ai { border:1px solid #2F3B9A; background:linear-gradient(#0F1330, #0B0E1E); padding:12px 14px; font-size:12px; color:#C8CEFF; min-height:132px; position:relative; }
-#au .ai::before { content:''; position:absolute; left:-1px; top:-1px; width:9px; height:9px; background:#4A5BFF; }
-#au .ai .eye { width:34px; height:34px; border-radius:50%; background:radial-gradient(circle, #fff 0 12%, #8C98FF 13% 30%, #4A5BFF 31% 52%, transparent 53%); float:right; animation:auE 3s ease-in-out infinite; box-shadow:0 0 18px rgba(74,91,255,.6); }
-@keyframes auE { 50% { transform:scale(.88); box-shadow:0 0 28px rgba(74,91,255,.9); } }
-#au .ai p { margin:6px 0 0; } #au .ai .cur::after { content:'▌'; animation:auB 1s steps(1) infinite; } @keyframes auB { 50% { opacity:0; } }
-#au .acts { display:flex; flex-direction:column; gap:8px; }
-#au .bt { display:flex; align-items:center; gap:12px; text-align:left; padding:12px 14px; border:1px solid #3A4150; background:#12151B; color:#E9EBF0; cursor:pointer; font:500 12px "M PLUS 1 Code"; }
-#au .bt b { font:400 20px "Dela Gothic One"; font-weight:400; min-width:84px; }
-#au .bt span.m { color:#9AA1B0; } #au .bt .key { margin-left:auto; }
-#au .bt.y { background:#FFC400; color:#111; border-color:#FFC400; } #au .bt.y span.m { color:#3A3010; } #au .bt.y .key { border-color:#111; color:#111; }
-#au .bt:hover:not(:disabled) { filter:brightness(1.12); } #au .bt:disabled { opacity:.35; cursor:default; }
-#au .stat { display:flex; gap:8px; } #au .stat div { flex:1; border:1px solid #262B35; padding:8px 10px; } #au .stat b { display:block; font:800 22px Tektur, sans-serif; }
-/* claim search */
-#au .srch { position:absolute; inset:0; background:#ECE5D1; color:#1B1810; padding:26px 30px; transform:rotate(-.8deg); box-shadow:0 30px 60px rgba(0,0,0,.6); }
-#au .srch input { width:100%; font:500 20px "M PLUS 1 Code"; padding:10px 12px; border:2px solid #1B1810; background:#fff; outline:none; margin:10px 0 4px; }
-#au .hit { display:flex; gap:12px; align-items:baseline; padding:7px 4px; border-bottom:1px solid rgba(27,24,16,.15); cursor:pointer; }
-#au .hit:hover, #au .hit.sel { background:#FFF0B8; }
-#au .hit b { font:400 20px "Dela Gothic One"; font-weight:400; min-width:90px; } #au .hit span { font-size:12px; color:#4A4230; }
-#au .done-big { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:8px; color:#1B1810; }
-#au .done-big b { font:400 44px "Dela Gothic One"; font-weight:400; }
+#au .opt { text-align:left; background:#0D0E10; border:1px solid var(--line2); padding:11px 12px; font:500 12.5px var(--mono); color:var(--ink); cursor:pointer; display:flex; gap:10px; align-items:center; }
+#au .opt:hover { border-color:var(--y); }
+#au .opt.good { background:var(--y); color:#000; } #au .opt.good .key { border-color:#000; color:#000; } #au .opt.bad { background:var(--red); color:#fff; }
+#au .res { font:700 13px var(--mono); }
+/* the right: the core link, the AI, the actions */
+#au .side { position:absolute; left:924px; top:68px; width:336px; bottom:20px; display:flex; flex-direction:column; gap:10px; z-index:2; }
+#au .link { position:relative; height:206px; border:1px solid var(--line2); background:radial-gradient(circle at 50% 54%, rgba(74,91,255,.16), transparent 62%); overflow:hidden; }
+#au .link .ring { position:absolute; left:50%; top:54%; border-radius:50%; border:1px dashed rgba(140,152,255,.45); transform:translate(-50%,-50%); animation:auRot 18s linear infinite; }
+#au .link .ring.b { border-style:solid; border-color:rgba(255,255,255,.12); animation-duration:30s; animation-direction:reverse; }
+#au .link .ring.c { border:3px dotted rgba(255,230,0,.5); animation-duration:9s; }
+@keyframes auRot { to { transform:translate(-50%,-50%) rotate(360deg); } }
+#au .link .core { position:absolute; left:50%; top:54%; width:58px; height:58px; transform:translate(-50%,-50%); border-radius:50%; background:radial-gradient(circle, #fff 0 10%, #9AA4FF 22%, #4A5BFF 46%, rgba(74,91,255,0) 70%); box-shadow:0 0 30px rgba(74,91,255,.7); animation:auPl 3s ease-in-out infinite; }
+@keyframes auPl { 50% { transform:translate(-50%,-50%) scale(.9); } }
+#au .link.pulse .core { animation:auHit .7s ease-out; }
+@keyframes auHit { 0% { transform:translate(-50%,-50%) scale(1); } 30% { transform:translate(-50%,-50%) scale(1.7); box-shadow:0 0 80px rgba(74,91,255,1), 0 0 0 30px rgba(255,230,0,.2); } 100% { transform:translate(-50%,-50%) scale(1); } }
+#au .link .lb { position:absolute; left:10px; top:8px; } #au .link .cnt { position:absolute; right:10px; top:6px; font:700 22px var(--num); color:#8C98FF; }
+#au .link .brk { position:absolute; width:16px; height:16px; border:2px solid var(--y); }
+#au .ai { border:1px solid #2B3594; border-left:3px solid var(--ai); background:#070917; padding:10px 12px; font-size:11.5px; color:#C8CEFF; min-height:104px; }
+#au .ai p { margin:6px 0 0; } #au .ai .kj { font-size:13px; color:#fff; } #au .cur::after { content:'▌'; animation:auB 1s steps(1) infinite; color:#8C98FF; } @keyframes auB { 50% { opacity:0; } }
+#au .acts { display:flex; flex-direction:column; gap:6px; }
+#au .bt { display:grid; grid-template-columns:96px 1fr auto; align-items:center; gap:10px; text-align:left; padding:10px 12px; border:1px solid var(--line2); background:#0B0C0E; color:var(--ink); cursor:pointer; font:500 10.5px var(--mono); letter-spacing:.06em; }
+#au .bt b { font:600 18px var(--kj); letter-spacing:0; } #au .bt span.m { color:var(--mute); }
+#au .bt.y { background:var(--y); color:#000; border-color:var(--y); clip-path:polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%); } #au .bt.y span.m { color:#3A3500; } #au .bt.y .key { border-color:#000; color:#000; }
+#au .bt:hover:not(:disabled) { border-color:var(--y); } #au .bt.y:hover:not(:disabled) { filter:brightness(1.1); } #au .bt:disabled { opacity:.3; cursor:default; }
+#au .stat { display:flex; gap:6px; margin-top:auto; } #au .stat div { flex:1; border:1px solid var(--line); padding:7px 10px; } #au .stat b { display:block; font:700 20px var(--num); }
+/* claims */
+#au .srch .q { display:flex; align-items:center; gap:10px; border:1px solid var(--line2); background:#000; padding:0 12px; margin:12px 0 4px; }
+#au .srch .q span { font:700 13px var(--mono); color:var(--y); letter-spacing:.1em; }
+#au .srch input { flex:1; font:500 20px var(--mono); padding:10px 0; border:0; background:transparent; color:var(--ink); outline:none; caret-color:var(--y); }
+#au .hit { display:grid; grid-template-columns:110px 130px 1fr; gap:12px; align-items:baseline; padding:7px 6px; border-bottom:1px solid #121418; cursor:pointer; border-left:3px solid transparent; }
+#au .hit:hover, #au .hit.sel { background:linear-gradient(90deg, rgba(255,230,0,.12), transparent); border-left-color:var(--y); }
+#au .hit b { font:500 20px var(--kj); } #au .hit span { font-size:11.5px; color:#B8BCC6; }
+#au .done-big { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:10px; }
+#au .done-big b { font:600 46px var(--kj); } #au .done-big .lb { color:var(--y); }
 `;
 
 let A = null;                       // the room's state while open
@@ -135,12 +147,20 @@ export function openAudit(ctx) {
   A = { ctx, root, words, byId, pool: buildPool(ctx.KD, words), tab: ctx.tab || (files(ctx.save).length ? 'files' : ctx.founding ? 'found' : 'claim'),
     committed: [], since: 0, sel: 0, busy: false, check: null, q: '', hits: [], hsel: 0, batch: null, bi: 0, nToday: 0 };
   root.innerHTML = `<div class="stg">
-    <div class="blind"></div><div class="rays"></div><div class="lampg"></div><div class="edge"></div><div class="sign">審査</div>
-    <div class="top"><span class="ttl">審査室</span><span class="lb">Audit room · カラット</span><div class="tabs"></div><span class="lb" id="au-cl"></span><button class="x" type="button" id="au-x">閉じる · Close <span class="key">Esc</span></button></div>
-    <div class="cab"><div class="hd"><span class="lb" id="au-ch">書類棚 · Files</span><span class="lb" id="au-cn"></span></div><div class="list"></div></div>
+    <div class="grid"></div><div class="scan"></div><div class="glyph">審査</div>
+    <div class="reg" style="left:8px;top:58px;border-width:1px 0 0 1px"></div><div class="reg" style="right:8px;bottom:8px;border-width:0 1px 1px 0"></div>
+    <div class="top"><span class="tag">AUD-00</span><span class="ttl">審査室</span><span class="lb">Memory admission · カラット core</span><div class="tabs"></div><span class="lb" id="au-cl"></span><button class="x" type="button" id="au-x">閉じる · CLOSE <span class="key">Esc</span></button></div>
+    <div class="pnl cab"><div class="ph"><span id="au-ch">QUEUE</span><span id="au-cn"></span></div><div class="list"></div></div>
     <div class="desk"></div>
-    <div class="side"><div class="ai"><div class="eye"></div><div class="lb" style="color:#8C98FF">カラットの所見 · The AI</div><p id="au-say" class="cur"></p></div><div class="acts"></div>
-      <div class="stat"><div><span class="lb">committed now</span><b id="au-n">0</b></div><div><span class="lb">in memory</span><b id="au-m">0</b></div></div></div>
+    <div class="side">
+      <div class="link"><span class="lb">CORE LINK // 記憶</span><span class="cnt" id="au-m">0</span>
+        <div class="ring" style="width:168px;height:168px"></div><div class="ring b" style="width:124px;height:124px"></div><div class="ring c" style="width:88px;height:88px"></div><div class="core"></div>
+        <div class="brk" style="left:96px;top:58px;border-width:2px 0 0 2px"></div><div class="brk" style="right:96px;top:58px;border-width:2px 2px 0 0"></div><div class="brk" style="left:96px;bottom:22px;border-width:0 0 2px 2px"></div><div class="brk" style="right:96px;bottom:22px;border-width:0 2px 2px 0"></div></div>
+      <div class="ai"><div class="lb" style="color:#8C98FF">ANALYSIS // カラットの所見</div><p id="au-say" class="cur"></p></div>
+      <div class="acts"></div>
+      <div class="stat"><div><span class="lb">committed now</span><b id="au-n">0</b></div><div><span class="lb">claims today</span><b id="au-c">—</b></div></div>
+    </div>
+    <div class="crt"></div>
   </div>`;
   fit(); addEventListener('resize', fit);
   root.querySelector('#au-x').onclick = close;
@@ -174,52 +194,54 @@ function current() {
 function render() {
   const s = save(), nF = fileList().length, left = claimsLeft(s, A.ctx.founding);
   $a('.tabs').innerHTML = [['files', '審査待ち', 'Files', nF], ['claim', '申告', 'Claim'], ...(A.ctx.founding ? [['found', '創業監査', 'Founding audit']] : [])]
-    .map(([id, j, e, n]) => `<button type="button" class="tab${A.tab === id ? ' on' : ''}" data-t="${id}"><b>${j}</b>${e}${n ? `<i>${n}</i>` : ''}</button>`).join('');
+    .map(([id, j, e, n]) => `<button type="button" class="tab${A.tab === id ? ' on' : ''}" data-t="${id}"><b>${j}</b>${e.toUpperCase()}${n ? `<i>${n}</i>` : ''}</button>`).join('');
   A.root.querySelectorAll('.tab').forEach(b => b.onclick = () => { if (A.busy) return; A.tab = b.dataset.t; A.check = null; A.claim = null; render(); });
   $a('#au-cl').textContent = A.tab === 'claim' ? (left === Infinity ? 'claims · unlimited during the founding' : `claims left today · ${left}/40`) : '';
-  $a('#au-n').textContent = A.committed.length; $a('#au-m').textContent = memN();
+  $a('#au-n').textContent = A.committed.length; $a('#au-m').textContent = memN(); $a('#au-c').textContent = left === Infinity ? '∞' : left;
   cabinet(); desk(); actions();
 }
 function pips(w, n = 5) {
   const r = save().words[w.id] || {}, cl = new Set(skillsClean(r));
   return SKILLS.slice(0, n).map(k => `<s class="${cl.has(k) ? 'on' : ''}"></s>`).join('');
 }
+const idx = i => String(i + 1).padStart(3, '0');
 function cabinet() {
   const L = $a('.list');
   if (A.tab === 'files') {
-    const F = fileList(); $a('#au-ch').textContent = '書類棚 · Flagged files'; $a('#au-cn').textContent = F.length + ' waiting';
-    L.innerHTML = F.map((w, i) => `<div class="fo${i === A.sel ? ' sel' : ''}" data-i="${i}"><b>${esc(w.w)}</b><span>${esc(w.r)}</span><span class="pp">${pips(w)}</span></div>`).join('') || '<div class="empty">No file waiting. The AI flags a word once it has clean evidence in 3 skills over 2 different days: play the Great Factory.</div>';
+    const F = fileList(); $a('#au-ch').innerHTML = '<b>QUEUE</b> 審査待ち'; $a('#au-cn').innerHTML = String(F.length).padStart(3, '0') + ' WAITING <span class="bc"></span>';
+    L.innerHTML = F.map((w, i) => `<div class="fo${i === A.sel ? ' sel' : ''}" data-i="${i}"><span class="n">${idx(i)}</span><b>${esc(w.w)}<small>${esc(w.r)}</small></b><span class="pp">${pips(w)}</span></div>`).join('') || '<div class="empty">QUEUE EMPTY.<br>The AI flags a word once it has clean evidence in 3 skills over 2 different days. Run shifts in the Great Factory.</div>';
     L.querySelectorAll('.fo').forEach(f => f.onclick = () => { if (A.busy) return; A.sel = +f.dataset.i; A.check = null; render(); });
   } else if (A.tab === 'found') {
-    const B = foundBatch(); $a('#au-ch').textContent = '創業監査 · This batch'; $a('#au-cn').textContent = Math.min(A.bi + 1, B.length) + ' / ' + B.length;
-    L.innerHTML = B.map((w, i) => `<div class="fo${i === A.bi ? ' sel' : ''}${i < A.bi ? ' done' : ''}"><b>${esc(w.w)}</b><span>${w.lvl ? 'N' + w.lvl : ''}</span></div>`).join('') || '<div class="empty">Every deck word is in memory or waiting in the files.</div>';
+    const B = foundBatch(); $a('#au-ch').innerHTML = '<b>BATCH</b> 創業監査'; $a('#au-cn').textContent = idx(Math.min(A.bi, Math.max(0, B.length - 1))) + ' / ' + String(B.length).padStart(3, '0');
+    L.innerHTML = B.map((w, i) => `<div class="fo${i === A.bi ? ' sel' : ''}${i < A.bi ? ' done' : ''}"><span class="n">${idx(i)}</span><b>${esc(w.w)}</b><span class="lb">${w.lvl ? 'N' + w.lvl : ''}</span></div>`).join('') || '<div class="empty">Every deck word is in memory or waiting in the queue.</div>';
   } else {
-    $a('#au-ch').textContent = '申告 · Recent claims'; const rc = A.committed.map(id => A.byId.get(id)).filter(Boolean).reverse();
-    $a('#au-cn').textContent = rc.length ? rc.length + ' today' : '';
-    L.innerHTML = rc.map(w => `<div class="fo done"><b>${esc(w.w)}</b><span>${esc(w.r)}</span></div>`).join('') || '<div class="empty">Claim a word you know that the games haven\'t proven yet. Every claim is spot-checked: the reading, typed, then the meaning.</div>';
+    $a('#au-ch').innerHTML = '<b>CLAIMS</b> 申告'; const rc = A.committed.map(id => A.byId.get(id)).filter(Boolean).reverse();
+    $a('#au-cn').textContent = rc.length ? rc.length + ' THIS SESSION' : '';
+    L.innerHTML = rc.map((w, i) => `<div class="fo done"><span class="n">${idx(i)}</span><b>${esc(w.w)}<small>${esc(w.r)}</small></b><span></span></div>`).join('') || '<div class="empty">Claim a word you know that the games haven\'t proven yet. Every claim is verified: the reading, typed, then the meaning.</div>';
   }
 }
+const CODE = { meaning: 'MNG', reading: 'RDG', recall: 'RCL', context: 'CTX', listen: 'LST' };
 function paperHTML(w, opts = {}) {
   const r = save().words[w.id] || {}, ev = r.ev || {}, today = day();
   const days = []; for (let i = 7; i >= 0; i--) days.push(day(Date.now() - i * 864e5));
-  const rows = SKILLS.map(k => { const e = ev[k] || { d: [] }; return `<tr><td style="width:120px"><b>${SKILL_J[k]}</b> <span style="color:#6A6048">${SK_EN[k]}</span></td><td><span class="pp">${days.map(d => `<s class="${e.d.includes(d) ? 'on' : ''}${d === today ? ' today' : ''}"></s>`).join('')}</span></td>
-    <td class="${e.miss && !e.d.length ? 'ms' : ''}" style="width:130px">${e.d.length ? e.d.length + ' day' + (e.d.length > 1 ? 's' : '') + (e.at ? ' · ' + esc(e.at) : '') : e.miss ? 'missed ' + new Date(e.miss).toLocaleDateString() : '—'}</td></tr>`; }).join('');
+  const rows = SKILLS.map(k => { const e = ev[k] || { d: [] }; return `<tr><td style="width:150px"><span class="code">${CODE[k]}</span><span class="kj">${SKILL_J[k]}</span> <span class="lb">${SK_EN[k]}</span></td><td><span class="pp">${days.map(d => `<s class="${e.d.includes(d) ? 'on' : ''}${d === today ? ' today' : ''}"></s>`).join('')}</span></td>
+    <td class="${e.miss && !e.d.length ? 'ms' : ''}" style="width:140px;text-align:right">${e.d.length ? e.d.length + (e.d.length > 1 ? ' DAYS' : ' DAY') + (e.at ? ' · ' + esc(e.at).toUpperCase() : '') : e.miss ? 'MISS ' + new Date(e.miss).toLocaleDateString('ja-JP') : '—'}</td></tr>`; }).join('');
   const no = String(w.id).padStart(5, '0'), hide = !!opts.hide;
-  return `<div class="clip"></div><div class="ph"><span>審査ファイル № ${no}</span><span>${opts.kind || ''}</span><span>${new Date().toLocaleDateString('ja-JP')}</span></div>
-    <div class="lb" style="color:#6A6048;margin-top:12px">対象 · Subject${w.lvl ? ' · JLPT N' + w.lvl : ''}</div>
-    <div class="subj${hide ? ' hide' : ''}"><ruby>${esc(w.w)}<rt>${esc(w.r)}</rt></ruby></div>
-    <div class="mean${hide ? ' hide' : ''}">${esc(w.m.length > 120 ? w.m.slice(0, 118) + '…' : w.m)}</div>
-    <div class="src">ジェフの日本語 · note ${w.id}${r.flag ? ' · flagged ' + new Date(r.flag).toLocaleDateString() : ''}${r.snooze ? ' · deferred ' + r.snooze.n + '×' : ''}</div>
-    <table><tr><th>証拠 · Evidence</th><th>last 8 days</th><th></th></tr>${rows}</table>`;
+  return `<div class="ph"><span><b>REC #${no}</b> ${opts.kind || ''}</span><span>${w.lvl ? 'JLPT N' + w.lvl + ' · ' : ''}${new Date().toLocaleDateString('ja-JP')} <span class="bc"></span></span></div>
+    <div class="rec"><div class="lb">SUBJECT // 対象</div>
+    <div class="subj${hide ? ' hide' : ''}"><span class="big">${esc(w.w)}</span><span class="rd">${esc(w.r)}</span></div>
+    <div class="${hide ? 'hide' : ''}"><div class="mean">${esc(w.m.length > 120 ? w.m.slice(0, 118) + '…' : w.m)}</div></div>
+    <div class="src">SRC ジェフの日本語 · NOTE ${w.id}${r.flag ? ' · FLAGGED ' + new Date(r.flag).toLocaleDateString('ja-JP') : ''}${r.snooze ? ' · DEFERRED ×' + r.snooze.n : ''}</div>
+    <table><tr><th>EVIDENCE // 証拠</th><th>LAST 8 DAYS</th><th style="text-align:right">STATUS</th></tr>${rows}</table></div>`;
 }
 function desk() {
   const D = $a('.desk'), w = current();
   if (A.tab === 'claim' && !A.claim) return claimDesk(D);
   if (!w) {
-    D.innerHTML = `<div class="paper in"><div class="done-big"><b>${A.tab === 'files' ? '処理完了' : '監査完了'}</b><span>${A.tab === 'files' ? 'No file left on the desk.' : 'Batch done.'}</span>${A.tab === 'found' && A.words.length ? '<span class="lb" style="color:#6A6048">Press Y for the next batch</span>' : ''}</div></div>`;
+    D.innerHTML = `<div class="paper in"><div class="ph"><span><b>REC —</b> IDLE</span><span class="bc"></span></div><div class="done-big"><span class="lb">${A.tab === 'files' ? 'QUEUE CLEARED' : 'BATCH COMPLETE'}</span><b>${A.tab === 'files' ? '処理完了' : '監査完了'}</b><span class="lb">${A.tab === 'found' && A.words.length ? 'PRESS Y FOR THE NEXT BATCH' : 'NO RECORD LOADED'}</span></div></div>`;
     say(A.tab === 'files' ? 'Nothing left to argue about. Go make evidence: the factory is open.' : 'The batch is done. Another twenty whenever you want.'); return;
   }
-  const kind = A.tab === 'files' ? '審査' : A.tab === 'found' ? '創業監査' : '申告';
+  const kind = A.tab === 'files' ? 'ADMISSION 審査' : A.tab === 'found' ? 'FOUNDING 創業監査' : 'CLAIM 申告';
   const done = A.check && A.check.step === 'done';
   D.innerHTML = `<div class="paper in">${paperHTML(w, { kind, hide: A.tab !== 'files' ? !done : !!A.check && !done })}${A.check ? slipHTML() : ''}</div>`;
   if (A.check) wireSlip();
@@ -236,29 +258,29 @@ let sayH = 0;
 function say(t) { const p = $a('#au-say'); if (!p) return; clearInterval(sayH); let i = 0; p.textContent = ''; sayH = setInterval(() => { if (!A) return clearInterval(sayH); i += 2; p.textContent = t.slice(0, i); if (i >= t.length) clearInterval(sayH); }, 16); }
 function actions() {
   const X = $a('.acts'), w = current();
-  if (A.check) { X.innerHTML = `<button class="bt" type="button" id="au-ab"><b>取り下げ</b><span class="m">Withdraw</span><span class="key">Esc</span></button>`; $a('#au-ab').onclick = () => { A.check = null; render(); }; return; }
+  if (A.check) { X.innerHTML = `<button class="bt" type="button" id="au-ab"><b>取り下げ</b><span class="m">ABORT CHECK</span><span class="key">Esc</span></button>`; $a('#au-ab').onclick = () => { A.check = null; render(); }; return; }
   if (A.tab === 'files') {
     const r = w && save().words[w.id], n = r && r.snooze ? r.snooze.n + 1 : 1;
-    X.innerHTML = `<button class="bt y" type="button" id="au-y" ${w ? '' : 'disabled'}><b>記憶する</b><span class="m">Commit to memory</span><span class="key">Y</span></button>
-      <button class="bt" type="button" id="au-no" ${w ? '' : 'disabled'}><b>保留</b><span class="m">Not yet · again in ${[3, 7, 14][Math.min(2, n - 1)]} days</span><span class="key">N</span></button>
-      <button class="bt" type="button" id="au-nx" ${fileList().length > 1 ? '' : 'disabled'}><b>次</b><span class="m">Next file</span><span class="key">→</span></button>`;
+    X.innerHTML = `<button class="bt y" type="button" id="au-y" ${w ? '' : 'disabled'}><b>記憶する</b><span class="m">COMMIT TO MEMORY</span><span class="key">Y</span></button>
+      <button class="bt" type="button" id="au-no" ${w ? '' : 'disabled'}><b>保留</b><span class="m">DEFER · AGAIN IN ${[3, 7, 14][Math.min(2, n - 1)]} DAYS</span><span class="key">N</span></button>
+      <button class="bt" type="button" id="au-nx" ${fileList().length > 1 ? '' : 'disabled'}><b>次</b><span class="m">NEXT RECORD</span><span class="key">→</span></button>`;
     $a('#au-y').onclick = yes; $a('#au-no').onclick = no; $a('#au-nx').onclick = () => move(1);
   } else if (A.tab === 'found') {
-    X.innerHTML = `<button class="bt y" type="button" id="au-y" ${w || A.words.length ? '' : 'disabled'}><b>${w ? '知ってる' : '次の束'}</b><span class="m">${w ? 'I know it · spot check' : 'Next batch of 20'}</span><span class="key">Y</span></button>
-      <button class="bt" type="button" id="au-no" ${w ? '' : 'disabled'}><b>まだ</b><span class="m">Not yet · leave it to the games</span><span class="key">N</span></button>`;
+    X.innerHTML = `<button class="bt y" type="button" id="au-y" ${w || A.words.length ? '' : 'disabled'}><b>${w ? '知ってる' : '次の束'}</b><span class="m">${w ? 'I KNOW IT · VERIFY' : 'NEXT BATCH OF 20'}</span><span class="key">Y</span></button>
+      <button class="bt" type="button" id="au-no" ${w ? '' : 'disabled'}><b>まだ</b><span class="m">NOT YET · LEAVE IT TO THE GAMES</span><span class="key">N</span></button>`;
     $a('#au-y').onclick = yes; $a('#au-no').onclick = no;
   } else {
-    X.innerHTML = A.claim ? `<button class="bt y" type="button" id="au-y"><b>申告する</b><span class="m">Claim · spot check</span><span class="key">Y</span></button><button class="bt" type="button" id="au-no"><b>戻る</b><span class="m">Back to the search</span><span class="key">N</span></button>`
-      : `<button class="bt" type="button" disabled><b>検索</b><span class="m">Type a word: kanji, kana, romaji or English</span></button>`;
+    X.innerHTML = A.claim ? `<button class="bt y" type="button" id="au-y"><b>申告する</b><span class="m">CLAIM · VERIFY</span><span class="key">Y</span></button><button class="bt" type="button" id="au-no"><b>戻る</b><span class="m">BACK TO THE QUERY</span><span class="key">N</span></button>`
+      : `<button class="bt" type="button" disabled><b>検索</b><span class="m">KANJI · KANA · ROMAJI · ENGLISH</span><span></span></button>`;
     if (A.claim) { $a('#au-y').onclick = yes; $a('#au-no').onclick = no; }
   }
 }
 
 /* ---------------- claims: the search ---------------- */
 function claimDesk(D) {
-  D.innerHTML = `<div class="srch"><div class="ph"><span>申告書 · Claim form</span><span>${new Date().toLocaleDateString('ja-JP')}</span></div>
-    <div class="lb" style="color:#6A6048;margin-top:14px">I know this word</div><input id="au-q" autocomplete="off" spellcheck="false" placeholder="kaisha · かいしゃ · 会社 · company" value="${esc(A.q)}"><div id="au-qk" class="lb" style="color:#6A6048;min-height:16px"></div>
-    <div id="au-hits"></div></div>`;
+  D.innerHTML = `<div class="paper in srch"><div class="ph"><span><b>CLAIM</b> 申告書 // I KNOW THIS WORD</span><span>${new Date().toLocaleDateString('ja-JP')} <span class="bc"></span></span></div>
+    <div class="rec"><div class="q"><span>QUERY&gt;</span><input id="au-q" autocomplete="off" spellcheck="false" placeholder="kaisha · かいしゃ · 会社 · company" value="${esc(A.q)}"></div><div id="au-qk" class="lb" style="min-height:16px;color:var(--y)"></div>
+    <div id="au-hits"></div></div></div>`;
   const q = $a('#au-q'); q.focus(); q.oninput = () => { A.q = q.value; A.hsel = 0; hits(); }; hits();
   say(claimsLeft(save(), A.ctx.founding) > 0 ? 'Name a word you know. I will check it myself.' : 'No claims left today. The factory is still open.');
 }
@@ -266,7 +288,7 @@ function hits() {
   const s = save(), raw = A.q.trim().toLowerCase(), kana = /[a-z]/.test(raw) ? toKana(raw, true).kana : raw;
   $a('#au-qk').textContent = /[a-z]/.test(raw) && kana !== raw ? '→ ' + kana : '';
   A.hits = !raw ? [] : A.words.filter(w => !(s.words[w.id] && s.words[w.id].cert) && (w.w.includes(raw) || (kana && w.r.startsWith(kana)) || (raw.length > 2 && /[a-z]/.test(raw) && w.m.toLowerCase().includes(raw)))).slice(0, 12);
-  $a('#au-hits').innerHTML = A.hits.map((w, i) => `<div class="hit${i === A.hsel ? ' sel' : ''}" data-i="${i}"><b>${esc(w.w)}</b><span>${esc(w.r)}</span><span>${esc(w.s)}</span></div>`).join('') || (raw ? '<div class="lb" style="color:#6A6048;margin-top:10px">Not in your deck, or already in memory.</div>' : '');
+  $a('#au-hits').innerHTML = A.hits.map((w, i) => `<div class="hit${i === A.hsel ? ' sel' : ''}" data-i="${i}"><b>${esc(w.w)}</b><span class="kj">${esc(w.r)}</span><span>${esc(w.s)}</span></div>`).join('') || (raw ? '<div class="lb" style="margin-top:10px">NO MATCH · NOT IN THE DECK, OR ALREADY IN MEMORY</div>' : '');
   A.root.querySelectorAll('.hit').forEach(h => h.onclick = () => pickClaim(A.hits[+h.dataset.i]));
 }
 function pickClaim(w) { if (!w) return; if (claimsLeft(save(), A.ctx.founding) <= 0) return say('No claims left today.'); A.claim = w; A.check = null; render(); }
@@ -278,9 +300,9 @@ function startCheck(w, then) {
 }
 function slipHTML() {
   const c = A.check;
-  if (c.step === 'reading') return `<div class="slip"><h5>抜き打ち検査 <span>SPOT CHECK · 1/2 · READING</span></h5><input id="au-r" autocomplete="off" spellcheck="false" placeholder="romaji"><div class="echo" id="au-e"></div></div>`;
-  if (c.step === 'meaning') return `<div class="slip"><h5>抜き打ち検査 <span>SPOT CHECK · 2/2 · MEANING</span></h5><div class="opts">${c.opts.map((o, i) => `<button class="opt" type="button" data-i="${i}"><span class="key">${i + 1}</span>${esc(o.s)}</button>`).join('')}</div></div>`;
-  return `<div class="slip"><h5>抜き打ち検査 <span>SPOT CHECK · ${c.pass ? 'PASSED' : 'FAILED'}</span></h5><div class="res">${esc(c.msg)}</div></div>`;
+  if (c.step === 'reading') return `<div class="slip"><h5><span>VERIFICATION // 1 OF 2 // READING</span><b>抜き打ち検査</b></h5><div class="inp"><span>&gt;</span><input id="au-r" autocomplete="off" spellcheck="false" placeholder="type the reading in romaji, then Enter"></div><div class="echo" id="au-e"></div></div>`;
+  if (c.step === 'meaning') return `<div class="slip"><h5><span>VERIFICATION // 2 OF 2 // MEANING</span><b>抜き打ち検査</b></h5><div class="opts">${c.opts.map((o, i) => `<button class="opt" type="button" data-i="${i}"><span class="key">${i + 1}</span>${esc(o.s)}</button>`).join('')}</div></div>`;
+  return `<div class="slip"><h5 style="${c.pass ? '' : 'background:var(--red);color:#fff'}"><span>VERIFICATION // ${c.pass ? 'PASSED' : 'FAILED'}</span><b>${c.pass ? '合格' : '不合格'}</b></h5><div class="res">${esc(c.msg)}</div></div>`;
 }
 function wireSlip() {
   const c = A.check;
@@ -329,17 +351,18 @@ function no() {
 function move(d) { if (A.busy || A.check || A.tab !== 'files') return; const n = fileList().length; if (n < 2) return; A.sel = (A.sel + d + n) % n; render(); }
 function stampIt(w, how) {
   A.busy = true; const P = $a('.paper'), D = $a('.desk');
-  P.insertAdjacentHTML('beforeend', `<div class="hanko">記憶<small>${how === 'claim' ? 'CLAIMED' : how === 'founding' ? 'FOUNDED' : 'COMMITTED'}</small></div>`);
-  D.classList.add('thud'); setTimeout(() => D.classList.remove('thud'), 260);
+  P.insertAdjacentHTML('beforeend', `<div class="band"><b>記憶</b><span>${how === 'claim' ? 'CLAIMED' : how === 'founding' ? 'FOUNDED' : 'COMMITTED'}<br>TO MEMORY // REC #${String(w.id).padStart(5, '0')}</span></div>`);
+  D.classList.add('thud'); setTimeout(() => D.classList.remove('thud'), 300);
+  setTimeout(() => { const L = $a('.link'); if (L) { L.classList.remove('pulse'); void L.offsetWidth; L.classList.add('pulse'); } }, 950);
   commit(save(), w.id, how); A.committed.push(w.id); A.ctx.persist();
   say(['Committed.', 'Into memory.', 'Filed in the wall.', '記憶完了.'][Math.random() * 4 | 0] + ` ${w.w} is mine now.`);
-  setTimeout(() => { P.classList.remove('in'); P.classList.add('out'); }, 520);
-  setTimeout(() => { A.busy = false; if (A.tab === 'found') A.bi++; if (A.tab === 'claim') A.claim = null; render(); }, 1100);
+  setTimeout(() => { P.classList.remove('in'); P.classList.add('out'); }, 600);
+  setTimeout(() => { A.busy = false; if (A.tab === 'found') A.bi++; if (A.tab === 'claim') A.claim = null; render(); }, 1250);
 }
 function rejectIt(w, failed) {
   A.busy = true; const P = $a('.paper');
   const d = snooze(save(), w.id); A.ctx.persist();
-  P.insertAdjacentHTML('beforeend', `<div class="hanko grey">保留<small>AGAIN IN ${d} DAYS</small></div>`);
+  P.insertAdjacentHTML('beforeend', `<div class="band grey"><b>保留</b><span>DEFERRED<br>AGAIN IN ${d} DAYS · FRESH EVIDENCE</span></div>`);
   say(failed ? `Spot check failed. Deferred ${d} days, fresh evidence only.` : `Not yet, then. I will ask again in ${d} days, on new evidence.`);
   setTimeout(() => { P.classList.remove('in'); P.classList.add('back'); }, 700);
   setTimeout(() => { A.busy = false; render(); }, 1250);
