@@ -35,6 +35,35 @@ export const MOTIONS = {
       civic: () => ({ v: 1, why: ['急がない方がいい', 'better slow'] }),
       ops: () => ({ v: -1, why: ['機会の損失', 'a lost season'] }) } } };
 
+/* the second arc: 公害公聴会 · the stack hearing */
+Object.assign(MOTIONS, {
+  retrofit: { arc: 'stack', j: '公開と改修', en: 'Disclose and retrofit', auto: false, power: true, costH: 8, clauses: ['report', 'grid'], next: 'live',
+    proj: { id: 'scrubber', prodX: .9, pollX: .8, mw: 3, upkeep: 6, label: '集塵機 · commissioning' },
+    d: p => `Publish the ledger and rent a scrubber: ${p.y(8)} on signing, ¥6/h, 3 MW. Production −10% until it is commissioned (two shipment runs, plus a Power shift with the grid clause); then pollution from output −65% for good.`,
+    base: {
+      chair: () => ({ v: 1, why: ['公開は株主に好印象', 'disclosure reassures shareholders'] }),
+      fin: st => st.spend >= st.need ? { v: 0, why: ['費用が重い', 'a heavy cost'] } : { v: -1, why: ['予備資金を割る', 'it breaks the reserve'] },
+      union: st => st.S.poll >= 55 ? { v: 1, why: ['煙は現場も吸う', 'the floor breathes the smoke'] } : { v: 0, why: ['仕事が減らなければ', 'if no jobs are lost'] },
+      civic: () => ({ v: 2, why: ['公開と改修', 'disclosure and a retrofit'] }),
+      ops: () => ({ v: -1, why: ['効率が落ちる', 'efficiency drops'] }) } },
+  cap: { arc: 'stack', j: '生産上限', en: 'Cap production', auto: false, clauses: ['premium', 'report'], next: 'live',
+    proj: { id: 'cap', prodX: .8, label: '生産上限 · clean output limit' },
+    d: () => 'A clean output limit: production −20% (and its pollution with it) until the review, no capital spent. Delivery capacity and sales fall.',
+    base: {
+      chair: () => ({ v: 1, why: ['慎重で妥当', 'careful and reasonable'] }),
+      fin: () => ({ v: -1, why: ['売上が減る', 'sales fall'] }),
+      union: () => ({ v: 0, why: ['賃金次第', 'depends on wages'] }),
+      civic: () => ({ v: 2, why: ['分かりやすい上限', 'a cap anyone can check'] }),
+      ops: () => ({ v: -1, why: ['能力を捨てる', 'capacity thrown away'] }) } },
+  delay: { arc: 'stack', j: '公表延期', en: 'Delay disclosure', auto: false, clauses: [], next: 'live',
+    d: () => 'Keep the throughput and publish only a cap: for three attended visits a Factory shift may ship six at most. One shift over it and the paper prints the ledger: a review.',
+    base: {
+      chair: () => ({ v: -1, why: ['危険な賭け', 'a risky bet'] }),
+      fin: () => ({ v: 2, why: ['費用なし', 'costs nothing'] }),
+      union: () => ({ v: 1, why: ['仕事が減らない', 'no jobs lost'] }),
+      civic: () => ({ v: -2, why: ['隠蔽', 'a cover-up'] }),
+      ops: () => ({ v: 2, why: ['生産を止めない', 'production keeps going'] }) } } });
+
 /* ---------------- clauses: at most two per proposal, one per sponsor ---------------- */
 export const CLAUSES = {
   inspect: { by: 'chair', j: '独立検査', en: 'Independent inspection', why: ['独立検査', 'independent inspection'], due: 3,
@@ -55,7 +84,16 @@ export const CLAUSES = {
   stage: { by: 'fin', j: '段階的導入', en: 'Staged installation', why: ['段階的導入', 'staged installation'], due: 3,
     cost: () => 0, judge: () => ({ ok: true }), terms0: {},
     desc: () => 'Half the robot uplift at first; the full output after three shipment runs. No cost.',
-    contract: () => ({ metric: 'shipment runs before full output', qty: 3, funding: 'none', to: 'finance', deadline: 'automatic', remedy: '—' }) } };
+    contract: () => ({ metric: 'shipment runs before full output', qty: 3, funding: 'none', to: 'finance', deadline: 'automatic', remedy: '—' }) },
+  grid: { by: 'ops', j: '電力枠', en: 'A Power window', why: ['電力枠', 'a power window'], due: 3, cost: () => 0, judge: () => ({ ok: true }), terms0: {},
+    desc: () => 'Commission the scrubber during a Power plant shift (one is needed, from N4; before that, a third shipment run instead). No cost.',
+    contract: () => ({ metric: 'a Power plant shift after signing (N4+), or a third shipment run', qty: 1, funding: 'none', to: 'operations', deadline: '3 attended visits', remedy: 'commissioning slips to the review' }) },
+  premium: { by: 'fin', j: '環境表示', en: 'Clean-label premium', why: ['環境表示', 'a clean-label premium'], due: 3, cost: () => 0, judge: () => ({ ok: true }), terms0: {},
+    desc: () => 'The capped output sells under a clean label: +10% on the sale price while the cap holds. No cost.',
+    contract: () => ({ metric: 'the sale price while the cap holds', qty: 1.1, funding: 'none', to: 'finance', deadline: 'the cap\'s term', remedy: 'ends with the cap' }) },
+  scrub: { by: 'civic', j: '集塵機', en: 'Scrubber commissioned', why: ['集塵機', 'the scrubber'], due: 3, cost: () => 0, judge: () => ({ ok: true }), terms0: {}, desc: () => 'The scrubber runs by the review.', contract: () => ({ metric: 'commissioned', qty: 1, funding: 'escrowed on signing', to: 'the residents', deadline: '3 attended visits', remedy: 'one corrective visit, then broken' }) },
+  capheld: { by: 'civic', j: '上限遵守', en: 'Cap held', why: ['上限', 'the cap'], due: 3, cost: () => 0, judge: () => ({ ok: true }), terms0: {}, desc: () => 'The output limit holds until the review.', contract: () => ({ metric: 'production −20%', qty: 1, funding: 'lost sales', to: 'the residents', deadline: '3 attended visits', remedy: '—' }) },
+  clean: { by: 'civic', j: '公表上限', en: 'Published cap', why: ['公表上限', 'the published cap'], due: 3, cost: () => 0, judge: () => ({ ok: true }), terms0: {}, desc: () => 'No Factory shift ships more than six until the review.', contract: () => ({ metric: 'Factory shifts shipping more than six', qty: 0, funding: 'none', to: 'the residents', deadline: '3 attended visits', remedy: 'the paper prints the ledger; a supervised clean run or an inspection' }) } };
 
 /* ---------------- the first arc: 誰のライン? Who owns the line? ---------------- */
 const robotsOf = ctx => Math.floor(ctx.mem * .6);
@@ -158,6 +196,81 @@ export const ARCS = {
       return { ok: false };
     } } };
 
+/* ---------------- the second arc: 公害公聴会 · the stack hearing ----------------
+   Opens when the smog stays: pollution ≥ 55 for 12 simulated hours (it re-arms only under 45). The residents' envoy
+   calls a public hearing; the reporter is in the room. Three ways out, each with a promise to the residents. */
+ARCS.stack = {
+  id: 'stack', j: '公害公聴会', en: 'The stack hearing', first: 'retrofit', rescue: 'cap',
+  entry(save, ctx) {
+    const S = save.sim; if (ctx.tier < 0) return { ok: false, why: null };
+    if ((S.pHi || 0) >= 12) return { ok: true };
+    return { ok: false, why: S.poll >= 45 ? `公害 · a public hearing opens if pollution stays at 55+ for 12 hours (now ${Math.round(S.poll)}, ${S.pHi || 0} h)` : null };
+  },
+  signed(save, ctx, C, api) {
+    const S = save.sim, G = api.govOf(save), v = G.visit.n, m = C.acc.motion, base = { runs: S.runs, retr: S.retr, aired: S.aired, dlv: S.dlv, pwr: S.pwr || 0, capBr: S.capBr || 0 };
+    const pl = clause => G.pledges.push({ id: 'stack:' + clause, clause, case: 'stack', to: 'civic', terms: {}, st: 'open', v, dueV: v + 3, base });
+    if (m === 'retrofit') { pl('scrub'); C.grid = C.acc.clauses.includes('grid'); }
+    if (m === 'cap') { pl('capheld'); const p = S.proj.find(x => x.id === 'cap'); if (p && C.acc.clauses.includes('premium')) p.priceX = 1.1; }
+    if (m === 'delay') { pl('clean'); S.shipCap = 6; }
+    C.acc.base = { ...C.acc.base, ...base };
+  },
+  step(save, ctx, C, api) {
+    const S = save.sim, G = api.govOf(save), v = G.visit.n;
+    if (C.st !== 'live' || !C.acc) { if (C.st === 'cure' && v >= C.cureV) C.st = 'm2'; if (C.st === 'obj' && (S.cleanRun || 0) > (C.cleanBase || 0)) { C.st = 'm2'; C.cleaned = true; } return; }
+    const m = C.acc.motion;
+    if (m === 'retrofit' && !C.on) { const runs = since(S, C, 'runs'), pw = (S.pwr || 0) - (C.acc.base.pwr || 0);
+      if (runs >= 2 && (!C.grid || ctx.tier < 1 ? runs >= 3 || (C.grid && pw >= 1) : pw >= 1)) { const p = S.proj.find(x => x.id === 'scrubber'); if (p) Object.assign(p, { prodX: 1, pollX: .35, label: '集塵機 · commissioned' }); C.on = v; G.sig.scrub = 'on'; api.log(S, 'gov', '試運転完了 The scrubber is commissioned: pollution from output −65%.'); } }
+    if (m === 'delay' && (S.capBr || 0) > (C.acc.base.capBr || 0) && !C.leak) { C.leak = v; C.st = 'm2'; api.news(G, { v, k: 'paper', id: 'stack:leak' }); G.sig.audit = v + 2; api.trustAdd(G, 'civic', -5); api.log(S, 'gov', '新聞 The paper prints the operating ledger: a shift broke the published cap.'); return; }
+    if (v >= C.acc.v + 3) C.st = 'm2';
+  },
+  meeting(save, ctx, C, api) {
+    const S = save.sim, p = api.price(C.ref);
+    if (C.st === 'm1') return { kind: 'vote', n: 1, title: ['公害公聴会', 'The stack hearing'], brief: BRIEF.s1, motions: ['retrofit', 'cap', 'delay'] };
+    if (C.st !== 'm2') return null;
+    const m = C.acc.motion, lines = [], opts = [];
+    if (m === 'retrofit') { lines.push(['集塵機', C.on ? 'Commissioned' : `Not commissioned: ${since(S, C, 'runs')} shipment runs${C.grid ? `, ${(S.pwr || 0) - (C.acc.base.pwr || 0)} Power shifts` : ''}`, !!C.on]);
+      if (C.on) opts.push({ id: 'keep', j: '継続', en: 'Keep the scrubber', d: 'It stays, with its upkeep. The residents remember the promise kept.', ok: true });
+      else opts.push({ id: 'extend', j: '是正延長', en: 'A corrective visit', d: 'One more attended visit to commission it. The promise is not yet broken.', ok: !C.ext, why: 'Already extended once.' },
+        { id: 'abandon', j: '断念', en: 'Abandon it', d: 'Remove the scrubber. The promise to the residents is broken; the paper prints it.', ok: true }); }
+    if (m === 'cap') { lines.push(['上限', 'The output limit held the whole term', true]);
+      opts.push({ id: 'keep', j: '上限継続', en: 'Keep the cap', d: 'Production stays −20% (premium kept if signed).', ok: true }, { id: 'lift', j: '上限解除', en: 'Lift the cap', d: 'Full output again; the residents are not pleased (−8 trust).', ok: true },
+        { id: 'retrofit', j: '改修へ', en: 'Move to a retrofit', d: 'Lift the cap and open a new vote on disclosing and retrofitting.', ok: true }); }
+    if (m === 'delay') {
+      if (!C.leak) { lines.push(['公表上限', 'No shift broke the cap', true]); opts.push({ id: 'disclose', j: '公表する', en: 'Disclose now', d: 'Publish the ledger at last: residents +4 trust, the cap ends.', ok: true }, { id: 'quiet', j: '沈黙', en: 'Stay quiet', d: 'The cap ends; nothing is published. The promise counts as kept.', ok: true }); }
+      else { lines.push(['公表上限', 'A shift broke the published cap; the paper printed the ledger', false]);
+        if (C.cleaned) opts.push({ id: 'cured', j: '監督運転済', en: 'Close it: the clean run is done', d: 'The supervised shift stayed under the cap. The breach is cured.', ok: true });
+        else opts.push({ id: 'clean', j: '監督運転', en: 'A supervised clean run', d: 'Your next Factory shift must ship six or fewer, under the commissioner\'s eye. It cures the breach.', ok: !C.obj, why: 'Already under way.' },
+          { id: 'inspect', j: '独立検査', en: 'An independent inspection', d: `Pay ${p.y(3.3)} now. It cures the breach.`, ok: api.spendable(save) >= p(3.3), why: `Needs ${p.y(3.3)} above the reserve.` },
+          { id: 'ignore', j: '無視', en: 'Ignore it', d: 'The promise is broken: residents −15 trust, and a pollution lawsuit lands on the table.', ok: true }); } }
+    return { kind: 'choice', n: 2, title: ['公聴会 · 再審', 'The hearing, reconvened'], brief: BRIEF.s2, lines, opts, broken: false };
+  },
+  status(save, ctx, C, api) {
+    const S = save.sim, G = api.govOf(save);
+    if (C.st === 'live') { const left = Math.max(0, C.acc.v + 3 - G.visit.n), m = C.acc.motion;
+      return `公聴会 · ${MOTIONS[m].en.toLowerCase()}${m === 'retrofit' ? (C.on ? ' · scrubber running' : ` · commissioning ${Math.min(since(S, C, 'runs'), 2)}/2 runs`) : m === 'delay' ? ' · Factory shifts: six at most' : ''} · review in ${left} visit${left === 1 ? '' : 's'}`; }
+    if (C.st === 'obj') return '公聴会 · supervised clean run: your next Factory shift must ship six or fewer';
+    return null;
+  },
+  choose(save, ctx, C, opt, api) {
+    const S = save.sim, G = api.govOf(save), v = G.visit.n, p = api.price(C.ref), mt = this.meeting(save, ctx, C, api), o = mt && mt.opts.find(x => x.id === opt);
+    if (!o || !o.ok) return { ok: false, why: o ? o.why : 'unknown' };
+    const pl = id => G.pledges.find(x => x.id === 'stack:' + id && x.st === 'open'), done = out => { C.st = 'done'; C.outcome = out; C.end = v; delete S.shipCap; api.remember(G, { v, k: 'meet', id: 'stack', n: 2, opt }); return { ok: true }; };
+    if (opt === 'keep' && C.acc.motion === 'retrofit') { api.settle(save, ctx, pl('scrub'), true, 1); G.unlock = Object.assign(G.unlock || {}, { siting: true }); return done('kept'); }
+    if (opt === 'extend') { C.ext = true; C.st = 'live'; C.acc.v += 1; const q = pl('scrub'); if (q) q.dueV++; return { ok: true }; }
+    if (opt === 'abandon') { api.settle(save, ctx, pl('scrub'), false, 0); S.proj = S.proj.filter(x => x.id !== 'scrubber'); delete G.sig.scrub; return done('abandoned'); }
+    if (C.acc.motion === 'cap') { api.settle(save, ctx, pl('capheld'), true, 1);
+      if (opt === 'lift' || opt === 'retrofit') S.proj = S.proj.filter(x => x.id !== 'cap');
+      if (opt === 'lift') api.trustAdd(G, 'civic', -8);
+      if (opt === 'retrofit') { done('to-retrofit'); C.st = 'm1'; C.draft = { motion: 'retrofit', cl: {} }; C.v0 = v; C.acc = null; delete C.failV; return { ok: true }; }
+      return done(opt); }
+    if (opt === 'disclose') { api.settle(save, ctx, pl('clean'), true, 1); api.trustAdd(G, 'civic', 4); return done('disclosed'); }
+    if (opt === 'quiet') { api.settle(save, ctx, pl('clean'), true, 1); return done('quiet'); }
+    if (opt === 'clean') { C.obj = true; C.st = 'obj'; C.cleanBase = S.cleanRun || 0; S.cleanWatch = 6; return { ok: true }; }
+    if (opt === 'inspect' || opt === 'cured') { if (opt === 'inspect') api.book(S, save.corp, 'ev', -p(3.3), '独立検査 An independent inspection of the emissions ledger.'); const q = pl('clean'); api.settle(save, ctx, q, false, 0); if (q) { q.cured = true; api.trustAdd(G, 'civic', 5); } return done('cured'); }
+    if (opt === 'ignore') { api.settle(save, ctx, pl('clean'), false, 0); if (!S.ev.some(e => e.k === 'lawsuit')) S.ev.push({ id: S.t + ':lawsuit', k: 'lawsuit', t: S.t }); return done('ignored'); }
+    return { ok: false };
+  } };
+
 /* meeting 3: the inspection. Results first, then the programme's outcome */
 function review(save, ctx, C, api) {
   const S = save.sim, G = api.govOf(save), runs = since(S, C, 'runs'), need = C.need || 6, retr = Math.floor(since(S, C, 'retr'));
@@ -216,6 +329,14 @@ export const BRIEF = {
     en: 'The trial was postponed. If four shipment runs go out, the board will discuss it again.',
     q: 'How many shipment runs does the board want to see?', a: ['Four', 'Six', 'Two', 'Ten'],
     hint: 'Sponsor hint: the objective is reversible; nothing is installed.' },
+  s1: { jp: '[工場|こうじょう]の[煙|けむり]について、[公聴会|こうちょうかい]が[開|ひら]かれます。[住民|じゅうみん]は[空気|くうき]の[汚|よご]れを[数字|すうじ]で[示|しめ]すよう[求|もと]めています。[記者|きしゃ]も[来|き]ています。',
+    en: 'A public hearing is being held about the factory smoke. The residents demand that the air pollution be shown in numbers. A reporter has come too.',
+    q: 'What do the residents want?', a: ['The pollution shown in numbers', 'A new park', 'Lower rent', 'A night curfew'],
+    hint: 'Sponsor hint: the envoy backs a retrofit outright; operations comes round with a Power window; finance needs a clean-label premium to accept a cap.' },
+  s2: { jp: '[約束|やくそく]から[時間|じかん]が[経|た]ちました。[住民|じゅうみん]は[空|そら]がきれいになったか[確|たし]かめに[来|き]ます。',
+    en: 'Time has passed since the promise. The residents are coming to check whether the sky got cleaner.',
+    q: 'What are the residents coming to check?', a: ['Whether the sky got cleaner', 'Whether wages rose', 'Whether the trains run on time', 'Whether the shops opened'],
+    hint: 'Sponsor hint: a broken cap can still be cured by a supervised clean run.' },
   m3: { jp: '[検査|けんさ]の日です。[監査委員|かんさいいん]が[約束|やくそく]の[記録|きろく]を[確|たし]かめます。[守|まも]られていなければ、[新聞|しんぶん]が書くでしょう。',
     en: 'It is inspection day. The audit commissioner checks the record of the promises. If they were not kept, the paper will write about it.',
     q: 'Who checks the record of the promises?', a: ['The audit commissioner', 'The union', 'The newspaper', 'The residents'],
@@ -278,6 +399,30 @@ export const STANCE = {
     fin: [L('[研修費|けんしゅうひ]は[預|あず]かります。', 'I\'ll hold the training money in escrow.'), L('[予備資金|よびしきん]が[残|のこ]れば[賛成|さんせい]です。', 'If the reserve survives, yes.')],
     legal: [L('[研修|けんしゅう]の[方針|ほうしん]は[検査|けんさ]まで[固定|こてい]されます。', 'The Training policy is locked until the review.'), L('[期限|きげん]は三[回|かい]の[訪問|ほうもん]です。', 'The deadline is three attended visits.')],
     audit: [L('[研修|けんしゅう]の[実績|じっせき]を[数|かぞ]えます。', 'I will count the training placements.'), L('四[人|にん]が[新|あたら]しい[仕事|しごと]に[就|つ]けば[合格|ごうかく]です。', 'Four people in new roles is a pass.')] },
+  retrofit: {
+    union: [L('[煙|けむり]が[減|へ]るなら[現場|げんば]も[助|たす]かる。', 'Less smoke helps the floor too.'), L('[工事|こうじ]で[仕事|しごと]が[減|へ]らないなら[賛成|さんせい]だ。', 'If the works don\'t cost jobs, I\'m for it.')],
+    civic: [L('[公開|こうかい]と[改修|かいしゅう]、それが[私|わたし]たちの[要求|ようきゅう]です。', 'Disclosure and a retrofit: that is our demand.'), L('[報告|ほうこく]を[付|つ]けてくだされば、なお[良|よ]いです。', 'With a public report attached, even better.')],
+    ops: [L('[集塵機|しゅうじんき]は[効率|こうりつ]を[落|お]とす。[試運転|しうんてん]まで[一割|いちわり][減|へ]る。', 'The scrubber costs efficiency: ten percent less until it\'s commissioned.'), L('[発電所|はつでんしょ]で[安定|あんてい]した[電力|でんりょく]をくれ。それなら[賛成|さんせい]する。', 'Give me a steady Power window and I\'ll vote for it.')],
+    chair: [L('[公開|こうかい]は[株主|かぶぬし]にも[良|よ]い[印象|いんしょう]です。', 'Disclosure looks good to the shareholders.'), L('[私|わたし]は[賛成|さんせい]です。[財務|ざいむ]を[説得|せっとく]してください。', 'I\'m for it. Convince finance.')],
+    fin: [L('[費用|ひよう]は[重|おも]いですね。', 'The cost is heavy.'), L('[予備資金|よびしきん]が[残|のこ]るなら[反対|はんたい]しません。', 'If the reserve survives, I won\'t oppose it.')],
+    legal: [L('[公開|こうかい]すれば[訴訟|そしょう]の[危険|きけん]は[下|さ]がります。', 'Disclosing lowers the risk of lawsuits.'), L('[数字|すうじ]は[正直|しょうじき]に[出|だ]してください。', 'Publish honest numbers.')],
+    audit: [L('[試運転|しうんてん]の[記録|きろく]を[確認|かくにん]します。', 'I\'ll check the commissioning records.'), L('[出荷便|しゅっかびん]二つと[発電|はつでん]の[記録|きろく]が[要|い]ります。', 'I need two shipment runs and a power record.')] },
+  cap: {
+    union: [L('[生産|せいさん]を[減|へ]らすと[残業|ざんぎょう]も[減|へ]る。[悪|わる]くない。', 'Less output, less overtime. Not bad.'), L('[賃金|ちんぎん]が[下|さ]がらないなら、[文句|もんく]はない。', 'As long as wages don\'t drop, no complaints.')],
+    civic: [L('[上限|じょうげん]は[分|わ]かりやすいです。', 'A cap is easy to understand.'), L('[守|まも]られているか、[毎回|まいかい][確|たし]かめます。', 'We\'ll check every time that it holds.')],
+    ops: [L('[能力|のうりょく]を[捨|す]てるのか。[反対|はんたい]だ。', 'Throwing capacity away? I\'m against it.'), L('[一時的|いちじてき]なら[我慢|がまん]する。', 'If it\'s temporary, I can live with it.')],
+    chair: [L('[慎重|しんちょう]で[妥当|だとう]です。', 'Careful and reasonable.'), L('[財務|ざいむ]が[納得|なっとく]すれば[通|とお]ります。', 'It passes if finance is convinced.')],
+    fin: [L('[売上|うりあげ]が[減|へ]ります。[反対|はんたい]です。', 'Sales fall. I\'m against.'), L('[環境|かんきょう][表示|ひょうじ]で[高|たか]く[売|う]れるなら[話|はなし]は[別|べつ]です。', 'If a clean label lets us sell higher, that changes things.')],
+    legal: [L('[上限|じょうげん]は[契約|けいやく]に[書|か]けます。', 'A cap can be written into a contract.'), L('[期限|きげん]は三[回|かい]の[訪問|ほうもん]です。', 'The term is three attended visits.')],
+    audit: [L('[生産量|せいさんりょう]を[毎時|まいじ][記録|きろく]します。', 'I\'ll log the output every hour.'), L('[上限|じょうげん]は[自動|じどう]で[守|まも]られます。', 'The cap enforces itself.')] },
+  delay: {
+    union: [L('[仕事|しごと]が[減|へ]らないなら、それでいい。', 'If no jobs are lost, fine.'), L('…でも[煙|けむり]は[俺|おれ]たちも[吸|す]う。', '…but we breathe the smoke too.')],
+    civic: [L('[隠|かく]すのですか。[反対|はんたい]です。', 'You\'re hiding it? I\'m against.'), L('[公表|こうひょう]した[上限|じょうげん]を一[度|ど]でも[破|やぶ]れば、[記者|きしゃ]が[書|か]きます。', 'Break the published cap once and the reporter writes.')],
+    ops: [L('[生産|せいさん]を[止|と]めずに[済|す]む。[賛成|さんせい]だ。', 'We keep producing. I\'m for it.'), L('[工場|こうじょう]の[出荷|しゅっか]は一[回|かい]六[個|こ]までだ。', 'Factory shifts ship six at most.')],
+    chair: [L('[危|あぶ]ない[賭|か]けです。', 'A risky bet.'), L('[違反|いはん]があれば[審査|しんさ]になります。', 'A breach means a review.')],
+    fin: [L('[現金|げんきん]は[守|まも]れます。[賛成|さんせい]です。', 'The cash is safe. Yes.'), L('[費用|ひよう]はかかりません。[今|いま]は。', 'It costs nothing. For now.')],
+    legal: [L('[公表|こうひょう]を[遅|おく]らせても[違法|いほう]ではありません。', 'Delaying disclosure isn\'t illegal.'), L('ただし[公表|こうひょう]した[上限|じょうげん]は[約束|やくそく]です。', 'But the published cap is a promise.')],
+    audit: [L('[出荷|しゅっか]を一[便|びん]ずつ[数|かぞ]えます。', 'I\'ll count every shipment.'), L('六[個|こ]を[超|こ]えた[瞬間|しゅんかん]に[記録|きろく]します。', 'The moment one goes over six, I record it.')] },
   defer: {
     union: [L('[急|いそ]がないなら、[文句|もんく]はない。', 'If you\'re not rushing, no complaints.'), L('[延期|えんき]なら[俺|おれ]たちは[動|うご]かない。', 'If it\'s postponed, we don\'t move.')],
     civic: [L('[急|いそ]がない[方|ほう]がいいです。', 'Better not to rush.'), L('[延期|えんき]に[賛成|さんせい]します。', 'I support postponing.')],
@@ -295,6 +440,8 @@ export const REPLY = {
     agreed: L('これなら[署名|しょめい]できる。', 'This I can sign.'), grudging: L('…[仕方|しかた]ない。[覚|おぼ]えておくぞ。', '…Fine. I\'ll remember this.') },
   inspect: { agreed: L('[結構|けっこう]です。[検査|けんさ]は六[便|びん]の[後|あと]に[行|おこな]います。', 'Good. The inspection will follow six shipment runs.') },
   report: { agreed: L('ありがとうございます。[報告|ほうこく]は[放送局|ほうそうきょく]で[流|なが]してください。', 'Thank you. Put the report out through the broadcast station.') },
+  grid: { agreed: L('[発電所|はつでんしょ]の[枠|わく]で[試運転|しうんてん]する。それなら[乗|の]る。', 'We commission in a Power window. Then I\'m in.') },
+  premium: { agreed: L('[環境|かんきょう][表示|ひょうじ]で一[割|わり][高|たか]く[売|う]れます。[賛成|さんせい]しましょう。', 'A clean label sells ten percent higher. I\'ll vote yes.') },
   stage: { agreed: L('二[段階|だんかい]にしましょう。三[便|びん]の[後|あと]に[全出力|ぜんしゅつりょく]です。', 'Two stages, then. Full output after three runs.') } };
 export const SAY = {
   noCase: L('[今|いま]は[議題|ぎだい]がありません。', 'Nothing on the agenda right now.'),

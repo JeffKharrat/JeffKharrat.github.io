@@ -6,7 +6,7 @@
    quarter's close, night, weather, the season).
    createDiorama(canvas, get, view): get() → { S, corp, X (ctx), C (capacity) }; view = { x, y, w, h } in world px. */
 
-import { drawLeaf } from './leaf.js?v=11';
+import { drawLeaf } from './leaf.js?v=12';
 const W = 1240, H = 634, GY = 372, CELL = 16, GC0 = 96, GC1 = 1224, ROWS = 14;
 const Y = '#FFE600', RED = '#FF3B30', L1 = '#A3ABBA', L2 = '#7C8492', D1 = '#2A2E36', D2 = '#1D2026', D3 = '#14161A', INK = '#ECEEF2', MUTE = '#6E7582', BG = '#050608';
 const GREY = ['#1A1D23', '#20232A', '#262A32', '#15171C', '#2C3038', '#101216', '#30343D'];
@@ -71,7 +71,8 @@ function draw(cx, g, st, dt) {
     const sx = fx + 64 + s * 50, sy = GY - fh - 98;
     cx.fillStyle = L1; cx.fillRect(sx, sy, 34, 98); cx.fillStyle = L2; cx.fillRect(sx + 28, sy, 6, 98); checker(cx, sx, sy + 12, 34, 10, 5, '#0B0C0F', L1);
     cx.fillStyle = '#0B0C0F'; cx.font = F8; cx.fillText('CT-' + (s + 1), sx + 6, sy + 64);
-    if (!strike && Math.random() < Math.min(.55, prod / 40) * dt * 60 / 3) st.smoke.push({ x: sx + 10 + Math.random() * 12, y: sy - 4, s: 4, a: .9, vx: 6 + Math.random() * 6 });
+    const scr = (S.proj || []).find(p => p.id === 'scrubber'); if (scr) { cx.fillStyle = scr.pollX < .5 ? Y : '#5A616D'; cx.fillRect(sx - 3, sy - 8, 40, 8); cx.fillStyle = '#0B0C0F'; for (let q = 0; q < 4; q++) cx.fillRect(sx + 1 + q * 10, sy - 6, 5, 4); }
+    if (!strike && Math.random() < Math.min(.55, prod / 40) * (scr && scr.pollX < .5 ? .35 : 1) * dt * 60 / 3) st.smoke.push({ x: sx + 10 + Math.random() * 12, y: sy - 4, s: 4, a: .9, vx: 6 + Math.random() * 6 });
   }
   st.smoke.forEach(p => { p.y -= 14 * dt; p.x += p.vx * dt; p.s += 3 * dt; p.a -= .14 * dt; }); st.smoke = st.smoke.filter(p => p.a > 0);
   st.smoke.forEach(p => { const c = 150 - poll * 90 | 0, q = Math.round(p.s / 2) * 2; cx.fillStyle = `rgba(${c},${c},${c + 4},${p.a * .7})`; cx.fillRect(Math.round(p.x / 2) * 2, Math.round(p.y / 2) * 2, q, q); });
@@ -90,7 +91,7 @@ function draw(cx, g, st, dt) {
   } else { cx.fillStyle = MUTE; cx.font = F8; cx.fillText('ライン停止 · LINE STOPPED', fx + 104, fy + 54); }
   for (let k = 0; k < 9; k++) { cx.fillStyle = '#0B0C0F'; cx.fillRect(fx + 96 + k * 14, fy + 18, 8, 4); }
   if (accident) { const on = Math.sin(T * 10) > 0; cx.fillStyle = on ? RED : '#3A1010'; cx.fillRect(fx + fw - 18, fy - 8, 8, 8); if (on) { cx.fillStyle = 'rgba(255,59,48,.18)'; cx.beginPath(); cx.arc(fx + fw - 14, fy - 4, 22, 0, 7); cx.fill(); } }
-  callout(cx, fx + 64, GY - fh - 98, fx + 10, 116, `CT-1/2/3  STACKS 30 M  ·  POLLUTION ${S.poll.toFixed(0)}`);
+  callout(cx, fx + 64, GY - fh - 98, fx + 10, 116, `CT-1/2/3  STACKS 30 M  ·  POLLUTION ${S.poll.toFixed(0)}${(S.proj || []).some(p => p.id === 'scrubber') ? '  ·  集塵機 ' + ((S.proj.find(p => p.id === 'scrubber').pollX < .5) ? 'ON' : 'COMMISSIONING') : ''}${(S.proj || []).some(p => p.id === 'cap') ? '  ·  上限 −20%' : ''}`);
   callout(cx, fx + 20, fy + 6, fx - 6, fy - 40, 'FAC-01  GREAT FACTORY  80 × 26 M');
 
   /* PWR-02: the power plant, the lines to the town */

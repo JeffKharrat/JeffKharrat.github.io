@@ -3,11 +3,11 @@
    draft from desk to desk, ask the chair for a hearing. The room is a picture with three layers (wall, people, the
    counter in front of them) everything said is Japanese first, with furigana and the
    English underneath. The logic is gov.js; this file only draws it and sends the player's actions there. */
-import { EVENTS, resolve, POL, FAC, capacity, LEDGER } from './sim.js?v=11';
-import * as gov from './gov.js?v=11';
-import { AUTH, STANCE, REPLY, SAY, need, mood } from './gov-arc.js?v=11';
-import { ICON } from './icons.js?v=11';
-import { leafSVG } from './leaf.js?v=11';
+import { EVENTS, resolve, POL, FAC, capacity, LEDGER } from './sim.js?v=12';
+import * as gov from './gov.js?v=12';
+import { AUTH, STANCE, REPLY, SAY, need, mood } from './gov-arc.js?v=12';
+import { ICON } from './icons.js?v=12';
+import { leafSVG } from './leaf.js?v=12';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const yen = v => (v < 0 ? '−¥' : '¥') + Math.abs(Math.round(v)).toLocaleString();
@@ -290,7 +290,7 @@ function resultHTML(r, C) {
   if (!r.ok) return `<div class="res fail"><b class="lb" style="color:var(--red)">REFUSED</b> ${esc(r.why || '')}</div>`;
   if (r.pass) return `<div class="res pass"><b class="lb" style="color:var(--y)">${r.override ? '緊急権限 · FORCED' : '可決 · PASSED'}</b> ${r.T ? `${r.T.yes}–${r.T.no}–${r.T.abs}` : ''}. ${rb(SAY.signed.jp)} <span class="lb">${esc(SAY.signed.en)}</span></div>`;
   return `<div class="res fail"><b class="lb" style="color:var(--red)">否決 · FAILED</b> ${r.again ? 'Earlier today.' : `${r.T.yes}–${r.T.no}–${r.T.abs}.`} One failed submission per motion per visit. Change the proposal, or:
-    <div style="margin-top:6px"><button type="button" class="go g" data-fb="keep">現状維持 · KEEP THE LINE AS IT IS</button>${C.draft.motion !== 'pilot' ? '<button type="button" class="go g" data-fb="pilot">共同試験 · SWITCH TO THE JOINT PILOT</button>' : ''}<button type="button" class="go g" data-fb="withdraw">撤回 · WITHDRAW</button></div></div>`;
+    <div style="margin-top:6px"><button type="button" class="go g" data-fb="keep">現状維持 · KEEP THE LINE AS IT IS</button>${(() => { const r = gov.ARCS[C.id].rescue, Mr = gov.MOTIONS[r]; return C.draft.motion !== r ? `<button type="button" class="go g" data-fb="pilot">${Mr.j} · SWITCH TO: ${esc(Mr.en.toUpperCase())}</button>` : ''; })()}<button type="button" class="go g" data-fb="withdraw">撤回 · WITHDRAW</button></div></div>`;
 }
 
 /* ---------------- wiring and keys ---------------- */
@@ -380,6 +380,7 @@ export function demoArc(save, ctx, branch) {
   save.corp.funds = Math.max(save.corp.funds, 6000); gov.visit(save, ctx, Date.now()); gov.progress(save, ctx);
   const C = gov.caseOf(save, 'line'); if (!C) return;
   const next = () => { g.visit.day = null; gov.visit(save, ctx, Date.now()); };
+  if (branch === 'stack') { g.cases.line = { id: 'line', st: 'done', outcome: 'demo' }; S.poll = 70; S.pHi = 14; gov.progress(save, ctx); return; }
   if (branch === 'm1') return;
   if (branch === 'rescue') { gov.submit(save, ctx, 'line', 'demo:fail'); return; }
   if (branch === 'defer') { gov.setMotion(save, 'line', 'defer'); gov.submit(save, ctx, 'line', 'demo:defer'); next(); return; }

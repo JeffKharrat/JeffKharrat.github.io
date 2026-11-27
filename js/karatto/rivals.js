@@ -3,8 +3,8 @@
    its tools, kanji are the exploits. They answer, bounded: on an attended visit only, at most one act per visit and
    two a week, never deleting a certified word (a breach only marks words compromised, as before).
    Pure logic, no DOM. Saved in save.riv. */
-import { book, log, weekStart } from './sim.js?v=11';
-import { govOf, price, refRate, visitHooks } from './gov.js?v=11';
+import { book, log, weekStart } from './sim.js?v=12';
+import { govOf, price, refRate, visitHooks } from './gov.js?v=12';
 
 const H = 3600e3, clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const RIVALS = {

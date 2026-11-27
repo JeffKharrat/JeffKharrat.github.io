@@ -82,6 +82,8 @@ function tick(S, corp, ctx, live) {
   const grow = (k, target) => { const d = clamp((target - pop[k]) * .006, -3, 3); pop[k] = Math.max(0, pop[k] + (d > 0 ? Math.min(d * draw, Math.max(0, room) * .02 + .2) : d)); };
   grow('w', C.jobsW * 1.12); grow('c', C.jobsC); grow('e', C.jobsE);
   if (S.stab < 25) { pop.w *= .998; pop.c *= .999; }
+  /* idle workers move away (to other towns) unless retrained: 3% of them an hour */
+  { const idle0 = pop.w - Math.min(pop.w, C.jobsW); if (idle0 > 1 && !P.train) pop.w -= idle0 * .03; }
   const empW = Math.min(pop.w, C.jobsW), idle = pop.w - empW, u = pop.w > 1 ? idle / pop.w : 0;
   const work = C.strike ? 0 : empW;                                           // on strike: employed, not working, not paid
   let retrained = 0;
@@ -90,23 +92,27 @@ function tick(S, corp, ctx, live) {
   const boost = S.boost && S.boost.until > S.t ? S.boost.mw : 0, pmw = (S.proj || []).reduce((n, p) => n + (p.mw || 0), 0);
   const demand = work * .12 * hm + C.robots * .08 + total * .06 + pmw, supply = Math.max(10, 90 + (ctx.tier >= 1 ? 60 : 0) + boost - (S.sab && S.sab.until > S.t ? S.sab.mw : 0));
   S.power = supply - demand; const brown = S.power < 0 ? clamp(supply / demand, .5, 1) : 1;
-  const prod = (work * .1 * hm + C.robots * .12 * (C.strike ? .85 : 1)) * brown * (fu.conv ? 1.08 : 1);
+  const PX = k => (S.proj || []).reduce((m, p) => m * (p[k] == null ? 1 : p[k]), 1);   // projects: production, pollution and price factors
+  const prod = (work * .1 * hm + C.robots * .12 * (C.strike ? .85 : 1)) * brown * (fu.conv ? 1.08 : 1) * PX('prodX');
   const need = total * .012, have = S.goods + prod, eat = Math.min(need, have), short = need > 0 ? 1 - eat / need : 0;
   S.goods = have - eat;                                                       // households first, before any reservation
   fillLots(S);
   /* the market: price no longer follows fame (the first balance pass); fame and contracts widen what it takes */
-  const fameL = Math.floor(Math.sqrt((ctx.fame || 0) / 50)) + 1, price = 6 * (fu.qc ? 1.05 : 1) * (S.pw && S.pw.until > S.t ? S.pw.k : 1);
+  const fameL = Math.floor(Math.sqrt((ctx.fame || 0) / 50)) + 1, price = 6 * (fu.qc ? 1.05 : 1) * (S.pw && S.pw.until > S.t ? S.pw.k : 1) * PX('priceX');
   const hold = (S.hold && S.hold.until > S.t ? S.hold.pct : 0), out = C.strike ? .3 : 1 - hold;
   const sold = Math.min((40 + fameL * 5) * out, available(S)); S.goods -= sold;
   /* money */
   const rev = { sales: sold * price, services: pop.c * .4 };
-  const cost = { wages: (work + pop.c + pop.e) * .3 * [.8, 1, 1.25][P.wage] + idle * .05, safety: [0, .02, .05][P.safety] * total, eco: [0, 4, 10][P.eco], watch: [0, 3, 8][P.watch],
+  const cost = { wages: (work + pop.c + pop.e) * .3 * [.8, 1, 1.25][P.wage] + idle * .05, safety: [0, .02, .05][P.safety] * total, eco: [0, 4 + prod * .15, 10 + prod * .45][P.eco], watch: [0, 3, 8][P.watch],
     pr: [0, 6][P.pr], train: P.train ? 5 + retrained * 4 : 0, upkeep: 6 + 2 * ctx.div + 2 * (ctx.up || 0), proj: (S.proj || []).reduce((n, p) => n + (p.upkeep || 0), 0), interest: S.debt * .0005 };
   const R = Object.values(rev).reduce((a, b) => a + b, 0), K = Object.values(cost).reduce((a, b) => a + b, 0);
   corp.funds += R - K; S.q.rev += R; S.q.cost += K; S.q.led.op += R - K; S.q.hrs++;
   S.last = { rev, cost, R, K, prod, need, sold, price, u, idle, empW, short, brown, demand, supply, C, hold: out < 1 ? 1 - out : 0, ess: cost.wages + cost.safety + cost.upkeep + cost.interest + cost.proj };
   /* pollution and accidents */
-  S.poll = clamp(S.poll + prod * .012 - [0, .6, 1.4][P.eco] - S.poll * .004, 0, 100);
+  /* pollution: grows with the square root of output (bigger plants are cleaner per unit), the land absorbs 1.2% an hour,
+     control removes a share of what is emitted (standard 45%, strong 85%) and costs more as output grows */
+  S.poll = clamp(S.poll + .08 * Math.sqrt(prod) * (1 - [0, .45, .85][P.eco]) * PX('pollX') - S.poll * .012, 0, 100);
+  S.pHi = S.poll >= 55 ? (S.pHi || 0) + 1 : S.poll < 45 ? 0 : (S.pHi || 0);      // hours of sustained smog (the hearing's trigger, with hysteresis)
   if (rnd(S.t, 1) < [.003, .008, .02][P.hours] * [2, 1, .4][P.safety]) { S.happy -= 6; S.fac.union -= 5; event(S, 'accident', live); }
   /* mood */
   const happyT = 55 + [0, -8, -20][P.hours] + [-12, 0, 10][P.wage] + [-6, 0, 4][P.safety] - u * 40 - short * 30 - S.poll * .25 - (brown < 1 ? 8 : 0) - (C.strike ? 10 : 0);
@@ -284,7 +290,7 @@ export function addGame(save, id, e) {
       const fr = e.freight || 0, lt = e.lot || 0, tr = e.training || 0, take = Math.min(fr * 4, available(S));
       S.goods -= take; S.dlv += fr + lt; S.fac.res = clamp(S.fac.res + (fr + lt) * .4, 0, 100);
       return `物流 ${fr} freight${lt ? `, ${lt} contract` : ''}${tr ? `, ${tr} training runs (service fee)` : ''}`; },
-    power: () => { S.boost = { until: S.t + 24 * H, mw: Math.round((e.grid || 0) * .8) }; return `発電所 grid ${e.grid || 0}% → +${S.boost.mw} MW for 24 h`; },
+    power: () => { S.pwr = (S.pwr || 0) + 1; S.boost = { until: S.t + 24 * H, mw: Math.round((e.grid || 0) * .8) }; return `発電所 grid ${e.grid || 0}% → +${S.boost.mw} MW for 24 h`; },
     lab: () => { corp.research = (corp.research || 0) + (e.research || 0); return `研究所 +${e.research || 0} research`; },
     broadcast: () => { S.aired += e.aired || 0; S.fac.res = clamp(S.fac.res + (e.aired || 0) * .8, 0, 100); S.fameB += (e.aired || 0) * 2; S.stab = clamp(S.stab + (e.aired || 0) * .2, 5, 100); return `放送局 ${e.aired || 0} clips aired`; },
     exchange: () => `取引所 session move 紅葉重工 ${e.move >= 0 ? '+' : ''}${(e.move || 0).toFixed(1)}% (shown apart from the share price)`,
@@ -298,6 +304,8 @@ export const RUN = 5;
 export function addShift(save, ship, answers, yen = 0) {
   const S = save.sim; if (!S || S.v !== 2) { save.corp.funds = (save.corp.funds || 0) + yen; return; }
   migrate(S); S.goods += ship * 8; S.q.ship += ship; S.ships += ship;
+  if (S.cleanWatch && ship >= 1 && ship <= S.cleanWatch) { S.cleanRun = (S.cleanRun || 0) + 1; delete S.cleanWatch; log(S, 'gov', `監督運転 A supervised clean run: ${ship} shipped, under the cap.`); }
+  if (S.shipCap && ship > S.shipCap) { S.capBr = (S.capBr || 0) + 1; log(S, 'gov', `公表上限違反 A Factory shift shipped ${ship}, over the published cap of ${S.shipCap}.`); }
   /* a shipment run; while funded training places are open (a signed agreement), each run trains one displaced worker into a funded role */
   if (ship >= RUN) { S.runs++; if ((S.trainSlots || 0) > 0 && S.pop.w >= 1) { S.trainSlots--; S.retr++; S.pop.w -= 1; S.pop.c += 1; log(S, 'gov', `研修 One displaced worker moved into a funded role (${S.trainSlots} training places left).`); } } save.corp.data += answers;
   if (yen) book(S, save.corp, 'shift', yen);

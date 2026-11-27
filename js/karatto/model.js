@@ -1,6 +1,6 @@
 /* カラット: the knowledge model. Which facets of which kanji a word covers, each key's level, the divisions, the tier.
    Levels: 0 dark (no deck word has it), 1 dim (deck words, none certified), 2 acquired, 3 integrated, 4 mastered. */
-import { align, parseFurigana } from './align.js?v=11';
+import { align, parseFurigana } from './align.js?v=12';
 
 export const LEVELS = [5, 4, 3, 2, 1];
 export const TIERS = [
