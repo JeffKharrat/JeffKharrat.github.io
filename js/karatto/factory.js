@@ -7,11 +7,11 @@
    evidence for the word; a late one scraps it with no change to the evidence. Words already in memory are handled by
    the AI's own robots (blue, 自動). First attempt per word and skill in a shift only. At the end of the shift: the daily
    report, the yen, and the files the evidence now supports, sent to the audit in the core. */
-import { loadKanji } from './model.js?v=5';
-import * as store from './store.js?v=5';
-import { deckWord, buildPool, traps, shuffle } from './words.js?v=5';
-import { record, updateFlags, SKILL_J, day } from './evidence.js?v=5';
-import { addShift } from './sim.js?v=5';
+import { loadKanji } from './model.js?v=6';
+import * as store from './store.js?v=6';
+import { deckWord, buildPool, traps, shuffle } from './words.js?v=6';
+import { record, updateFlags, SKILL_J, day } from './evidence.js?v=6';
+import { addShift } from './sim.js?v=6';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;

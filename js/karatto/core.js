@@ -2,12 +2,12 @@
    cavity wall is its memory, a keyboard of every JLPT kanji. Two views: the base view (the AI and the corporation's
    panels) and the wall view (on the gantry, looking around the wall). Clicking a key presses it and opens its file. */
 import * as THREE from '../vendor/three.module.min.js';
-import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=5';
-import * as store from './store.js?v=5';
-import { files, updateFlags } from './evidence.js?v=5';
-import { openAudit } from './audit.js?v=5';
-import { advance, hourOf } from './sim.js?v=5';
-import { openMgmt, briefing, decide, mgmtOpen, refreshMgmt } from './mgmt.js?v=5';
+import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=6';
+import * as store from './store.js?v=6';
+import { files, updateFlags } from './evidence.js?v=6';
+import { openAudit } from './audit.js?v=6';
+import { advance, hourOf } from './sim.js?v=6';
+import { openMgmt, briefing, decide, mgmtOpen, refreshMgmt } from './mgmt.js?v=6';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;   // embed: opened over the site from Tau Jeffy VI
@@ -509,7 +509,7 @@ function fameOf() {
 }
 function simCtx() {
   const counts = [0, 0, 0, 0, 0], fc = SAVE.corp.factory || {}; S.forEach(s => counts[s.lvl]++);
-  return { mem: certifiedSet().size, acq: counts[2] + counts[3] + counts[4], tier: PROG.tier, div: Object.values(PROG.div).filter(d => d.a / d.n >= .8).length, up: (fc.conv ? 1 : 0) + (fc.qc ? 1 : 0) + (fc.ext ? 1 : 0), fame: fameOf() };
+  return { mem: certifiedSet().size, acq: counts[2] + counts[3] + counts[4], tier: PROG.tier, div: Object.values(PROG.div).filter(d => d.a / d.n >= .8).length, up: (fc.conv ? 1 : 0) + (fc.qc ? 1 : 0) + (fc.ext ? 1 : 0), fame: fameOf(), tech: SAVE.corp.tech || {} };
 }
 function simDir() { const d = SAVE.sim.dir; return { funds: `funds ¥${d.goal.toLocaleString()}`, stab: `stability ${d.goal}+`, ship: `ship ${d.goal} products`, mem: `${d.goal} words in memory`, poll: `pollution ≤ ${d.goal}` }[d.k] + ' this quarter'; }
 const busy = () => document.body.classList.contains('audit') || mgmtOpen() || (document.getElementById('mgm') || { classList: { contains: () => false } }).classList.contains('on');
@@ -520,7 +520,8 @@ function mgmt(tab) {
 }
 $('#b-mgmt').onclick = () => mgmt();
 /* every half minute: run the hours that have passed */
-setInterval(() => { if (!SAVE || !SAVE.sim || !PROG) return; if (hourOf(Date.now()) > SAVE.sim.t) { advance(SAVE, simCtx(), Date.now(), true); persist(); ui(); refreshMgmt(); nextDecision(); } }, 30000);
+setInterval(() => { if (!SAVE || !SAVE.sim || !PROG) return; if (hourOf(Date.now()) > SAVE.sim.t) { advance(SAVE, simCtx(), Date.now(), true); persist(); ui(); refreshMgmt(); nextDecision(); breachAlert(); } }, 30000);
+function breachAlert() { const b = SAVE.sim && SAVE.sim.breach && SAVE.sim.breach.open; if (b && breachAlert.t !== b.t) { breachAlert.t = b.t; toast(`侵入警報 BREACH · ${b.rival}'s AI is attacking the memory. Defend it in 保安部 (Security) on the surface.`, 9000); } }
 $('#b-wall').onclick = () => go('wall'); $('#b-base').onclick = () => go('base');
 
 /* ---------------- demo deck: for previews before Anki is connected ---------------- */

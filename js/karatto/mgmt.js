@@ -1,7 +1,8 @@
 /* カラット: 経営, the management console in the core. Overview (the planet's numbers and their last three days),
    policies, factions, quarterly reports, the log. Also the briefing after time away, and the decisions (決裁).
    Marathon-style: black, hairlines, micro labels, the AI's yellow. */
-import { POL, FAC, GROUPS, EVENTS, resolve, setPolicy, dirProgress, capacity } from './sim.js?v=5';
+import { POL, FAC, GROUPS, EVENTS, resolve, setPolicy, dirProgress, capacity, forecast } from './sim.js?v=6';
+import { ICON } from './icons.js?v=6';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const yen = v => (v < 0 ? '−¥' : '¥') + Math.abs(Math.round(v)).toLocaleString();
@@ -42,6 +43,14 @@ const CSS = `
 #mg .kpi svg { position:absolute; left:12px; right:12px; bottom:8px; width:216px; height:30px; }
 #mg .kpi.warn { border-color:var(--red); } #mg .kpi.warn .v { color:var(--red); }
 #mg .kpi .j { font:600 13px var(--kj); margin-right:6px; }
+#mg .kpi.sm { height:92px; padding:7px 11px; } #mg .kpi.sm .v { font-size:22px; margin-top:2px; } #mg .kpi.sm svg { height:22px; bottom:6px; }
+#mg .kpi .fc { position:absolute; right:11px; top:30px; font:700 10px var(--num); color:var(--mute); text-align:right; } #mg .kpi .fc b { color:var(--ink); font-size:12px; }
+#mg canvas.dio { position:absolute; left:0; top:0; width:1240px; height:170px; border:1px solid var(--line2); }
+#mg .fico { display:inline-flex; vertical-align:-5px; margin-right:8px; }
+#mg .fcast { grid-column:1 / -1; margin-top:-4px; font:700 10px var(--mono); letter-spacing:.06em; color:var(--mute); min-height:15px; }
+#mg .fcast b { font:700 11px var(--num); margin:0 10px 0 4px; } #mg .fcast .up { color:var(--ok); } #mg .fcast .dn { color:var(--red); }
+#mg .proj { margin:0 0 6px; padding:8px 14px; border-bottom:1px solid var(--line); font:700 10px var(--mono); letter-spacing:.08em; color:var(--mute); }
+#mg .proj b { color:var(--ink); font:700 12px var(--num); margin:0 12px 0 4px; }
 /* rows and bars */
 #mg .row { display:grid; grid-template-columns:110px 1fr 90px; gap:10px; align-items:center; padding:5px 0; border-bottom:1px solid #121418; }
 #mg .row .kj { font-size:13px; }
@@ -55,7 +64,7 @@ const CSS = `
 #mg .tot { display:flex; justify-content:space-between; padding:6px 0; font:700 13px var(--num); }
 #mg .st { display:flex; gap:8px; align-items:center; padding:5px 0; } #mg .st i { width:8px; height:8px; background:var(--mute); } #mg .st i.r { background:var(--red); } #mg .st i.y { background:var(--y); } #mg .st i.g { background:var(--ok); }
 /* policies */
-#mg .pol { display:grid; grid-template-columns:200px 1fr 520px; gap:16px; align-items:center; padding:11px 14px; border-bottom:1px solid #121418; }
+#mg .pol { display:grid; grid-template-columns:200px 1fr 520px; gap:6px 16px; align-items:center; padding:8px 14px; border-bottom:1px solid #121418; }
 #mg .pol .kj { font-size:17px; } #mg .pol p { margin:0; color:#B8BCC6; font-size:11.5px; }
 #mg .seg { display:flex; border:1px solid var(--line2); }
 #mg .seg button { flex:1; background:transparent; border:0; border-right:1px solid var(--line2); color:var(--ink); padding:8px 6px; cursor:pointer; font:500 11px var(--mono); }
@@ -112,7 +121,7 @@ export function openMgmt(c) {
   render();
 }
 const mfit = () => M && fit(M.root);
-export function closeMgmt() { if (!M) return; removeEventListener('keydown', mkeys, true); removeEventListener('resize', mfit); M.root.classList.remove('on'); const c = M.c; M = null; c.onClose && c.onClose(); }
+export function closeMgmt() { if (!M) return; dioStop(); removeEventListener('keydown', mkeys, true); removeEventListener('resize', mfit); M.root.classList.remove('on'); const c = M.c; M = null; c.onClose && c.onClose(); }
 export const mgmtOpen = () => !!M;
 export function refreshMgmt() { if (M) render(); }
 function mkeys(e) { const mm = document.getElementById('mgm'); if (!M || (mm && mm.classList.contains('on'))) return; e.stopImmediatePropagation(); if (e.key === 'Escape') { e.preventDefault(); closeMgmt(); } const n = ['1', '2', '3', '4', '5'].indexOf(e.key); if (n >= 0) { M.tab = TABS[n][0]; render(); } }
@@ -124,70 +133,82 @@ function render() {
   M.root.querySelector('#mg-ck').textContent = `Q${S.q.n} · ${new Date(S.t).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
   const B = M.root.querySelector('.body');
   B.innerHTML = { over, pol, fac, rep, log }[M.tab]();
-  if (M.tab === 'pol') B.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { if (setPolicy(save, b.dataset.p, +b.dataset.v)) { M.c.persist(); render(); } });
+  if (M.tab === 'over') dioStart(B.querySelector('canvas.dio')); else dioStop();
+  if (M.tab === 'pol') B.querySelectorAll('[data-p]').forEach(b => {
+    b.onclick = () => { if (setPolicy(save, b.dataset.p, +b.dataset.v)) { M.c.persist(); M.fc = null; render(); } };
+    b.onmouseenter = () => polCast(b.dataset.p, +b.dataset.v); b.onfocus = b.onmouseenter;
+  });
 }
-function kpi(x, y, j, en, v, d, h, k, warn, tip) {
-  return `<div class="mgp kpi${warn ? ' warn' : ''}" style="left:${x}px;top:${y}px" title="${esc(tip)}"><div><span class="j">${j}</span><span class="lb">${en}</span></div><div class="v">${v}</div><div class="d ${d && d.v > 0 ? 'up' : d && d.v < 0 ? 'dn' : 'lb'}">${d ? d.t : ''}</div>${k ? spark(h, k) : ''}</div>`;
+function kpi(x, y, j, en, v, d, h, k, warn, tip, f) {
+  return `<div class="mgp kpi sm${warn ? ' warn' : ''}" style="left:${x}px;top:${y}px" title="${esc(tip)}"><div><span class="j">${j}</span><span class="lb">${en}</span></div><div class="v">${v}</div><div class="d ${d && d.v > 0 ? 'up' : d && d.v < 0 ? 'dn' : 'lb'}">${d ? d.t : ''}</div>${f ? `<div class="fc">24H →<br><b>${f}</b></div>` : ''}${k ? spark(h, k) : ''}</div>`;
 }
+/* the forecast with the policies as they are: cached for the hour */
+function base() { const S = M.c.save.sim; if (!M.fc || M.fc.t !== S.t) M.fc = { t: S.t, v: forecast(M.c.save, M.c.ctx(), null, 24), alt: {} }; return M.fc; }
 function over() {
-  const { save, ctx } = M.c, S = save.sim, corp = save.corp, X = ctx(), L = S.last || {}, Cp = capacity(S, X), h = S.hist;
+  const { save, ctx } = M.c, S = save.sim, corp = save.corp, X = ctx(), L = S.last || {}, Cp = capacity(S, X), h = S.hist, F = base().v.s;
   const pop = S.pop.w + S.pop.c + S.pop.e, hourly = (L.R || 0) - (L.K || 0);
   const d24 = (k, f = v => v, n = 0, invert) => { const v = delta(h, k); return { v: invert ? -v : v, t: (v >= 0 ? '▲ ' : '▼ ') + f(Math.abs(v)) + ' / 24H' }; };
   const tiles = [
-    ['資金', 'Funds', yen(corp.funds), { v: hourly, t: (hourly >= 0 ? '▲ ' : '▼ ') + yen(Math.abs(hourly)) + ' / HOUR' }, 'f', corp.funds < 0, 'Revenue minus costs, every hour. Below zero the main bank lends ¥3,000 (the board hates it).'],
-    ['株価', 'Share price', yen(S.share), d24('x', yen), 'x', false, 'Follows funds, fame, the board\'s mood and stability.'],
-    ['安定度', 'Stability', S.stab.toFixed(0), d24('s', v => v.toFixed(1)), 's', S.stab < 30, 'The master stat: happiness, minus pollution, plus surveillance, minus strikes and debt. Low stability stops growth.'],
-    ['人口', 'Population', Math.round(pop).toLocaleString(), d24('p', v => Math.round(v)), 'p', false, 'Grows toward the jobs, within the housing the online districts provide, faster when stable.'],
-    ['生活物資', 'Goods', Math.round(S.goods).toLocaleString(), d24('g', v => Math.round(v)), 'g', L.short > 0, 'Made by the workers and robots (and the Great Factory\'s shifts), eaten by the population; the surplus over 200 is sold.'],
-    ['電力', 'Power', sgn(S.power, 0), null, 'w', S.power < 0, 'Supply minus demand. Below zero: brownouts cut production and mood. The power plant (N4) adds supply.'],
-    ['公害', 'Pollution', S.poll.toFixed(0), d24('o', v => v.toFixed(1), 0, true), 'o', S.poll > 60, 'Rises with production, falls with pollution control. Residents and stability suffer; over 60, lawsuits.'],
-    ['幸福度', 'Happiness', S.happy.toFixed(0), d24('h', v => v.toFixed(1)), 'h', S.happy < 30, 'Hours, wages, safety, jobs, goods, pollution, power.'],
-    ['データ', 'Data', Math.floor(corp.data).toLocaleString(), null, '', false, 'The AI\'s own resource: from memory, surveillance and answers in the games. It will buy the AI\'s modules.'],
-    ['暴走度', 'Rampancy', S.bousou.toFixed(1), null, '', S.bousou > 50, 'Rises with surveillance, crunch and defying the board. At thresholds the AI changes.']];
-  let html = tiles.map((t, i) => kpi((i % 5) * 248, Math.floor(i / 5) * 126, ...t.slice(0, 4), h, t[4], t[5], t[6])).join('');
-  /* people and jobs */
+    ['資金', 'Funds', yen(corp.funds), { v: hourly, t: (hourly >= 0 ? '▲ ' : '▼ ') + yen(Math.abs(hourly)) + ' / HOUR' }, 'f', corp.funds < 0, 'Revenue minus costs, every hour. Below zero the main bank lends ¥3,000 (the board hates it).', yen(F.funds)],
+    ['株価', 'Share price', yen(S.share), d24('x', yen), 'x', false, 'Follows funds, fame, the board\'s mood and stability.', yen(F.share)],
+    ['安定度', 'Stability', S.stab.toFixed(0), d24('s', v => v.toFixed(1)), 's', S.stab < 30, 'The master stat: happiness, minus pollution, plus surveillance, minus strikes and debt. Low stability stops growth.', F.stab],
+    ['人口', 'Population', Math.round(pop).toLocaleString(), d24('p', v => Math.round(v)), 'p', false, 'Grows toward the jobs, within the housing the online districts provide, faster when stable.', F.pop],
+    ['生活物資', 'Goods', Math.round(S.goods).toLocaleString(), d24('g', v => Math.round(v)), 'g', L.short > 0, 'Made by the workers and robots (and the Great Factory\'s shifts), eaten by the population; the surplus over 100 is sold.', F.goods],
+    ['電力', 'Power', sgn(S.power, 0), null, 'w', S.power < 0, 'Supply minus demand. Below zero: brownouts cut production and mood. The power plant adds supply for a day.', ''],
+    ['公害', 'Pollution', S.poll.toFixed(0), d24('o', v => v.toFixed(1), 0, true), 'o', S.poll > 60, 'Rises with production, falls with pollution control. Residents and stability suffer; over 60, lawsuits.', F.poll],
+    ['幸福度', 'Happiness', S.happy.toFixed(0), d24('h', v => v.toFixed(1)), 'h', S.happy < 30, 'Hours, wages, safety, jobs, goods, pollution, power.', F.happy],
+    ['データ', 'Data', Math.floor(corp.data).toLocaleString(), null, '', false, 'The AI\'s own resource: from memory, surveillance and answers in the games. It will buy the AI\'s modules.', F.data],
+    ['暴走度', 'Rampancy', S.bousou.toFixed(1), null, '', S.bousou > 50, 'Rises with surveillance, crunch and defying the board. At thresholds the AI changes.', base().v.bousou.toFixed(1)]];
+  let html = `<canvas class="dio" width="2480" height="340"></canvas>` + tiles.map((t, i) => kpi((i % 5) * 248, 180 + Math.floor(i / 5) * 100, ...t.slice(0, 4), h, t[4], t[5], t[6], t[7])).join('');
   const row = (j, en, v, cap, txt, red) => `<div class="row"><span><span class="kj">${j}</span> <span class="lb">${en}</span></span><span class="bar"><s class="${red ? 'r' : ''}" style="width:${Math.min(100, cap ? v / cap * 100 : 0)}%"></s></span><span style="text-align:right">${txt}</span></div>`;
-  html += `<div class="mgp" style="left:0;top:252px;width:404px;height:382px"><div class="ph"><span><b>POP</b> 人口と雇用 · PEOPLE &amp; JOBS</span><span class="bc"></span></div><div class="in">
+  const Y0 = 382, PH = 252;
+  html += `<div class="mgp" style="left:0;top:${Y0}px;width:404px;height:${PH}px"><div class="ph"><span><b>POP</b> 人口と雇用 · PEOPLE &amp; JOBS</span><span>ROBOTS ${Cp.robots}</span></div><div class="in">
     ${row('作業員', 'Workers', S.pop.w, Math.max(S.pop.w, Cp.jobsW), `${Math.round(Math.min(S.pop.w, Cp.jobsW))}/${Math.round(Cp.jobsW)}`)}
     ${row('事務員', 'Clerks', S.pop.c, Math.max(S.pop.c, Cp.jobsC), `${Math.round(S.pop.c)}/${Math.round(Cp.jobsC)}`)}
-    ${X.tier >= 2 ? row('技術者', 'Engineers', S.pop.e, Math.max(1, Cp.jobsE), `${Math.round(S.pop.e)}/${Cp.jobsE}`) : '<div class="row"><span><span class="kj">技術者</span> <span class="lb">Engineers</span></span><span class="lb">OPENS AT N3 · 中堅企業</span><span></span></div>'}
+    ${X.tier >= 2 ? row('技術者', 'Engineers', S.pop.e, Math.max(1, Cp.jobsE), `${Math.round(S.pop.e)}/${Cp.jobsE}`) : '<div class="row"><span><span class="kj">技術者</span> <span class="lb">Engineers</span></span><span class="lb">OPENS AT N3</span><span></span></div>'}
     ${row('住宅', 'Housing', pop, Cp.housing, `${Math.round(pop)}/${Cp.housing}`, pop > Cp.housing * .95)}
     ${row('失業', 'Idle', L.idle || 0, Math.max(1, S.pop.w), ((L.u || 0) * 100).toFixed(0) + '%', (L.u || 0) > .1)}
-    <div class="st" style="margin-top:8px"><i class="y"></i><span>ロボット Robots <b>${Cp.robots}</b> · one per ${Math.round(1 / .6 * 10) / 10} words in memory · each takes a quarter of a worker's job</span></div>
-    <div class="st"><i></i><span>Districts online give housing (+90 each) and offices (+12). Words in memory add robots and office work.</span></div>
-    ${S.pol.train ? '<div class="st"><i class="g"></i><span>研修 Training: idle workers become clerks.</span></div>' : (L.u || 0) > .05 ? '<div class="st"><i class="r"></i><span>Robots leave workers idle. 研修 Training (社則) would retrain them.</span></div>' : ''}
+    ${S.pol.train ? '<div class="st"><i class="g"></i><span>研修 Training: idle workers become clerks.</span></div>' : (L.u || 0) > .05 ? '<div class="st"><i class="r"></i><span>Robots leave workers idle. 研修 Training would retrain them.</span></div>' : '<div class="st"><i></i><span>Districts held give housing and offices; words in memory, robots.</span></div>'}
   </div></div>`;
-  /* the hour's books */
-  const R = L.rev || {}, K = L.cost || {}, NR = { sales: '販売 Sales', services: 'サービス Services' }, NK = { wages: '人件費 Wages', safety: '安全 Safety', eco: '公害対策 Pollution control', watch: '監視 Surveillance', pr: '広報 PR', train: '研修 Training', upkeep: '維持費 Upkeep', interest: '利息 Interest' };
-  html += `<div class="mgp" style="left:416px;top:252px;width:404px;height:382px"><div class="ph"><span><b>P&amp;L</b> 時間収支 · THIS HOUR</span><span>Q${S.q.n} ${yen(S.q.rev - S.q.cost)}</span></div><div class="in">
+  const R = L.rev || {}, K = L.cost || {}, NR = { sales: '販売 Sales', services: 'サービス Services' }, NK = { wages: '人件費 Wages', safety: '安全 Safety', eco: '公害対策 Pollution ctrl', watch: '監視 Surveillance', pr: '広報 PR', train: '研修 Training', upkeep: '維持費 Upkeep', interest: '利息 Interest' };
+  html += `<div class="mgp" style="left:416px;top:${Y0}px;width:404px;height:${PH}px"><div class="ph"><span><b>P&amp;L</b> 時間収支 · THIS HOUR</span><span>Q${S.q.n} ${yen(S.q.rev - S.q.cost)}</span></div><div class="in" style="padding-top:6px">
     ${Object.entries(R).map(([k, v]) => `<div class="pl"><span>${NR[k]}</span><b class="up">+${yen(v)}</b></div>`).join('')}
     ${Object.entries(K).filter(([, v]) => v > .01).map(([k, v]) => `<div class="pl"><span>${NK[k]}</span><b class="dn">−${yen(v)}</b></div>`).join('')}
-    <div class="tot"><span>NET / HOUR</span><span class="${hourly >= 0 ? 'up' : 'dn'}">${hourly >= 0 ? '+' : '−'}${yen(Math.abs(hourly))}</span></div>
-    <div class="lb" style="margin-top:6px">production ${(L.prod || 0).toFixed(1)}/h · consumption ${(L.need || 0).toFixed(1)}/h · sold ${(L.sold || 0).toFixed(0)} at ${yen(L.price || 0)}</div>
+    <div class="tot"><span>NET / HOUR · NEXT 24H AVG ${yen(base().v.net)}</span><span class="${hourly >= 0 ? 'up' : 'dn'}">${hourly >= 0 ? '+' : '−'}${yen(Math.abs(hourly))}</span></div>
   </div></div>`;
-  /* the board's directive and the state of things */
   const dp = dirProgress(S, corp, X), qEnd = S.q.start + 7 * 24 * 3600e3, left = Math.max(0, (qEnd - S.t) / 3600e3);
   const pct = dp ? Math.min(100, dp.D.k === 'poll' ? (dp.v <= dp.goal ? 100 : Math.max(0, 100 - (dp.v - dp.goal) * 2)) : dp.v / dp.goal * 100) : 0;
   const status = [
+    S.breach && S.breach.open ? `<div class="st"><i class="r"></i><span>侵入警報 Breach: ${esc(S.breach.open.rival)} is attacking the memory · 保安部</span></div>` : '',
     S.strike > S.t ? `<div class="st"><i class="r"></i><span>ストライキ中 Strike: the factory is stopped for ${Math.ceil((S.strike - S.t) / 3600e3)} h</span></div>` : '',
-    S.shackle ? `<div class="st"><i class="r"></i><span>取締役会の制約 The board locked ${POL[S.shackle.k].j} for ${Math.ceil((S.shackle.until - S.t) / 3600e3)} h</span></div>` : '',
-    S.debt > 0 ? `<div class="st"><i class="r"></i><span>融資残高 Loan: ${yen(S.debt)} (repaid when funds pass ¥5,000)</span></div>` : '',
+    S.shackle ? `<div class="st"><i class="r"></i><span>The board locked ${POL[S.shackle.k].j} for ${Math.ceil((S.shackle.until - S.t) / 3600e3)} h</span></div>` : '',
+    S.debt > 0 ? `<div class="st"><i class="r"></i><span>融資 Loan: ${yen(S.debt)} (repaid above ¥5,000)</span></div>` : '',
     S.power < 0 ? '<div class="st"><i class="r"></i><span>停電 Brownouts: demand is over supply</span></div>' : '',
-    S.ev.length ? `<div class="st"><i class="y"></i><span>${S.ev.length} decision${S.ev.length > 1 ? 's' : ''} waiting (決裁)</span></div>` : '',
-    ...Object.entries(S.fac).filter(([k, v]) => v < 30 && (k !== 'eng' || X.tier >= 2)).map(([k, v]) => `<div class="st"><i class="r"></i><span>${FAC[k][0]} ${FAC[k][1]} unhappy (${v.toFixed(0)})</span></div>`)].join('') || '<div class="st"><i class="g"></i><span>平常運転 Normal operation.</span></div>';
-  html += `<div class="mgp" style="left:832px;top:252px;width:408px;height:382px"><div class="ph"><span><b>DIR</b> 取締役会の指令 · DIRECTIVE</span><span>${left.toFixed(0)} H LEFT</span></div><div class="in">
-    ${dp ? `<div class="kj" style="font-size:20px">${dp.D.j}</div><div style="margin:4px 0 8px">${esc(dp.txt)}</div><div class="bar"><s style="width:${pct}%"></s></div><div class="lb" style="margin-top:5px">${dp.ok ? 'ON TRACK · +¥500 AND THE BOARD\'S FAVOUR' : 'NOT YET · MISSING IT ANGERS THE BOARD'}</div>` : ''}
-    <div class="lb" style="margin:16px 0 4px">STATUS</div>${status}
+    S.ev.length ? `<div class="st"><i class="y"></i><span>${S.ev.length} decision${S.ev.length > 1 ? 's' : ''} waiting (決裁 · 本社)</span></div>` : '',
+    ...Object.entries(S.fac).filter(([k, v]) => v < 30 && (k !== 'eng' || X.tier >= 2)).map(([k, v]) => `<div class="st"><span class="fico" style="color:var(--red)">${ICON[k](16)}</span><span>${FAC[k][0]} ${FAC[k][1]} unhappy (${v.toFixed(0)})</span></div>`)].join('') || '<div class="st"><i class="g"></i><span>平常運転 Normal operation.</span></div>';
+  html += `<div class="mgp" style="left:832px;top:${Y0}px;width:408px;height:${PH}px"><div class="ph"><span><b>DIR</b> 取締役会の指令 · DIRECTIVE</span><span>${left.toFixed(0)} H LEFT</span></div><div class="in">
+    ${dp ? `<div class="kj" style="font-size:18px">${dp.D.j}</div><div style="margin:2px 0 6px">${esc(dp.txt)}</div><div class="bar"><s style="width:${pct}%"></s></div><div class="lb" style="margin-top:5px">${dp.ok ? 'ON TRACK · +¥500 AND THE BOARD\'S FAVOUR' : 'NOT YET · MISSING IT ANGERS THE BOARD'}</div>` : ''}
+    <div class="lb" style="margin:10px 0 2px">STATUS</div>${status}
   </div></div>`;
   return html;
 }
 function pol() {
-  const { save } = M.c, S = save.sim;
-  return `<div class="mgp" style="left:0;top:0;right:0;bottom:0;width:auto"><div class="ph"><span><b>POL</b> 社則 · COMPANY POLICY</span><span>CHANGES APPLY FROM THE NEXT HOUR</span></div>
+  const { save } = M.c, S = save.sim, F = base().v;
+  return `<div class="mgp" style="left:0;top:0;right:0;bottom:0;width:auto;overflow:auto"><div class="ph"><span><b>POL</b> 社則 · COMPANY POLICY</span><span>HOVER AN OPTION: 24H FORECAST AGAINST THE CURRENT POLICY</span></div>
+    <div class="proj">IF NOTHING CHANGES · IN 24H: FUNDS<b>${yen(F.s.funds)}</b>STABILITY<b>${F.s.stab}</b>HAPPINESS<b>${F.s.happy}</b>POLLUTION<b>${F.s.poll}</b>${Object.keys(FAC).map(k => `${FAC[k][1].toUpperCase()}<b>${Math.round(F.fac[k])}</b>`).join('')}</div>
     ${Object.entries(POL).map(([k, P]) => { const lock = S.shackle && S.shackle.k === k;
       return `<div class="pol"><div><div class="kj">${P.j}</div><span class="lb">${P.en}</span>${lock ? '<div class="lock">LOCKED BY THE BOARD</div>' : ''}</div><p>${esc(P.d)}</p>
-      <div class="seg">${P.o.map(([j, e], v) => `<button type="button" data-p="${k}" data-v="${v}" class="${S.pol[k] === v ? 'on' : ''}" ${lock ? 'disabled' : ''}><b>${j}</b>${e}</button>`).join('')}</div></div>`; }).join('')}
+      <div class="seg">${P.o.map(([j, e], v) => `<button type="button" data-p="${k}" data-v="${v}" class="${S.pol[k] === v ? 'on' : ''}" ${lock ? 'disabled' : ''}><b>${j}</b>${e}</button>`).join('')}</div><div class="fcast" id="fc-${k}"></div></div>`; }).join('')}
   </div>`;
+}
+function polCast(k, v) {
+  const S = M.c.save.sim, el = document.getElementById('fc-' + k); if (!el) return;
+  document.querySelectorAll('#mg .fcast').forEach(x => { if (x !== el) x.innerHTML = ''; });
+  if (S.pol[k] === v) { el.innerHTML = 'CURRENT POLICY'; return; }
+  const B = base(), key = k + v, A = B.alt[key] || (B.alt[key] = forecast(M.c.save, M.c.ctx(), { [k]: v }, 24)), b = B.v;
+  const d = (lab, x, y, f = n => n.toFixed(0), inv) => { const dd = x - y, good = inv ? dd < 0 : dd > 0; return `${lab}<b class="${Math.abs(dd) < .5 ? '' : good ? 'up' : 'dn'}">${dd >= 0 ? '+' : '−'}${f(Math.abs(dd))}</b>`; };
+  el.innerHTML = `24H IF ${POL[k].o[v][1].toUpperCase()}: ` + d('FUNDS ', A.s.funds, b.s.funds, n => '¥' + Math.round(n).toLocaleString()) + d('STAB ', A.s.stab, b.s.stab) + d('HAPPY ', A.s.happy, b.s.happy) + d('POLL ', A.s.poll, b.s.poll, undefined, true) +
+    Object.keys(FAC).map(f => d(FAC[f][1].toUpperCase() + ' ', A.fac[f], b.fac[f])).join('') + d('暴走 ', A.bousou, b.bousou, n => n.toFixed(1), true);
 }
 function fac() {
   const { save, ctx } = M.c, S = save.sim, X = ctx(), T = S.drivers || {};
@@ -195,7 +216,7 @@ function fac() {
   const DO = { union: 'Below 30 they threaten to strike.', board: 'Below 30 they lock a policy.', res: 'Below 30 they protest at HQ.', eng: 'Below 30 they leave (later).' };
   return Object.entries(FAC).map(([k, [j, en]], i) => { const v = S.fac[k], t = T[k] == null ? v : T[k], off = k === 'eng' && X.tier < 2;
     return `<div class="mgp fc" style="left:${i * 310}px;top:0;opacity:${off ? .4 : 1}"><div class="ph"><span><b>${k.toUpperCase()}</b> ${en.toUpperCase()}</span><span class="bc"></span></div><div class="in">
-      <div class="kj t">${j}</div><div class="big" style="color:${v < 30 ? 'var(--red)' : 'inherit'}">${v.toFixed(0)}<small>/ 100 · drifting to ${Math.round(Math.max(0, Math.min(100, t)))}</small></div>
+      <div class="kj t"><span class="fico" style="color:${v < 30 ? 'var(--red)' : 'var(--y)'}">${ICON[k](30)}</span>${j}</div><div class="big" style="color:${v < 30 ? 'var(--red)' : 'inherit'}">${v.toFixed(0)}<small>/ 100 · drifting to ${Math.round(Math.max(0, Math.min(100, t)))}</small></div>
       <div class="bar"><s class="${v < 30 ? 'r' : ''}" style="width:${v}%"></s><em style="left:30%"></em><u style="left:${Math.max(0, Math.min(100, t))}%"></u></div>
       <p style="color:#B8BCC6;margin:14px 0 6px">${WHY[k]}</p><p class="lb" style="color:${v < 30 ? 'var(--red)' : 'var(--mute)'}">${off ? 'OPENS AT N3' : DO[k]}</p></div></div>`; }).join('') +
     `<div class="mgp" style="left:0;top:316px;width:1240px;height:318px"><div class="ph"><span><b>INFO</b> 派閥 · HOW IT WORKS</span></div><div class="in" style="color:#B8BCC6;line-height:1.7">
@@ -243,4 +264,73 @@ function open(r, close, keys) {
   const k = e => { e.stopImmediatePropagation(); if (keys.includes(e.key)) { e.preventDefault(); end(); } };
   const end = () => { removeEventListener('keydown', k, true); close(); };
   r.querySelector('#mgm-ok').onclick = end; addEventListener('keydown', k, true);
+}
+
+/* ================= the diorama: the company town, living by the numbers ================= */
+let DIO = null;
+function dioStop() { if (DIO) { cancelAnimationFrame(DIO.raf); DIO = null; } }
+function dioStart(cv) {
+  dioStop(); if (!cv || !M) return;
+  const cx = cv.getContext('2d'), W = 1240, Hh = 170, seed = n => { const x = Math.sin(n * 91.7) * 43758.5; return x - Math.floor(x); };
+  const sky = Array.from({ length: 60 }, (_, i) => ({ x: i * 22 + seed(i) * 10, h: 20 + seed(i + 3) * 46 }));
+  const people = Array.from({ length: 90 }, (_, i) => ({ x: seed(i + 7) * W, d: seed(i + 9) < .5 ? -1 : 1, v: .6 + seed(i + 11), ph: seed(i) * 6 }));
+  const bots = Array.from({ length: 30 }, (_, i) => ({ x: 60 + seed(i + 21) * 220, d: 1, ph: seed(i + 23) * 6 }));
+  const drones = Array.from({ length: 6 }, (_, i) => ({ x: seed(i + 31) * W, y: 30 + seed(i + 33) * 40, d: seed(i + 35) < .5 ? -1 : 1 }));
+  const smoke = [], coins = [];
+  DIO = { raf: 0 }; let last = performance.now(), T = 0;
+  const frame = now => {
+    if (!DIO || !M) return; DIO.raf = requestAnimationFrame(frame);
+    const dt = Math.min(.05, (now - last) / 1000); last = now; T += dt;
+    const S = M.c.save.sim, L = S.last || {}, X = M.c.ctx(), C = capacity(S, X), pop = S.pop.w + S.pop.c + S.pop.e;
+    const hr = (new Date(S.t).getUTCHours() + 9) % 24, night = hr < 6 || hr >= 19, strike = S.strike > S.t, brown = S.power < 0, poll = S.poll / 100;
+    cx.setTransform(2, 0, 0, 2, 0, 0);
+    /* sky by the hour, haze by the pollution */
+    const g = cx.createLinearGradient(0, 0, 0, Hh); g.addColorStop(0, night ? '#05060A' : '#1A1E26'); g.addColorStop(1, night ? '#10121A' : '#2A2F38'); cx.fillStyle = g; cx.fillRect(0, 0, W, Hh);
+    if (night) for (let i = 0; i < 40; i++) { cx.fillStyle = `rgba(255,255,255,${.2 + .3 * seed(i)})`; cx.fillRect(seed(i + 1) * W, seed(i + 2) * 60, 1, 1); }
+    /* far skyline */
+    cx.fillStyle = night ? '#0B0D12' : '#20242C'; sky.forEach(b => cx.fillRect(b.x, 112 - b.h, 18, b.h));
+    /* housing blocks: one per 90 places of housing */
+    const nb = Math.min(14, Math.round(C.housing / 90)), happy = S.happy / 100;
+    for (let i = 0; i < nb; i++) { const x = 420 + i * 46, h = 38 + seed(i + 40) * 34; cx.fillStyle = '#15181E'; cx.fillRect(x, 130 - h, 38, h);
+      for (let r = 0; r < h / 8 - 1; r++) for (let q = 0; q < 4; q++) { const on = seed(i * 31 + r * 7 + q) < (night ? .25 + happy * .6 : .1) && !(brown && Math.sin(T * 14 + i) > 0); cx.fillStyle = on ? (seed(i + r + q) < .15 ? '#FFE600' : 'rgba(255,240,190,.75)') : '#0D0F13'; cx.fillRect(x + 4 + q * 8, 130 - h + 5 + r * 8, 5, 4); } }
+    /* the factory: sawtooth hall, two chimneys, smoke by the production */
+    cx.fillStyle = '#1A1D23'; cx.fillRect(40, 92, 260, 38); cx.fillStyle = '#22262E'; for (let i = 0; i < 6; i++) { cx.beginPath(); cx.moveTo(40 + i * 43, 92); cx.lineTo(40 + i * 43, 80); cx.lineTo(83 + i * 43, 92); cx.fill(); }
+    for (const [x, h] of [[250, 66], [276, 56]]) { cx.fillStyle = '#2A2E36'; cx.fillRect(x, 130 - h, 10, h); for (let b = 0; b < 3; b++) { cx.fillStyle = b % 2 ? '#E8E3D2' : '#B8432E'; cx.fillRect(x, 130 - h + b * 6, 10, 6); } }
+    if (!strike && Math.random() < Math.min(.9, (L.prod || 0) / 20)) smoke.push({ x: 255 + (Math.random() < .5 ? 0 : 26), y: 64, r: 3, a: .5 });
+    smoke.forEach(p => { p.y -= 12 * dt; p.x += 8 * dt; p.r += 6 * dt; p.a -= .12 * dt; }); while (smoke.length && smoke[0].a <= 0) smoke.shift();
+    smoke.forEach(p => { const c = 120 - poll * 70 | 0; cx.fillStyle = `rgba(${c},${c},${c - 6},${Math.max(0, p.a)})`; cx.beginPath(); cx.arc(p.x, p.y, p.r, 0, 7); cx.fill(); });
+    /* robots in the yard */
+    const nr = Math.min(30, Math.round(C.robots / 8));
+    for (let i = 0; i < nr; i++) { const b = bots[i]; if (!strike || true) b.x += b.d * 18 * dt; if (b.x > 300 || b.x < 50) b.d *= -1; cx.fillStyle = '#FFE600'; cx.fillRect(b.x, 124 + Math.sin(T * 6 + b.ph) * .8, 4, 4); }
+    /* HQ tower and the money */
+    cx.fillStyle = '#1C1F25'; cx.fillRect(1110, 36, 54, 94); cx.fillStyle = '#FFE600'; cx.fillRect(1110, 36, 54, 3);
+    for (let r = 0; r < 10; r++) for (let q = 0; q < 5; q++) { cx.fillStyle = night && seed(r * 5 + q) < .6 ? 'rgba(255,240,190,.7)' : '#101216'; cx.fillRect(1114 + q * 10, 44 + r * 8, 6, 4); }
+    cx.fillStyle = '#ECEEF2'; cx.font = '600 9px "M PLUS 1"'; cx.fillText('カラット', 1118, 33);
+    const net = (L.R || 0) - (L.K || 0); if (Math.random() < Math.min(.12, Math.abs(net) / 500)) coins.push({ x: 1120 + Math.random() * 34, y: 40, v: net >= 0 ? -1 : 1, a: 1 });
+    coins.forEach(c => { c.y += c.v * 22 * dt; c.a -= .5 * dt; }); while (coins.length && coins[0].a <= 0) coins.shift();
+    cx.font = '700 9px Tektur'; coins.forEach(c => { cx.fillStyle = c.v < 0 ? `rgba(255,230,0,${c.a})` : `rgba(255,59,48,${c.a})`; cx.fillText('¥', c.x, c.y); });
+    /* the street and its people: as many as the population, slower when unhappy */
+    cx.fillStyle = '#0E1014'; cx.fillRect(0, 130, W, 40); cx.fillStyle = '#FFE600'; for (let x = (T * 20) % 40 - 40; x < W; x += 40) cx.fillRect(x, 150, 16, 1);
+    const np = Math.min(90, Math.round(pop / 5)), idle = Math.min(20, Math.round((L.idle || 0) / 4));
+    for (let i = 0; i < np; i++) { const p = people[i], sad = seed(i + 50) > happy; p.x += p.d * p.v * (sad ? 8 : 20) * dt; if (p.x > W) p.x = 0; if (p.x < 0) p.x = W;
+      const y = 136 + (i % 3) * 4 + (sad ? 0 : Math.abs(Math.sin(T * 8 + p.ph)) * -1.5); cx.fillStyle = sad ? '#6A707C' : '#ECEEF2'; cx.fillRect(p.x, y, 2, 4); cx.fillRect(p.x, y - 2, 2, 2); }
+    for (let i = 0; i < idle; i++) { cx.fillStyle = '#8A909C'; cx.fillRect(310 + i * 5, 133, 2, 3); }
+    /* a strike: pickets at the factory gate */
+    if (strike) for (let i = 0; i < 12; i++) { const x = 120 + i * 9, y = 126 + Math.sin(T * 5 + i) * 1.5; cx.fillStyle = '#ECEEF2'; cx.fillRect(x, y, 2, 5); cx.fillStyle = '#FF3B30'; cx.fillRect(x - 3, y - 9, 8, 5); }
+    /* a protest at HQ */
+    if (S.fac.res < 35) for (let i = 0; i < 16; i++) { const x = 1060 + (i % 8) * 6, y = 128 + Math.floor(i / 8) * 4 + Math.sin(T * 6 + i) * 1.2; cx.fillStyle = '#ECEEF2'; cx.fillRect(x, y, 2, 4); if (i % 3 === 0) { cx.fillStyle = '#FFE600'; cx.fillRect(x - 3, y - 10 + Math.sin(T * 4 + i) * 2, 8, 6); } }
+    /* surveillance drones */
+    for (let i = 0; i < S.pol.watch * 3; i++) { const d = drones[i % 6]; d.x += d.d * 30 * dt; if (d.x > W || d.x < 0) d.d *= -1; cx.fillStyle = '#FFE600'; cx.fillRect(d.x - 2, d.y, 4, 2); cx.fillStyle = 'rgba(255,230,0,.08)'; cx.beginPath(); cx.moveTo(d.x, d.y + 2); cx.lineTo(d.x - 14, 130); cx.lineTo(d.x + 14, 130); cx.fill(); }
+    /* the core's light under the street */
+    const cg = cx.createRadialGradient(780, 172, 2, 780, 172, 90); cg.addColorStop(0, `rgba(255,230,0,${.35 + .1 * Math.sin(T * 2)})`); cg.addColorStop(1, 'rgba(255,230,0,0)'); cx.fillStyle = cg; cx.fillRect(690, 130, 180, 40);
+    /* haze */
+    if (poll > .05) { cx.fillStyle = `rgba(110,92,60,${poll * .45})`; cx.fillRect(0, 0, W, 130); }
+    if (brown && Math.sin(T * 9) > .7) { cx.fillStyle = 'rgba(0,0,0,.35)'; cx.fillRect(0, 0, W, Hh); }
+    /* captions */
+    const tags = [strike && 'ストライキ中 · STRIKE', S.fac.res < 35 && '抗議中 · PROTEST', brown && '停電 · BROWNOUT', S.poll > 60 && '公害警報 · SMOG', S.breach && S.breach.open && '侵入警報 · BREACH', S.pol.watch && '監視中 · SURVEILLANCE'].filter(Boolean);
+    cx.font = '700 9px "M PLUS 1 Code"'; cx.fillStyle = '#000'; cx.fillRect(8, 8, 330, 16); cx.fillStyle = '#FFE600'; cx.fillText(`LIVE · 社宅街 COMPANY TOWN · ${String(hr).padStart(2, '0')}:00 · POP ${Math.round(pop)} · ROBOTS ${C.robots}`, 14, 19);
+    tags.forEach((t, i) => { const w = cx.measureText(t).width + 12; cx.fillStyle = /STRIKE|PROTEST|BROWNOUT|SMOG|BREACH/.test(t) ? '#FF3B30' : '#FFE600'; cx.fillRect(8 + i * 0, 28 + i * 18, w, 15); cx.fillStyle = '#000'; cx.fillText(t, 14, 39 + i * 18); });
+    if (!tags.length) { cx.fillStyle = '#5CFFA0'; cx.fillRect(8, 28, 140, 15); cx.fillStyle = '#000'; cx.fillText('平常運転 · NORMAL', 14, 39); }
+  };
+  DIO.raf = requestAnimationFrame(frame);
 }

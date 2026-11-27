@@ -975,7 +975,7 @@ function tauState() {
   return { tier: s.tier ?? -1, held, total: total || 27 };
 }
 const siteOpen = (st, s) => s.t <= st.tier + 1;
-const CORE_URL = 'karatto/?embed=1&v=5', GAMES = { factory: 'karatto/factory/?embed=1&v=5' };   // v: a new address each release, so the frame never shows a cached page   // the buildings with a game inside
+const KV = 6, CORE_URL = `karatto/?embed=1&v=${KV}`, GAMES = { factory: 'factory', logistics: 'log', power: 'power', lab: 'lab', broadcast: 'broadcast', security: 'security', exchange: 'exchange', hq: 'hq' };   // v: a new address each release, so a frame never shows a cached page   // v: a new address each release, so the frame never shows a cached page   // the buildings with a game inside
 const siteNeed = s => 'Opens when N' + [5, 4, 3, 2, 1][s.t - 1] + ' is held';
 const poseQ = p => ({ E: p.E, q: lookQ(p.E, p.T, p.up) });
 /* each landmark's shot: az (degrees round the site, 0 = toward +i, 90 = toward +j on its face), el (degrees above the ground),
@@ -1105,8 +1105,8 @@ function tauPanel() {
     return `<li><button type="button" data-n="${n}" class="${TV.view === 'site' && TV.site === n ? 'on' : ''}${open ? '' : ' off'}"><b>${s.jp}</b><span>${s.en}</span><i>${s.id === 'core' ? '↓' : open ? '●' : 'N' + [5, 4, 3, 2, 1][s.t - 1]}</i></button></li>`; }).join('');
   el.querySelectorAll('[data-t="sites"] button').forEach(b => b.onclick = () => setView('site', +b.dataset.n));
   el.querySelector('[data-t="globe"]').classList.toggle('on', TV.view === 'globe');
-  const site = SITES[TV.site], game = TV.view === 'site' && site && GAMES[site.id] && siteOpen(st, site), en = el.querySelector('[data-t="enter"]');
-  en.hidden = !game; if (game) { en.textContent = site.jp + 'に入る · Enter'; en.onclick = () => openCore(GAMES[site.id]); }
+  const site = SITES[TV.site], game = TV.view === 'site' && site && GAMES[site.id], open = game && siteOpen(st, site), en = el.querySelector('[data-t="enter"]');
+  en.hidden = !game; if (game) { en.textContent = open ? site.jp + 'に入る · Enter' : site.jp + 'を見学 · Preview'; en.classList.toggle('pv', !open); en.onclick = () => openCore(`karatto/${GAMES[site.id]}/?embed=1&v=${KV}${open ? '' : '&preview=1'}`); }
 }
 (() => {
   const el = panelsEl[TAU]; if (!el) return;

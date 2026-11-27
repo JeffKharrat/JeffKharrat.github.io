@@ -38,7 +38,7 @@ export function weekStart(t) { const j = t + 9 * H - 4 * H, d = new Date(j), dow
 /* ctx from the core: { mem: words in memory, acq: kanji acquired, tier: -1..4, div: divisions held, up: factory upgrades, fame } */
 export function capacity(S, ctx) {
   const strike = S.strike > S.t;
-  const robots = Math.floor(ctx.mem * .6);
+  const robots = Math.floor(ctx.mem * .6 * (ctx.tech && ctx.tech.auto1 ? 1.15 : 1));
   const housing = 220 + 90 * ctx.div;
   const jobsF = strike ? 0 : 140 + 50 * ctx.up, jobsW = Math.max(strike ? 0 : 20, jobsF - robots * .25);
   const jobsC = 40 + 12 * ctx.div + Math.floor(ctx.mem * .05), jobsE = ctx.tier >= 2 ? 20 + 5 * ctx.div : 0;
@@ -58,7 +58,8 @@ function tick(S, corp, ctx, live) {
   let retrained = 0;
   if (P.train && idle > 1 && pop.c < C.jobsC) { retrained = Math.min(idle * .01, C.jobsC - pop.c); pop.w -= retrained; pop.c += retrained; }
   /* power, production, goods */
-  const demand = empW * .12 * hm + C.robots * .08 + total * .06, supply = 90 + (ctx.tier >= 1 ? 60 : 0);
+  const boost = S.boost && S.boost.until > S.t ? S.boost.mw : 0;
+  const demand = empW * .12 * hm + C.robots * .08 + total * .06, supply = 90 + (ctx.tier >= 1 ? 60 : 0) + boost;
   S.power = supply - demand; const brown = S.power < 0 ? clamp(supply / demand, .5, 1) : 1;
   const prod = (empW * .1 * hm + C.robots * .12) * brown;
   const need = total * .012, have = S.goods + prod, eat = Math.min(need, have), short = need > 0 ? 1 - eat / need : 0;
@@ -105,6 +106,9 @@ function tick(S, corp, ctx, live) {
   if (F.board < 30 && rnd(S.t, 4) < .03) event(S, 'shackle', live);
   if (S.poll > 60 && rnd(S.t, 5) < .03) event(S, 'lawsuit', live);
   if (rnd(S.t, 6) < .012) event(S, 'order', live);
+  /* a data breach: a rival AI attacks the memory. At most two a week, never decided by the autopilot (see 保安部) */
+  const wk = weekStart(S.t); if (!S.breach || S.breach.wk !== wk) S.breach = { wk, n: 0, open: S.breach && S.breach.open };
+  if (!S.breach.open && S.breach.n < 2 && ctx.mem >= 10 && rnd(S.t, 7) < (S.stab < 45 ? .012 : .004) * (live ? 1 : 0)) { S.breach.open = { t: S.t, rival: rnd(S.t, 8) < .5 ? '黒鉄重工' : '白鷺HD' }; S.breach.n++; log(S, 'breach', `侵入警報 Breach alert: ${S.breach.open.rival}'s AI is attacking the memory. Defend it in 保安部 Security.`); }
   S.hist.push({ t: S.t, f: Math.round(corp.funds), s: +S.stab.toFixed(1), p: Math.round(total), g: Math.round(S.goods), o: +S.poll.toFixed(1), h: +S.happy.toFixed(1), x: S.share, w: +S.power.toFixed(1) });
   if (S.hist.length > 168) S.hist.shift();
 }
@@ -185,13 +189,33 @@ export function advance(save, ctx, now = Date.now(), live = false) {
   }
   return { hours: n, before, after: snap(S, corp), log: S.log.slice(log0), reports: reps };
 }
+/* what the next hours would look like, on a copy: with the policies as they are, or with a change */
+export function forecast(save, ctx, pol, hours = 24) {
+  const c = JSON.parse(JSON.stringify({ sim: save.sim, corp: save.corp })), S = c.sim; if (pol) Object.assign(S.pol, pol);
+  const net = []; for (let i = 0; i < hours; i++) { S.t += H; tick(S, c.corp, ctx, false); net.push(S.last.R - S.last.K); }
+  return { s: snap(S, c.corp), fac: { ...S.fac }, net: net.reduce((a, b) => a + b, 0) / hours, bousou: S.bousou };
+}
 export const snap = (S, corp) => ({ funds: Math.round(corp.funds), stab: Math.round(S.stab), pop: Math.round(S.pop.w + S.pop.c + S.pop.e), goods: Math.round(S.goods), poll: Math.round(S.poll), share: S.share, data: Math.floor(corp.data), happy: Math.round(S.happy) });
 export function setPolicy(save, k, v) {
   const S = save.sim; if (S.shackle && S.shackle.k === k) return false;
   S.pol[k] = v; log(S, 'policy', `社則 ${POL[k].j} → ${POL[k].o[v][0]} (${POL[k].o[v][1]})`); return true;
 }
 /* the Great Factory reports a shift: goods made, products shipped, data from the answers */
+/* the other buildings report their shifts */
+export function addGame(save, id, e) {
+  const S = save.sim; if (!S || S.v !== 2) return; const corp = save.corp; e = e || {};
+  corp.data += e.right || 0;
+  const txt = {
+    log: () => { S.goods = Math.max(0, S.goods - (e.delivered || 0) * 4); S.fac.res = clamp(S.fac.res + (e.delivered || 0) * .4, 0, 100); return `物流 ${e.delivered || 0} deliveries`; },
+    power: () => { S.boost = { until: S.t + 24 * H, mw: Math.round((e.grid || 0) * .8) }; return `発電所 grid ${e.grid || 0}% → +${S.boost.mw} MW for 24 h`; },
+    lab: () => { corp.research = (corp.research || 0) + (e.research || 0); return `研究所 +${e.research || 0} research`; },
+    broadcast: () => { S.fac.res = clamp(S.fac.res + (e.aired || 0) * .8, 0, 100); S.fameB += (e.aired || 0) * 2; S.stab = clamp(S.stab + (e.aired || 0) * .2, 5, 100); return `放送局 ${e.aired || 0} clips aired`; },
+    exchange: () => { S.fameB += Math.max(0, e.move || 0) * .5; return `取引所 カラット ${e.move >= 0 ? '+' : ''}${(e.move || 0).toFixed(1)}%`; },
+    security: () => { if (e.real) { S.breach.open = null; S.stab = clamp(S.stab + (e.lost ? -e.lost * 2 : 4), 5, 100); } return e.real ? `保安部 breach repelled: ${e.held} held, ${e.lost} lost` : `保安部 drill: ${e.held} held`; },
+    hq: () => `本社 board meeting: ${e.items || 0} items` }[id];
+  if (txt) log(S, id, txt() + `, +${e.right || 0} data.`);
+}
 export function addShift(save, ship, answers) {
-  const S = save.sim; if (!S) return; S.goods += ship * 8; S.q.ship += ship; save.corp.data += answers;
+  const S = save.sim; if (!S || S.v !== 2) return; S.goods += ship * 8; S.q.ship += ship; save.corp.data += answers;
   log(S, 'factory', `大工場 shift: ${ship} shipped, +${ship * 8} goods, +${answers} data.`);
 }

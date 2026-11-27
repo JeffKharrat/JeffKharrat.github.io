@@ -1,7 +1,7 @@
 /* カラット: the words the games are played with. Deck words (from ジェフの日本語, read-only) normalised, and a pool of
    common words from the kanji data to draw traps from: same kanji, same sound, close in look, never a second right answer. */
-import { parseFurigana } from './align.js?v=5';
-import { kata2hira } from './kana.js?v=5';
+import { parseFurigana } from './align.js?v=6';
+import { kata2hira } from './kana.js?v=6';
 
 const isKanji = c => /[一-鿿々]/.test(c);
 export const clean = m => (m || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
@@ -14,7 +14,7 @@ export function short(m) {
 }
 const STOP = new Set(['to', 'a', 'an', 'the', 'of', 'be', 'in', 'on', 'one', "one's", 'something', 'someone', 'for', 'and', 'or', 'with', 'by', 'at', 'as', 'is', 'up', 'out', 'get', 'do', 'make']);
 const toks = m => new Set(clean(m).toLowerCase().replace(/[^a-z\s'-]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !STOP.has(w)));
-const overlap = (a, b) => { const A = toks(a); for (const w of toks(b)) if (A.has(w)) return true; return false; };
+export const overlap = (a, b) => { const A = toks(a); for (const w of toks(b)) if (A.has(w)) return true; return false; };
 
 /* a deck word as the games use it: written form, reading (hiragana), meaning, its kanji, its level (its hardest kanji) */
 export function deckWord(w, KD) {
