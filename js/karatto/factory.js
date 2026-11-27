@@ -7,11 +7,12 @@
    evidence for the word; a late one scraps it with no change to the evidence. Words already in memory are handled by
    the AI's own robots (blue, 自動). First attempt per word and skill in a shift only. At the end of the shift: the daily
    report, the yen, and the files the evidence now supports, sent to the audit in the core. */
-import { loadKanji } from './model.js?v=6';
-import * as store from './store.js?v=6';
-import { deckWord, buildPool, traps, shuffle } from './words.js?v=6';
-import { record, updateFlags, SKILL_J, day } from './evidence.js?v=6';
-import { addShift } from './sim.js?v=6';
+import { loadKanji } from './model.js?v=7';
+import * as store from './store.js?v=7';
+import { deckWord, buildPool, traps, shuffle } from './words.js?v=7';
+import { record, updateFlags, SKILL_J, day } from './evidence.js?v=7';
+import { addShift } from './sim.js?v=7';
+import { leafSVG, leafFavicon } from './leaf.js?v=7';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;
@@ -574,7 +575,7 @@ function demoDeck() {
 
 /* ---------------- start ---------------- */
 (async function boot() {
-  fit();
+  fit(); $('#lf').innerHTML = leafSVG(30); leafFavicon();
   KD = await loadKanji('../../data/karatto/kanji.json');
   if (document.fonts) await Promise.race([Promise.all([document.fonts.load('400 20px "M PLUS 1"', '第一ライン安全品質入荷出荷プレス溶接検査始業前日報'), document.fonts.load('500 12px "M PLUS 1 Code"', 'あ'), document.fonts.load('800 20px Tektur', '0')]), new Promise(r => setTimeout(r, 5000))]);
   hall();

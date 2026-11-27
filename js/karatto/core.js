@@ -2,12 +2,13 @@
    cavity wall is its memory, a keyboard of every JLPT kanji. Two views: the base view (the AI and the corporation's
    panels) and the wall view (on the gantry, looking around the wall). Clicking a key presses it and opens its file. */
 import * as THREE from '../vendor/three.module.min.js';
-import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=6';
-import * as store from './store.js?v=6';
-import { files, updateFlags } from './evidence.js?v=6';
-import { openAudit } from './audit.js?v=6';
-import { advance, hourOf } from './sim.js?v=6';
-import { openMgmt, briefing, decide, mgmtOpen, refreshMgmt } from './mgmt.js?v=6';
+import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=7';
+import * as store from './store.js?v=7';
+import { files, updateFlags } from './evidence.js?v=7';
+import { openAudit } from './audit.js?v=7';
+import { leafSVG, leafFavicon } from './leaf.js?v=7';
+import { advance, hourOf } from './sim.js?v=7';
+import { openMgmt, briefing, decide, mgmtOpen, refreshMgmt } from './mgmt.js?v=7';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;   // embed: opened over the site from Tau Jeffy VI
@@ -567,6 +568,7 @@ function frame(now) {
 
 /* ---------------- start ---------------- */
 (async function start() {
+  $('#emblem').innerHTML = leafSVG(44, { N: 23 }); leafFavicon();
   resize(); cavity(); theAI(); pipes(); gantry();
   requestAnimationFrame(frame);
   KD = await loadKanji('../data/karatto/kanji.json');

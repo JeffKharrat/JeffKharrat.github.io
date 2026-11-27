@@ -5,9 +5,10 @@
      申告 Claim         a word you know that the games haven't proven: always spot-checked. 40 a day after the founding.
      創業監査 Founding  before the corporation exists: your deck's easiest words, 20 at a time, each one spot-checked.
    The AI argues; Jeff decides. Nothing here touches Anki. */
-import { deckWord, buildPool, traps, shuffle } from './words.js?v=6';
-import { toKana, sameReading } from './kana.js?v=6';
-import { SKILLS, SKILL_J, files, commit, snooze, record, claimsLeft, useClaim, skillsClean, day } from './evidence.js?v=6';
+import { deckWord, buildPool, traps, shuffle } from './words.js?v=7';
+import { toKana, sameReading } from './kana.js?v=7';
+import { leafSVG } from './leaf.js?v=7';
+import { SKILLS, SKILL_J, files, commit, snooze, record, claimsLeft, useClaim, skillsClean, day } from './evidence.js?v=7';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const SK_EN = { meaning: 'Meaning', reading: 'Reading', recall: 'Recall', context: 'Context', listen: 'Listening' };
@@ -110,7 +111,7 @@ const CSS = `
 #au .link .ring.b { border-style:solid; border-color:rgba(255,255,255,.12); animation-duration:30s; animation-direction:reverse; }
 #au .link .ring.c { border:3px dotted rgba(255,230,0,.5); animation-duration:9s; }
 @keyframes auRot { to { transform:translate(-50%,-50%) rotate(360deg); } }
-#au .link .core { position:absolute; left:50%; top:54%; width:58px; height:58px; transform:translate(-50%,-50%); border-radius:50%; background:radial-gradient(circle, #fff 0 10%, #FFF3A0 22%, #FFE600 46%, rgba(255,230,0,0) 70%); box-shadow:0 0 30px rgba(255,230,0,.7); animation:auPl 3s ease-in-out infinite; }
+#au .link .core { position:absolute; left:50%; top:54%; width:64px; height:64px; transform:translate(-50%,-50%); filter:drop-shadow(0 0 10px rgba(255,230,0,.45)); animation:auPl 3s ease-in-out infinite; } #au .link .core svg { display:block; }
 @keyframes auPl { 50% { transform:translate(-50%,-50%) scale(.9); } }
 #au .link.pulse .core { animation:auHit .7s ease-out; }
 @keyframes auHit { 0% { transform:translate(-50%,-50%) scale(1); } 30% { transform:translate(-50%,-50%) scale(1.7); box-shadow:0 0 80px rgba(255,230,0,1), 0 0 0 30px rgba(255,230,0,.2); } 100% { transform:translate(-50%,-50%) scale(1); } }
@@ -149,12 +150,12 @@ export function openAudit(ctx) {
   root.innerHTML = `<div class="stg">
     <div class="grid"></div><div class="scan"></div><div class="glyph">審査</div>
     <div class="reg" style="left:8px;top:58px;border-width:1px 0 0 1px"></div><div class="reg" style="right:8px;bottom:8px;border-width:0 1px 1px 0"></div>
-    <div class="top"><span class="tag">AUD-00</span><span class="ttl">審査室</span><span class="lb">Memory admission · カラット core</span><div class="tabs"></div><span class="lb" id="au-cl"></span><button class="x" type="button" id="au-x">閉じる · CLOSE <span class="key">Esc</span></button></div>
+    <div class="top">${leafSVG(30)}<span class="tag">AUD-00</span><span class="ttl">審査室</span><span class="lb">Memory admission · カラット core</span><div class="tabs"></div><span class="lb" id="au-cl"></span><button class="x" type="button" id="au-x">閉じる · CLOSE <span class="key">Esc</span></button></div>
     <div class="pnl cab"><div class="ph"><span id="au-ch">QUEUE</span><span id="au-cn"></span></div><div class="list"></div></div>
     <div class="desk"></div>
     <div class="side">
       <div class="link"><span class="lb">CORE LINK // 記憶</span><span class="cnt" id="au-m">0</span>
-        <div class="ring" style="width:168px;height:168px"></div><div class="ring b" style="width:124px;height:124px"></div><div class="ring c" style="width:88px;height:88px"></div><div class="core"></div>
+        <div class="ring" style="width:168px;height:168px"></div><div class="ring b" style="width:124px;height:124px"></div><div class="ring c" style="width:88px;height:88px"></div><div class="core">${leafSVG(64, { N: 23 })}</div>
         <div class="brk" style="left:96px;top:58px;border-width:2px 0 0 2px"></div><div class="brk" style="right:96px;top:58px;border-width:2px 2px 0 0"></div><div class="brk" style="left:96px;bottom:22px;border-width:0 0 2px 2px"></div><div class="brk" style="right:96px;bottom:22px;border-width:0 2px 2px 0"></div></div>
       <div class="ai"><div class="lb" style="color:#FFF08A">ANALYSIS // カラットの所見</div><p id="au-say" class="cur"></p></div>
       <div class="acts"></div>

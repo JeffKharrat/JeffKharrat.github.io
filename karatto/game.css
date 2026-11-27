@@ -21,6 +21,7 @@ button { font:inherit; color:inherit; }
 #top .tag { background:var(--y); color:#000; font:700 10px var(--mono); letter-spacing:.12em; padding:3px 6px; }
 #top .tag.pv { background:transparent; color:var(--y); border:1px solid var(--y); }
 #top .t b { font:600 19px var(--kj); }
+#top .lf { display:flex; } #top .lf svg { display:block; }
 #clock { font:700 24px var(--num); letter-spacing:.06em; min-width:80px; }
 #top .st { display:flex; gap:16px; font:700 13px var(--num); margin-left:auto; white-space:nowrap; }
 #top .st span em { font:500 10px var(--mono); font-style:normal; color:var(--mute); margin-right:6px; letter-spacing:.1em; }

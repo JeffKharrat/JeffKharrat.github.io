@@ -2,9 +2,10 @@
    decisions (決裁) and put them on the table in Japanese, with furigana. A comprehension check comes first: answer
    it right and every option is open; wrong, and only the safe one is left. With nothing waiting, the board holds a
    routine review. Reading practice: no word evidence, but the choices move the planet. */
-import { game, panel, esc, clamp, Y, RED, OK, sfx, $, shuffle } from './game.js?v=6';
-import { EVENTS, resolve, setPolicy, dirProgress } from './sim.js?v=6';
-import { ICON } from './icons.js?v=6';
+import { game, panel, esc, clamp, Y, RED, OK, sfx, $, shuffle } from './game.js?v=7';
+import { EVENTS, resolve, setPolicy, dirProgress } from './sim.js?v=7';
+import { ICON } from './icons.js?v=7';
+import { drawLeaf } from './leaf.js?v=7';
 
 const rb = s => s.replace(/\[([^|\]]+)\|([^\]]+)\]/g, '<ruby>$1<rt>$2</rt></ruby>');
 const TXT = {
@@ -95,7 +96,7 @@ game({
     for (let x = 0; x < 1280; x += 160) { cx.fillStyle = '#1A1C21'; cx.fillRect(x, 50, 6, 240); }
     /* the AI's screen at the head of the table */
     cx.fillStyle = '#0A0A07'; cx.fillRect(560, 90, 160, 110); cx.strokeStyle = Y; cx.strokeRect(560.5, 90.5, 160, 110);
-    const r = 26 + 3 * Math.sin(t * 2); const gg = cx.createRadialGradient(640, 145, 2, 640, 145, r * 1.6); gg.addColorStop(0, '#FFFBE0'); gg.addColorStop(.4, Y); gg.addColorStop(1, 'rgba(255,230,0,0)'); cx.fillStyle = gg; cx.beginPath(); cx.arc(640, 145, r * 1.6, 0, 7); cx.fill();
+    drawLeaf(cx, 640 - 46.5, 96, 3, { N: 31, pulse: t * 4 });
     cx.fillStyle = '#8A909C'; cx.font = '700 9px "M PLUS 1 Code"'; cx.textAlign = 'center'; cx.fillText('カラット · THE AI ATTENDS', 640, 216); cx.textAlign = 'left';
     /* the long table */
     cx.fillStyle = '#121418'; cx.beginPath(); cx.moveTo(560, 230); cx.lineTo(720, 230); cx.lineTo(1000, 296); cx.lineTo(280, 296); cx.fill(); cx.strokeStyle = '#2E333C'; cx.stroke();

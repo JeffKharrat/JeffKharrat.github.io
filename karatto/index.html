@@ -21,7 +21,7 @@ canvas#k3 { position:fixed; inset:0; width:100%; height:100%; display:block; cur
 .lbl { font:500 11px/1.3 var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--ink2); }
 /* the corporation, top left */
 #corp { left:24px; top:22px; width:min(360px, calc(100vw - 48px)); padding:16px 18px 14px; }
-#corp .name { font:700 34px/1 var(--jp); letter-spacing:.04em; }
+#corp .name { font:700 34px/1 var(--jp); letter-spacing:.04em; display:flex; align-items:center; gap:12px; } #emblem svg { display:block; }
 #corp .tier { margin-top:6px; font:600 13px/1.3 var(--disp); letter-spacing:.06em; }
 #corp .bar { height:8px; margin:12px 0 4px; background:#1B1E25; border:1px solid var(--line); position:relative; overflow:hidden; }
 #corp .bar i { position:absolute; inset:0 auto 0 0; background:repeating-linear-gradient(90deg, var(--acc) 0 6px, transparent 6px 8px); }
@@ -93,7 +93,7 @@ body.wall #hint { display:block; }
 <canvas id="k3"></canvas>
 <div class="ui pnl" id="corp">
   <div class="lbl">Mega corporation</div>
-  <div class="name">カラット</div>
+  <div class="name"><span id="emblem"></span>カラット</div>
   <div class="tier" id="tier">—</div>
   <div class="bar"><i id="famebar" style="width:0%"></i></div>
   <div class="row lbl"><span id="famelv">Level 1</span><span id="divn">—</span></div>
@@ -124,6 +124,6 @@ body.wall #hint { display:block; }
 <div class="ui pnl" id="file"><button class="x" id="file-x">×</button><div id="file-c"></div></div>
 <div class="ui pnl" id="set"><button class="x" id="set-x">×</button><div id="set-c"></div></div>
 <div class="ui pnl" id="toast"></div>
-<script type="module" src="../js/karatto/core.js?v=6"></script>
+<script type="module" src="../js/karatto/core.js?v=7"></script>
 </body>
 </html>

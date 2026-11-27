@@ -27,6 +27,7 @@ button { font:inherit; color:inherit; }
 /* top bar */
 #top { position:absolute; left:0; right:0; top:0; height:50px; display:flex; align-items:center; gap:18px; padding:0 16px; background:#050506; border-bottom:1px solid var(--line); z-index:5; }
 #top .t { display:flex; align-items:center; gap:10px; }
+#top .lf { display:flex; }
 #top .t .tag { background:var(--y); color:#000; font:700 10px var(--mono); letter-spacing:.12em; padding:3px 6px; }
 #top .t b { font:600 19px var(--kj); }
 #clock { font:700 24px var(--num); letter-spacing:.06em; min-width:80px; }
@@ -139,7 +140,7 @@ button { font:inherit; color:inherit; }
 <div id="wrap"><div id="stage">
   <canvas id="cv" width="1280" height="720" aria-hidden="true"></canvas>
   <div id="top">
-    <div class="t"><span class="tag">FAC-01</span><b>大工場</b><span class="lb">Great Factory · Line 01 · 第一ライン</span></div>
+    <div class="t"><span class="lf" id="lf"></span><span class="tag">FAC-01</span><b>大工場</b><span class="lb">Great Factory · Line 01 · 第一ライン</span></div>
     <span id="clock">03:00</span>
     <div id="prog" title="Shipped against the shift's target"><i></i><b></b></div>
     <div class="st"><span><em>出荷 SHIP</em><span id="s-ship">0</span></span><span><em>不良 DEF</em><span id="s-def">0</span></span><span><em>¥</em><span id="s-yen">0</span></span></div>
@@ -154,6 +155,6 @@ button { font:inherit; color:inherit; }
   <div class="ov" id="ov-brief"><div class="sheet" id="brief"></div></div>
   <div class="ov" id="ov-report"><div class="sheet" id="report"></div></div>
 </div></div>
-<script type="module" src="../../js/karatto/factory.js?v=6"></script>
+<script type="module" src="../../js/karatto/factory.js?v=7"></script>
 </body>
 </html>

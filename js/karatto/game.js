@@ -2,12 +2,13 @@
    report, the deck and the word pool, evidence (first attempt per word and skill per shift), the typing bar, the keycaps,
    sound, saving, and the link to the planet's simulation. Each game supplies its scene and its rules:
    game({ id, code, jp, en, site, tier, skills, dur, lead, how, stats, init, start, tick, draw, key, end, shop }). */
-import { loadKanji } from './model.js?v=6';
-import * as store from './store.js?v=6';
-import { deckWord, buildPool, traps, shuffle, overlap } from './words.js?v=6';
-import { toKana, sameReading } from './kana.js?v=6';
-import { record as rec0, updateFlags, SKILL_J, day } from './evidence.js?v=6';
-import { addGame, advance } from './sim.js?v=6';
+import { loadKanji } from './model.js?v=7';
+import * as store from './store.js?v=7';
+import { deckWord, buildPool, traps, shuffle, overlap } from './words.js?v=7';
+import { toKana, sameReading } from './kana.js?v=7';
+import { record as rec0, updateFlags, SKILL_J, day } from './evidence.js?v=7';
+import { addGame, advance } from './sim.js?v=7';
+import { leafSVG, leafFavicon } from './leaf.js?v=7';
 
 export { shuffle, toKana, sameReading, SKILL_J, overlap };
 export const $ = s => document.querySelector(s);
@@ -41,12 +42,12 @@ export async function game(cfg) {
   const G = { run: false, T: 0, T0: cfg.dur || 180, yen: 0, tried: new Set(), touched: new Map(), streak: 0, best: 0, right: 0, wrong: 0 };
   const api = { G, cfg, cx, W, H, sfx, esc, clamp, ease, $, DEMO, EMBED, get R() { return R; } };
   stage.insertAdjacentHTML('beforeend', `
-    <div id="top"><div class="t"><span class="tag" id="g-tag">${cfg.code}</span><b>${cfg.jp}</b><span class="lb">${cfg.en}</span></div>
+    <div id="top"><div class="t"><span class="lf">${leafSVG(30)}</span><span class="tag" id="g-tag">${cfg.code}</span><b>${cfg.jp}</b><span class="lb">${cfg.en}</span></div>
       <span id="clock">00:00</span><div class="st" id="g-st"></div>
       <button class="tb" id="b-mute" type="button">SND ON</button><button class="tb" id="b-exit" type="button">地上 · EXIT</button></div>
     <div id="ui"></div><div id="toast"></div>
     <div class="ov" id="ov-brief"><div class="sheet" id="brief"></div></div><div class="ov" id="ov-report"><div class="sheet" id="report"></div></div>`);
-  fit();
+  fit(); leafFavicon();
   const muteL = () => { $('#b-mute').textContent = MUTE ? 'SND OFF' : 'SND ON'; };
   $('#b-mute').onclick = () => { MUTE = !MUTE; try { localStorage.setItem('karatto.mute', MUTE ? '1' : '0'); } catch (e) {} muteL(); }; muteL();
   $('#b-exit').onclick = exit;

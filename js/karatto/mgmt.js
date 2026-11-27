@@ -1,9 +1,10 @@
 /* カラット: 経営, the management console in the core. Overview (the planet's numbers and their last three days),
    policies, factions, quarterly reports, the log. Also the briefing after time away, and the decisions (決裁).
    Marathon-style: black, hairlines, micro labels, the AI's yellow. */
-import { POL, FAC, GROUPS, EVENTS, resolve, setPolicy, dirProgress, capacity, forecast } from './sim.js?v=6';
-import { ICON } from './icons.js?v=6';
-import { createDiorama } from './diorama.js?v=6';
+import { POL, FAC, GROUPS, EVENTS, resolve, setPolicy, dirProgress, capacity, forecast } from './sim.js?v=7';
+import { ICON } from './icons.js?v=7';
+import { createDiorama } from './diorama.js?v=7';
+import { leafSVG } from './leaf.js?v=7';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const yen = v => (v < 0 ? '−¥' : '¥') + Math.abs(Math.round(v)).toLocaleString();
@@ -116,7 +117,7 @@ let M = null;
 export function openMgmt(c) {
   /* c: { save, ctx(), persist(), onClose(), tab } */
   css(); const root = el('mg'); M = { c, root, tab: c.tab || 'over' };
-  root.innerHTML = `<div class="stg"><div class="top"><span class="tag">MGT-01</span><span class="ttl">経営</span><span class="lb">Management · カラット</span><div class="tabs"></div><span class="clock" id="mg-ck"></span><button class="x" type="button" id="mg-x">閉じる · CLOSE <span class="key">Esc</span></button></div><div class="body"></div></div>`;
+  root.innerHTML = `<div class="stg"><div class="top">${leafSVG(30)}<span class="tag">MGT-01</span><span class="ttl">経営</span><span class="lb">Management · カラット</span><div class="tabs"></div><span class="clock" id="mg-ck"></span><button class="x" type="button" id="mg-x">閉じる · CLOSE <span class="key">Esc</span></button></div><div class="body"></div></div>`;
   root.querySelector('#mg-x').onclick = closeMgmt; root.classList.add('on'); fit(root);
   addEventListener('keydown', mkeys, true); addEventListener('resize', mfit);
   render();
@@ -245,7 +246,7 @@ export function briefing(sum, done) {
   css(); const r = el('mgm'), a = sum.before, b = sum.after;
   const dd = (j, en, k, f = v => v, inv) => { const d = b[k] - a[k]; return `<div><span class="lb">${j} ${en}</span><b>${f(b[k])}</b><span class="${(inv ? -d : d) > 0 ? 'up' : (inv ? -d : d) < 0 ? 'dn' : 'lb'}">${d >= 0 ? '▲' : '▼'} ${f(Math.abs(d))}</span></div>`; };
   r.innerHTML = `<div class="stg" style="display:flex;align-items:center;justify-content:center"><div class="card"><div class="bar"><span>BRIEFING // 留守中の報告</span><span>${sum.hours} H SIMULATED${sum.hours >= 72 ? ' (CAPPED)' : ''}</span></div>
-    <h2>おかえりなさい。</h2><div style="color:#B8BCC6">While you were away, the corporation ran on your policies; the autopilot handled what couldn't wait.</div>
+    <div style="float:right;margin:4px 0 0 16px">${leafSVG(96, { N: 23 })}</div><h2>おかえりなさい。</h2><div style="color:#B8BCC6">While you were away, the corporation ran on your policies; the autopilot handled what couldn't wait.</div>
     <div class="dl">${dd('資金', 'FUNDS', 'funds', yen)}${dd('安定度', 'STABILITY', 'stab')}${dd('人口', 'POPULATION', 'pop')}${dd('生活物資', 'GOODS', 'goods')}${dd('株価', 'SHARE', 'share', yen)}${dd('公害', 'POLLUTION', 'poll', v => v, true)}${dd('幸福度', 'HAPPINESS', 'happy')}${dd('データ', 'DATA', 'data')}</div>
     ${sum.log.length ? `<div class="lb">WHAT HAPPENED</div><div class="ev">${sum.log.slice(-14).reverse().map(l => `<div>${esc(l.text)}</div>`).join('')}</div>` : ''}
     <button class="go" type="button" id="mgm-ok">了解 · UNDERSTOOD <span class="key">Enter</span></button></div></div>`;
