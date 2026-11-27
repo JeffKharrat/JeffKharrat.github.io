@@ -6,7 +6,7 @@
    quarter's close, night, weather, the season).
    createDiorama(canvas, get, view): get() → { S, corp, X (ctx), C (capacity) }; view = { x, y, w, h } in world px. */
 
-import { drawLeaf } from './leaf.js?v=14';
+import { drawLeaf } from './leaf.js?v=15';
 const W = 1240, H = 634, GY = 372, CELL = 16, GC0 = 96, GC1 = 1224, ROWS = 14;
 const Y = '#FFE600', RED = '#FF3B30', L1 = '#A3ABBA', L2 = '#7C8492', D1 = '#2A2E36', D2 = '#1D2026', D3 = '#14161A', INK = '#ECEEF2', MUTE = '#6E7582', BG = '#050608';
 const GREY = ['#1A1D23', '#20232A', '#262A32', '#15171C', '#2C3038', '#101216', '#30343D'];

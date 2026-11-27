@@ -4,10 +4,10 @@
    A wrong shop is a misdelivery: the truck goes there and back for nothing, and that skill's evidence is wiped.
    A rival AI works the same district from its own depot at the top of the map: if its truck reaches a shop first, the
    order is theirs (横取り). The faster you read, the fewer they take. */
-import { game, panel, esc, clamp, ease, Y, RED, OK, sfx, $, overlap } from './game.js?v=14';
-import { available } from './sim.js?v=14';
-import { activeLot, sendLot } from './gov.js?v=14';
-import { RIVALS, LINES, rubyHTML, pickRival, matchResult, rivalDef } from './rivals.js?v=14';
+import { game, panel, esc, clamp, ease, Y, RED, OK, sfx, $, overlap } from './game.js?v=15';
+import { available } from './sim.js?v=15';
+import { activeLot, sendLot } from './gov.js?v=15';
+import { RIVALS, LINES, rubyHTML, pickRival, matchResult, rivalDef } from './rivals.js?v=15';
 
 const COLS = [400, 640, 880], ROWS = [150, 310, 470], VX = [520, 520, 760], DEP = { x: 640, y: 616 };
 const shopPos = n => ({ c: n % 3, r: 2 - Math.floor(n / 3) });                       // numpad: 1 2 3 bottom row, 7 8 9 top
@@ -159,7 +159,8 @@ function arrive(api, t) {
 }
 
 /* ---------------- the rival ---------------- */
-function rroute(n) { const { c, r } = shopPos(n), x = COLS[c], y = ROWS[r] + 80, vx = VX[c] + 20; return [{ x: vx, y: 40 }, { x: vx, y }, { x, y }]; }
+const RDEP = { x: 935, y: 664 };
+function rroute(n) { const { c, r } = shopPos(n), x = COLS[c], y = ROWS[r] + 80, vx = VX[c] + 18; return [{ x: RDEP.x, y: RDEP.y }, { x: RDEP.x, y: DEP.y + 8 }, { x: vx, y: DEP.y + 8 }, { x: vx, y }, { x, y }]; }
 function rtalk(api, k, once) { if (once && RV.said[k]) return; RV.said[k] = 1; RV.line = LINES[RV.k][k]; riv(api, true); }
 function riv(api, force) {
   const el = $('#p-riv'); if (!el) return; const key = RV.mine + ':' + RV.theirs + ':' + (RV.line && RV.line.en); if (!force && el.dataset.k === key) return; el.dataset.k = key; const P = RIVALS[RV.k];
@@ -213,8 +214,10 @@ function scene(cx, t, api) {
     const p = along(P, d); truck(cx, p.x, p.y, p.a, true);
   }
   /* the rival's depot (top) and trucks */
-  const RC = RIVALS[RV.k].col; cx.fillStyle = '#121418'; cx.fillRect(560, 0, 160, 34); cx.strokeStyle = RC; cx.strokeRect(560.5, .5, 160, 34);
-  cx.fillStyle = RC; cx.font = '500 11px "M PLUS 1"'; cx.fillText(RIVALS[RV.k].corp + ' 配送所', 568, 22);
+  const RC = RIVALS[RV.k].col; cx.fillStyle = '#121418'; cx.fillRect(860, 632, 150, 66); cx.strokeStyle = RC; cx.lineWidth = 2; cx.strokeRect(861, 633, 148, 64); cx.lineWidth = 1;
+  cx.fillStyle = RC; cx.fillRect(860, 632, 150, 4); cx.font = '500 12px "M PLUS 1"'; cx.fillText(RIVALS[RV.k].corp, 868, 690); cx.font = '700 8px "M PLUS 1 Code"'; cx.fillText('RIVAL DEPOT // ' + RIVALS[RV.k].ai, 868, 650);
+  cx.fillStyle = '#1A1C21'; cx.fillRect(926, 616, 18, 18);
+  const parked = Math.max(0, 3 - RV.trucks.length); for (let i = 0; i < parked; i++) { cx.fillStyle = RC; cx.fillRect(872 + i * 34, 656, 20, 12); cx.fillStyle = '#111'; cx.fillRect(886 + i * 34, 656, 6, 12); }
   for (const r of RV.trucks) { const p = along(r.P, r.d); cx.save(); cx.translate(p.x, p.y); cx.rotate(p.a); cx.fillStyle = RC; cx.fillRect(-14, -7, 20, 14); cx.fillStyle = '#111'; cx.fillRect(6, -7, 8, 14); cx.restore();
     if (r.st === 'out') { cx.strokeStyle = RC; cx.globalAlpha = .5; cx.setLineDash([4, 6]); cx.beginPath(); cx.moveTo(p.x, p.y); const e = r.P[r.P.length - 1]; cx.lineTo(e.x, e.y); cx.stroke(); cx.setLineDash([]); cx.globalAlpha = 1; } }
   /* effects */

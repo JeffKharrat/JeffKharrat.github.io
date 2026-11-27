@@ -1,7 +1,7 @@
 /* カラット: 取引所, the exchange. News flashes come off the wire: your deck's example sentences with the card's word
    blanked. Fill the blank (1–4) before the rival AI trades on the same news: first takes the whole move, second only
    half; a wrong fill is a bad trade. H shows the English, at half the move. Skill: context. */
-import { game, panel, keycaps, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=14';
+import { game, panel, keycaps, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=15';
 
 const RIV = [{ n: '黒鉄重工', en: 'Kurogane Heavy', c: '#8A909C', p: 960 }, { n: '白鷺HD', en: 'Shirasagi', c: '#5CFFA0', p: 1200 }];
 let cur = null, phase = 'idle', K, gap = 0, hint = false, me = 1000, P0 = 1000, HIST = [], won = 0, lost = 0, late = 0, wire = [], tick0 = 0;
