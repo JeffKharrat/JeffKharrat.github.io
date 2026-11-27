@@ -3,6 +3,7 @@
    Marathon-style: black, hairlines, micro labels, the AI's yellow. */
 import { POL, FAC, GROUPS, EVENTS, resolve, setPolicy, dirProgress, capacity, forecast } from './sim.js?v=6';
 import { ICON } from './icons.js?v=6';
+import { createDiorama } from './diorama.js?v=6';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const yen = v => (v < 0 ? '−¥' : '¥') + Math.abs(Math.round(v)).toLocaleString();
@@ -124,16 +125,17 @@ const mfit = () => M && fit(M.root);
 export function closeMgmt() { if (!M) return; dioStop(); removeEventListener('keydown', mkeys, true); removeEventListener('resize', mfit); M.root.classList.remove('on'); const c = M.c; M = null; c.onClose && c.onClose(); }
 export const mgmtOpen = () => !!M;
 export function refreshMgmt() { if (M) render(); }
-function mkeys(e) { const mm = document.getElementById('mgm'); if (!M || (mm && mm.classList.contains('on'))) return; e.stopImmediatePropagation(); if (e.key === 'Escape') { e.preventDefault(); closeMgmt(); } const n = ['1', '2', '3', '4', '5'].indexOf(e.key); if (n >= 0) { M.tab = TABS[n][0]; render(); } }
-const TABS = [['over', '概要', 'Overview'], ['pol', '社則', 'Policies'], ['fac', '派閥', 'Factions'], ['rep', '決算', 'Reports'], ['log', '記録', 'Log']];
+function mkeys(e) { const mm = document.getElementById('mgm'); if (!M || (mm && mm.classList.contains('on'))) return; e.stopImmediatePropagation(); if (e.key === 'Escape') { e.preventDefault(); closeMgmt(); } const n = ['1', '2', '3', '4', '5', '6'].indexOf(e.key); if (n >= 0) { M.tab = TABS[n][0]; render(); } }
+const TABS = [['over', '概要', 'Overview'], ['live', '現場', 'Live'], ['pol', '社則', 'Policies'], ['fac', '派閥', 'Factions'], ['rep', '決算', 'Reports'], ['log', '記録', 'Log']];
 function render() {
   const { save } = M.c, S = save.sim;
   M.root.querySelector('.tabs').innerHTML = TABS.map(([k, j, e], i) => `<button type="button" class="tab${M.tab === k ? ' on' : ''}" data-t="${k}"><b>${j}</b>${e.toUpperCase()}${k === 'fac' && Object.values(S.fac).some(v => v < 30) ? '<i>!</i>' : ''}</button>`).join('');
   M.root.querySelectorAll('.tab').forEach(b => b.onclick = () => { M.tab = b.dataset.t; render(); });
   M.root.querySelector('#mg-ck').textContent = `Q${S.q.n} · ${new Date(S.t).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
   const B = M.root.querySelector('.body');
-  B.innerHTML = { over, pol, fac, rep, log }[M.tab]();
-  if (M.tab === 'over') dioStart(B.querySelector('canvas.dio')); else dioStop();
+  B.innerHTML = { over, live, pol, fac, rep, log }[M.tab]();
+  if (M.tab === 'over') { const c = B.querySelector('canvas.dio'); dioStart(c, { x: 0, y: 236, w: 1240, h: 170 }); c.onclick = () => { M.tab = 'live'; render(); }; }
+  else if (M.tab === 'live') dioStart(B.querySelector('canvas.live'), { x: 0, y: 0, w: 1240, h: 634 }); else dioStop();
   if (M.tab === 'pol') B.querySelectorAll('[data-p]').forEach(b => {
     b.onclick = () => { if (setPolicy(save, b.dataset.p, +b.dataset.v)) { M.c.persist(); M.fc = null; render(); } };
     b.onmouseenter = () => polCast(b.dataset.p, +b.dataset.v); b.onfocus = b.onmouseenter;
@@ -159,7 +161,7 @@ function over() {
     ['幸福度', 'Happiness', S.happy.toFixed(0), d24('h', v => v.toFixed(1)), 'h', S.happy < 30, 'Hours, wages, safety, jobs, goods, pollution, power.', F.happy],
     ['データ', 'Data', Math.floor(corp.data).toLocaleString(), null, '', false, 'The AI\'s own resource: from memory, surveillance and answers in the games. It will buy the AI\'s modules.', F.data],
     ['暴走度', 'Rampancy', S.bousou.toFixed(1), null, '', S.bousou > 50, 'Rises with surveillance, crunch and defying the board. At thresholds the AI changes.', base().v.bousou.toFixed(1)]];
-  let html = `<canvas class="dio" width="2480" height="340"></canvas>` + tiles.map((t, i) => kpi((i % 5) * 248, 180 + Math.floor(i / 5) * 100, ...t.slice(0, 4), h, t[4], t[5], t[6], t[7])).join('');
+  let html = `<canvas class="dio" width="2480" height="340" style="cursor:pointer" title="現場 · open the live view"></canvas><span class="lb" style="position:absolute;right:10px;top:150px;background:#FFE600;color:#000;padding:2px 6px;pointer-events:none">現場 LIVE ▸ FULL VIEW</span>` + tiles.map((t, i) => kpi((i % 5) * 248, 180 + Math.floor(i / 5) * 100, ...t.slice(0, 4), h, t[4], t[5], t[6], t[7])).join('');
   const row = (j, en, v, cap, txt, red) => `<div class="row"><span><span class="kj">${j}</span> <span class="lb">${en}</span></span><span class="bar"><s class="${red ? 'r' : ''}" style="width:${Math.min(100, cap ? v / cap * 100 : 0)}%"></s></span><span style="text-align:right">${txt}</span></div>`;
   const Y0 = 382, PH = 252;
   html += `<div class="mgp" style="left:0;top:${Y0}px;width:404px;height:${PH}px"><div class="ph"><span><b>POP</b> 人口と雇用 · PEOPLE &amp; JOBS</span><span>ROBOTS ${Cp.robots}</span></div><div class="in">
@@ -201,6 +203,7 @@ function pol() {
       <div class="seg">${P.o.map(([j, e], v) => `<button type="button" data-p="${k}" data-v="${v}" class="${S.pol[k] === v ? 'on' : ''}" ${lock ? 'disabled' : ''}><b>${j}</b>${e}</button>`).join('')}</div><div class="fcast" id="fc-${k}"></div></div>`; }).join('')}
   </div>`;
 }
+function live() { return '<canvas class="live" width="2480" height="1268" style="position:absolute;left:0;top:0;width:1240px;height:634px;border:1px solid #383D46"></canvas>'; }
 function polCast(k, v) {
   const S = M.c.save.sim, el = document.getElementById('fc-' + k); if (!el) return;
   document.querySelectorAll('#mg .fcast').forEach(x => { if (x !== el) x.innerHTML = ''; });
@@ -266,71 +269,10 @@ function open(r, close, keys) {
   r.querySelector('#mgm-ok').onclick = end; addEventListener('keydown', k, true);
 }
 
-/* ================= the diorama: the company town, living by the numbers ================= */
+/* ================= the diorama (diorama.js): a crop on the overview, the whole of it on the LIVE tab ================= */
 let DIO = null;
-function dioStop() { if (DIO) { cancelAnimationFrame(DIO.raf); DIO = null; } }
-function dioStart(cv) {
+function dioStop() { if (DIO) { DIO.stop(); DIO = null; } }
+function dioStart(cv, view) {
   dioStop(); if (!cv || !M) return;
-  const cx = cv.getContext('2d'), W = 1240, Hh = 170, seed = n => { const x = Math.sin(n * 91.7) * 43758.5; return x - Math.floor(x); };
-  const sky = Array.from({ length: 60 }, (_, i) => ({ x: i * 22 + seed(i) * 10, h: 20 + seed(i + 3) * 46 }));
-  const people = Array.from({ length: 90 }, (_, i) => ({ x: seed(i + 7) * W, d: seed(i + 9) < .5 ? -1 : 1, v: .6 + seed(i + 11), ph: seed(i) * 6 }));
-  const bots = Array.from({ length: 30 }, (_, i) => ({ x: 60 + seed(i + 21) * 220, d: 1, ph: seed(i + 23) * 6 }));
-  const drones = Array.from({ length: 6 }, (_, i) => ({ x: seed(i + 31) * W, y: 30 + seed(i + 33) * 40, d: seed(i + 35) < .5 ? -1 : 1 }));
-  const smoke = [], coins = [];
-  DIO = { raf: 0 }; let last = performance.now(), T = 0;
-  const frame = now => {
-    if (!DIO || !M) return; DIO.raf = requestAnimationFrame(frame);
-    const dt = Math.min(.05, (now - last) / 1000); last = now; T += dt;
-    const S = M.c.save.sim, L = S.last || {}, X = M.c.ctx(), C = capacity(S, X), pop = S.pop.w + S.pop.c + S.pop.e;
-    const hr = (new Date(S.t).getUTCHours() + 9) % 24, night = hr < 6 || hr >= 19, strike = S.strike > S.t, brown = S.power < 0, poll = S.poll / 100;
-    cx.setTransform(2, 0, 0, 2, 0, 0);
-    /* sky by the hour, haze by the pollution */
-    const g = cx.createLinearGradient(0, 0, 0, Hh); g.addColorStop(0, night ? '#05060A' : '#1A1E26'); g.addColorStop(1, night ? '#10121A' : '#2A2F38'); cx.fillStyle = g; cx.fillRect(0, 0, W, Hh);
-    if (night) for (let i = 0; i < 40; i++) { cx.fillStyle = `rgba(255,255,255,${.2 + .3 * seed(i)})`; cx.fillRect(seed(i + 1) * W, seed(i + 2) * 60, 1, 1); }
-    /* far skyline */
-    cx.fillStyle = night ? '#0B0D12' : '#20242C'; sky.forEach(b => cx.fillRect(b.x, 112 - b.h, 18, b.h));
-    /* housing blocks: one per 90 places of housing */
-    const nb = Math.min(14, Math.round(C.housing / 90)), happy = S.happy / 100;
-    for (let i = 0; i < nb; i++) { const x = 420 + i * 46, h = 38 + seed(i + 40) * 34; cx.fillStyle = '#15181E'; cx.fillRect(x, 130 - h, 38, h);
-      for (let r = 0; r < h / 8 - 1; r++) for (let q = 0; q < 4; q++) { const on = seed(i * 31 + r * 7 + q) < (night ? .25 + happy * .6 : .1) && !(brown && Math.sin(T * 14 + i) > 0); cx.fillStyle = on ? (seed(i + r + q) < .15 ? '#FFE600' : 'rgba(255,240,190,.75)') : '#0D0F13'; cx.fillRect(x + 4 + q * 8, 130 - h + 5 + r * 8, 5, 4); } }
-    /* the factory: sawtooth hall, two chimneys, smoke by the production */
-    cx.fillStyle = '#1A1D23'; cx.fillRect(40, 92, 260, 38); cx.fillStyle = '#22262E'; for (let i = 0; i < 6; i++) { cx.beginPath(); cx.moveTo(40 + i * 43, 92); cx.lineTo(40 + i * 43, 80); cx.lineTo(83 + i * 43, 92); cx.fill(); }
-    for (const [x, h] of [[250, 66], [276, 56]]) { cx.fillStyle = '#2A2E36'; cx.fillRect(x, 130 - h, 10, h); for (let b = 0; b < 3; b++) { cx.fillStyle = b % 2 ? '#E8E3D2' : '#B8432E'; cx.fillRect(x, 130 - h + b * 6, 10, 6); } }
-    if (!strike && Math.random() < Math.min(.9, (L.prod || 0) / 20)) smoke.push({ x: 255 + (Math.random() < .5 ? 0 : 26), y: 64, r: 3, a: .5 });
-    smoke.forEach(p => { p.y -= 12 * dt; p.x += 8 * dt; p.r += 6 * dt; p.a -= .12 * dt; }); while (smoke.length && smoke[0].a <= 0) smoke.shift();
-    smoke.forEach(p => { const c = 120 - poll * 70 | 0; cx.fillStyle = `rgba(${c},${c},${c - 6},${Math.max(0, p.a)})`; cx.beginPath(); cx.arc(p.x, p.y, p.r, 0, 7); cx.fill(); });
-    /* robots in the yard */
-    const nr = Math.min(30, Math.round(C.robots / 8));
-    for (let i = 0; i < nr; i++) { const b = bots[i]; if (!strike || true) b.x += b.d * 18 * dt; if (b.x > 300 || b.x < 50) b.d *= -1; cx.fillStyle = '#FFE600'; cx.fillRect(b.x, 124 + Math.sin(T * 6 + b.ph) * .8, 4, 4); }
-    /* HQ tower and the money */
-    cx.fillStyle = '#1C1F25'; cx.fillRect(1110, 36, 54, 94); cx.fillStyle = '#FFE600'; cx.fillRect(1110, 36, 54, 3);
-    for (let r = 0; r < 10; r++) for (let q = 0; q < 5; q++) { cx.fillStyle = night && seed(r * 5 + q) < .6 ? 'rgba(255,240,190,.7)' : '#101216'; cx.fillRect(1114 + q * 10, 44 + r * 8, 6, 4); }
-    cx.fillStyle = '#ECEEF2'; cx.font = '600 9px "M PLUS 1"'; cx.fillText('カラット', 1118, 33);
-    const net = (L.R || 0) - (L.K || 0); if (Math.random() < Math.min(.12, Math.abs(net) / 500)) coins.push({ x: 1120 + Math.random() * 34, y: 40, v: net >= 0 ? -1 : 1, a: 1 });
-    coins.forEach(c => { c.y += c.v * 22 * dt; c.a -= .5 * dt; }); while (coins.length && coins[0].a <= 0) coins.shift();
-    cx.font = '700 9px Tektur'; coins.forEach(c => { cx.fillStyle = c.v < 0 ? `rgba(255,230,0,${c.a})` : `rgba(255,59,48,${c.a})`; cx.fillText('¥', c.x, c.y); });
-    /* the street and its people: as many as the population, slower when unhappy */
-    cx.fillStyle = '#0E1014'; cx.fillRect(0, 130, W, 40); cx.fillStyle = '#FFE600'; for (let x = (T * 20) % 40 - 40; x < W; x += 40) cx.fillRect(x, 150, 16, 1);
-    const np = Math.min(90, Math.round(pop / 5)), idle = Math.min(20, Math.round((L.idle || 0) / 4));
-    for (let i = 0; i < np; i++) { const p = people[i], sad = seed(i + 50) > happy; p.x += p.d * p.v * (sad ? 8 : 20) * dt; if (p.x > W) p.x = 0; if (p.x < 0) p.x = W;
-      const y = 136 + (i % 3) * 4 + (sad ? 0 : Math.abs(Math.sin(T * 8 + p.ph)) * -1.5); cx.fillStyle = sad ? '#6A707C' : '#ECEEF2'; cx.fillRect(p.x, y, 2, 4); cx.fillRect(p.x, y - 2, 2, 2); }
-    for (let i = 0; i < idle; i++) { cx.fillStyle = '#8A909C'; cx.fillRect(310 + i * 5, 133, 2, 3); }
-    /* a strike: pickets at the factory gate */
-    if (strike) for (let i = 0; i < 12; i++) { const x = 120 + i * 9, y = 126 + Math.sin(T * 5 + i) * 1.5; cx.fillStyle = '#ECEEF2'; cx.fillRect(x, y, 2, 5); cx.fillStyle = '#FF3B30'; cx.fillRect(x - 3, y - 9, 8, 5); }
-    /* a protest at HQ */
-    if (S.fac.res < 35) for (let i = 0; i < 16; i++) { const x = 1060 + (i % 8) * 6, y = 128 + Math.floor(i / 8) * 4 + Math.sin(T * 6 + i) * 1.2; cx.fillStyle = '#ECEEF2'; cx.fillRect(x, y, 2, 4); if (i % 3 === 0) { cx.fillStyle = '#FFE600'; cx.fillRect(x - 3, y - 10 + Math.sin(T * 4 + i) * 2, 8, 6); } }
-    /* surveillance drones */
-    for (let i = 0; i < S.pol.watch * 3; i++) { const d = drones[i % 6]; d.x += d.d * 30 * dt; if (d.x > W || d.x < 0) d.d *= -1; cx.fillStyle = '#FFE600'; cx.fillRect(d.x - 2, d.y, 4, 2); cx.fillStyle = 'rgba(255,230,0,.08)'; cx.beginPath(); cx.moveTo(d.x, d.y + 2); cx.lineTo(d.x - 14, 130); cx.lineTo(d.x + 14, 130); cx.fill(); }
-    /* the core's light under the street */
-    const cg = cx.createRadialGradient(780, 172, 2, 780, 172, 90); cg.addColorStop(0, `rgba(255,230,0,${.35 + .1 * Math.sin(T * 2)})`); cg.addColorStop(1, 'rgba(255,230,0,0)'); cx.fillStyle = cg; cx.fillRect(690, 130, 180, 40);
-    /* haze */
-    if (poll > .05) { cx.fillStyle = `rgba(110,92,60,${poll * .45})`; cx.fillRect(0, 0, W, 130); }
-    if (brown && Math.sin(T * 9) > .7) { cx.fillStyle = 'rgba(0,0,0,.35)'; cx.fillRect(0, 0, W, Hh); }
-    /* captions */
-    const tags = [strike && 'ストライキ中 · STRIKE', S.fac.res < 35 && '抗議中 · PROTEST', brown && '停電 · BROWNOUT', S.poll > 60 && '公害警報 · SMOG', S.breach && S.breach.open && '侵入警報 · BREACH', S.pol.watch && '監視中 · SURVEILLANCE'].filter(Boolean);
-    cx.font = '700 9px "M PLUS 1 Code"'; cx.fillStyle = '#000'; cx.fillRect(8, 8, 330, 16); cx.fillStyle = '#FFE600'; cx.fillText(`LIVE · 社宅街 COMPANY TOWN · ${String(hr).padStart(2, '0')}:00 · POP ${Math.round(pop)} · ROBOTS ${C.robots}`, 14, 19);
-    tags.forEach((t, i) => { const w = cx.measureText(t).width + 12; cx.fillStyle = /STRIKE|PROTEST|BROWNOUT|SMOG|BREACH/.test(t) ? '#FF3B30' : '#FFE600'; cx.fillRect(8 + i * 0, 28 + i * 18, w, 15); cx.fillStyle = '#000'; cx.fillText(t, 14, 39 + i * 18); });
-    if (!tags.length) { cx.fillStyle = '#5CFFA0'; cx.fillRect(8, 28, 140, 15); cx.fillStyle = '#000'; cx.fillText('平常運転 · NORMAL', 14, 39); }
-  };
-  DIO.raf = requestAnimationFrame(frame);
+  DIO = createDiorama(cv, () => { if (!M) return null; const S = M.c.save.sim, X = M.c.ctx(); return { S, corp: M.c.save.corp, X, C: capacity(S, X) }; }, view);
 }

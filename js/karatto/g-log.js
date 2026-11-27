@@ -36,10 +36,16 @@ function newOrder(api) {
 function slips(api) {
   const P = $('#p-ord'); sel = clamp(sel, 0, Math.max(0, ORD.length - 1));
   P.innerHTML = ORD.map((o, i) => { const left = Math.max(0, o.T - (api.t - o.born));
-    return `<div class="slip${i === sel ? ' on' : ''}" data-i="${i}"><div class="sh"><span>伝票 #${String(Math.floor(o.id * 9000 + 1000))}</span><span>${o.skill === 'reading' ? '読み READING' : '意味 MEANING'}</span></div>
+    return `<div class="slip${i === sel ? ' on' : ''}${o.seen ? '' : ' new'}" data-i="${i}"><div class="sh"><span>伝票 #${String(Math.floor(o.id * 9000 + 1000))}</span><span>${o.skill === 'reading' ? '読み READING' : '意味 MEANING'}</span></div>
       <div class="dest ${o.skill === 'reading' ? 'kj' : 'en'}">${esc(o.skill === 'reading' ? o.w.r : o.w.s)}</div>
-      <div class="sf"><span>¥${o.fee}</span><span class="tm"><s style="width:${left / o.T * 100}%"></s></span><span>${Math.ceil(left)}s</span></div></div>`; }).join('') || '<div class="m" style="padding:10px 4px">待機中 · waiting for orders</div>';
+      <div class="sf"><span>¥${o.fee}</span><span class="tm"><s style="width:${left / o.T * 100}%"></s></span><span class="sec">${Math.ceil(left)}s</span></div></div>`; }).join('') || '<div class="m" style="padding:10px 4px">待機中 · waiting for orders</div>';
+  ORD.forEach(o => o.seen = true);
   P.querySelectorAll('.slip').forEach(d => d.onclick = () => { sel = +d.dataset.i; slips(api); });
+}
+/* only the bars and the seconds move between changes: no rebuild, no replayed animation */
+function timers(api) {
+  const els = document.querySelectorAll('#p-ord .slip');
+  ORD.forEach((o, i) => { const el = els[i]; if (!el) return; const left = Math.max(0, o.T - (api.t - o.born)); el.querySelector('.tm s').style.width = (left / o.T * 100) + '%'; const sc = el.querySelector('.sec'), t = Math.ceil(left) + 's'; if (sc.textContent !== t) sc.textContent = t; el.classList.toggle('late', left < 8); });
 }
 function fleet(api) {
   $('#p-fleet').innerHTML = TR.map((t, i) => `<div class="tr"><b>${i + 1}</b><span>${t.st === 'idle' ? '<span class="m">待機 idle</span>' : t.st === 'out' ? `<span class="y">配送中 → ${esc(SH[t.o.n].w.w)}</span>` : t.st === 'back' ? '帰庫 returning' : '<span class="y">荷下ろし unloading</span>'}</span></div>`).join('');
@@ -65,11 +71,11 @@ game({
   shop: [{ id: 'truck4', name: '四台目', en: 'A fourth truck', cost: 700, d: 'One more truck in the fleet.' }, { id: 'fast', name: '高速トラック', en: 'Faster trucks', cost: 600, d: 'Trucks drive a third faster.' }, { id: 'longer', name: 'シフト延長', en: 'Longer shift', cost: 500, d: 'Shifts run 4 minutes.' }],
   init(api) {
     const css = document.createElement('style'); css.textContent = `
-      .slip { border:1px solid var(--line2); background:#0A0B0D; margin-bottom:8px; padding:7px 9px; cursor:pointer; animation:drop .35s both; }
+      .slip { border:1px solid var(--line2); background:#0A0B0D; margin-bottom:8px; padding:7px 9px; cursor:pointer; } .slip.new { animation:drop .35s both; } .slip.late .tm s { background:var(--red); } .slip.late .sec { color:var(--red); }
       .slip.on { border-color:var(--y); box-shadow:inset 3px 0 0 var(--y); }
       .slip .sh { display:flex; justify-content:space-between; font:700 9px var(--mono); letter-spacing:.12em; color:var(--mute); }
       .slip .dest { margin:6px 0 4px; text-align:center; } .slip .dest.kj { font-size:27px; } .slip .dest.en { font:700 15px/1.3 var(--mono); }
-      .slip .sf { display:flex; gap:8px; align-items:center; font:700 11px var(--num); } .slip .tm { flex:1; height:4px; background:#1A1C21; position:relative; } .slip .tm s { position:absolute; left:0; top:0; bottom:0; background:var(--y); }
+      .slip .sf { display:flex; gap:8px; align-items:center; font:700 11px var(--num); } .slip .tm { flex:1; height:4px; background:#1A1C21; position:relative; } .slip .tm s { position:absolute; left:0; top:0; bottom:0; background:var(--y); transition:width .25s linear; }
       .tr { display:flex; gap:10px; padding:4px 0; border-bottom:1px solid #15171B; font-size:11.5px; } .tr b { font:700 13px var(--num); width:16px; } .tr .kj { font-size:13px; }`;
     document.head.appendChild(css);
     panel('pl', { x: 12, y: 62, w: 236, h: 520 }, '伝票 · ORDERS', 'ORD').id = 'p-ord';
@@ -89,7 +95,7 @@ game({
     if (!api.G.run) return;
     spawnT -= dt; if (spawnT <= 0 && ORD.length < 3) { newOrder(api); spawnT = 6; }
     for (const o of ORD.slice()) if (api.t - o.born > o.T) { ORD.splice(ORD.indexOf(o), 1); st.late++; api.log(o.w.w, '期限切れ', 'expired', 'm'); slips(api); }
-    if (Math.floor(api.t * 4) !== Math.floor((api.t - dt) * 4)) slips(api);
+    timers(api);
     const sp = api.U.fast ? 400 : 300;
     for (const t of TR) {
       if (t.st === 'out') { t.d += sp * dt; if (t.d >= t.L) { t.d = t.L; t.st = 'drop'; t.wait = .6; arrive(api, t); } }
