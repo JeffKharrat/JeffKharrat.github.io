@@ -1,7 +1,7 @@
 /* カラット: 取引所, the exchange. News flashes come off the wire: your deck's example sentences with the card's word
    blanked. Fill the blank (1–4) before the rival AI trades on the same news: first takes the whole move, second only
    half; a wrong fill is a bad trade. H shows the English, at half the move. Skill: context. */
-import { game, panel, keycaps, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=9';
+import { game, panel, keycaps, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=10';
 
 const RIV = [{ n: '黒鉄重工', en: 'Kurogane Heavy', c: '#8A909C', p: 960 }, { n: '白鷺HD', en: 'Shirasagi', c: '#5CFFA0', p: 1200 }];
 let cur = null, phase = 'idle', K, gap = 0, hint = false, me = 1000, P0 = 1000, HIST = [], won = 0, lost = 0, late = 0, wire = [], tick0 = 0;
@@ -30,9 +30,9 @@ function answer(api, i) {
 game({
   id: 'exchange', site: 'exchange', tier: 3, code: 'EXC-07', jp: '取引所', en: 'Exchange', sub: 'THE TRADING FLOOR · NEWS AGAINST THE RIVALS', title: '立会場', dur: 180,
   skills: ['context'],
-  lead: 'News flashes come off the wire: your deck\'s example sentences, the card\'s word blanked. Fill the blank (<span class="key">1</span>–<span class="key">4</span>). Right: the trade goes through and カラット\'s share moves. The rival AIs trade on the same news on their own clock: answer before them for the whole move, after them for half. Wrong: a bad trade. <span class="key">H</span> shows the English, at half the move.',
+  lead: 'News flashes come off the wire: your deck\'s example sentences, the card\'s word blanked. Fill the blank (<span class="key">1</span>–<span class="key">4</span>). Right: the trade goes through and 紅葉重工\'s share moves. The rival AIs trade on the same news on their own clock: answer before them for the whole move, after them for half. Wrong: a bad trade. <span class="key">H</span> shows the English, at half the move.',
   how: [['CONTEXT · 文脈', '文が決める', 'The four choices share a kanji or a field: only the sentence decides.'], ['RIVALS · 競合', '黒鉄重工 · 白鷺HD', 'The rival AIs trade on the news too. Beat their clock.'], ['SHARE · 株価', 'カラット', 'The session\'s move feeds the corporation\'s fame.']],
-  stats: [['カラット', 'SHARE', () => `${me.toFixed(0)} ${me >= P0 ? '▲' : '▼'}${Math.abs((me / P0 - 1) * 100).toFixed(1)}%`], ['先行', 'FIRST', () => won], ['¥', '', a => a.G.yen.toLocaleString()]],
+  stats: [['紅葉重工', 'SHARE', () => `${me.toFixed(0)} ${me >= P0 ? '▲' : '▼'}${Math.abs((me / P0 - 1) * 100).toFixed(1)}%`], ['先行', 'FIRST', () => won], ['¥', '', a => a.G.yen.toLocaleString()]],
   init(api) {
     const css = document.createElement('style'); css.textContent = `
       #p-news { padding:14px 18px; } #p-news .nh { display:flex; justify-content:space-between; font:700 10px var(--mono); letter-spacing:.16em; color:var(--y); margin-bottom:12px; }
@@ -64,12 +64,12 @@ game({
     if ((e.key === 'h' || e.key === 'H') && cur && phase === 'answer' && !hint) { hint = true; $('#n-en').innerHTML = esc(cur.s.en || cur.w.s) || '<span class="m">(no translation in the deck)</span>'; return true; }
   },
   end(api) { phase = 'idle'; K.off(); const move = (me / P0 - 1) * 100;
-    return { title: move >= 0 ? '大引け · 上昇' : '大引け · 下落', rows: [['カラット', (move >= 0 ? '+' : '') + move.toFixed(1) + '%', move >= 0 ? 'y' : 'r'], ['first to trade', won, 'y'], ['bad trades', lost, lost ? 'r' : '']], effect: { move } }; },
+    return { title: move >= 0 ? '大引け · 上昇' : '大引け · 下落', rows: [['紅葉重工', (move >= 0 ? '+' : '') + move.toFixed(1) + '%', move >= 0 ? 'y' : 'r'], ['first to trade', won, 'y'], ['bad trades', lost, lost ? 'r' : '']], effect: { move } }; },
   draw(cx, t, dt, api) {
     cx.fillStyle = '#050607'; cx.fillRect(0, 0, 1280, 720);
     /* the ticker band */
     cx.fillStyle = '#0B0C0E'; cx.fillRect(0, 50, 1280, 26); cx.font = '700 12px "M PLUS 1 Code"';
-    const items = [`カラット ${me.toFixed(0)} ${me >= P0 ? '▲' : '▼'}${Math.abs((me / P0 - 1) * 100).toFixed(1)}%`, ...RIV.map(r => `${r.n} ${r.p.toFixed(0)} ${r.p >= r.p0 ? '▲' : '▼'}${Math.abs((r.p / r.p0 - 1) * 100).toFixed(1)}%`), '為替 151.2', '原油 ▲', '半導体 ▲', '物流指数 ▼', '日経 ▲0.4%'];
+    const items = [`紅葉重工 ${me.toFixed(0)} ${me >= P0 ? '▲' : '▼'}${Math.abs((me / P0 - 1) * 100).toFixed(1)}%`, ...RIV.map(r => `${r.n} ${r.p.toFixed(0)} ${r.p >= r.p0 ? '▲' : '▼'}${Math.abs((r.p / r.p0 - 1) * 100).toFixed(1)}%`), '為替 151.2', '原油 ▲', '半導体 ▲', '物流指数 ▼', '日経 ▲0.4%'];
     const str = items.join('   ·   ') + '   ·   ', w = cx.measureText(str).width, off = (t * 60) % w;
     for (let x = -off; x < 1280; x += w) { let xx = x; items.forEach((s, i) => { cx.fillStyle = i === 0 ? Y : '#C9CDD6'; cx.fillText(s, xx, 68); xx += cx.measureText(s + '   ·   ').width; }); }
     /* the wall chart */
@@ -81,7 +81,7 @@ game({
       RIV.forEach((r, k) => { cx.strokeStyle = r.c; cx.globalAlpha = .7; cx.lineWidth = 1.5; cx.beginPath(); HIST.forEach((h, i) => cx.lineTo(xu(i), yv(norm(h.r[k], r.p0)))); cx.stroke(); cx.globalAlpha = 1; });
       cx.strokeStyle = Y; cx.lineWidth = 2.5; cx.shadowColor = Y; cx.shadowBlur = 8; cx.beginPath(); HIST.forEach((h, i) => cx.lineTo(xu(i), yv(norm(h.me, P0)))); cx.stroke(); cx.shadowBlur = 0; cx.lineWidth = 1;
     }
-    cx.font = '700 10px "M PLUS 1 Code"'; cx.fillStyle = Y; cx.fillText('■ カラット', X0, Y0 + 8); RIV.forEach((r, k) => { cx.fillStyle = r.c; cx.fillText(`■ ${r.n} (rival AI)`, X0 + 100 + k * 190, Y0 + 8); });
+    cx.font = '700 10px "M PLUS 1 Code"'; cx.fillStyle = Y; cx.fillText('■ 紅葉重工', X0, Y0 + 8); RIV.forEach((r, k) => { cx.fillStyle = r.c; cx.fillText(`■ ${r.n} (rival AI)`, X0 + 100 + k * 190, Y0 + 8); });
     cx.fillStyle = '#8A909C'; cx.fillText('株価 · SHARE PRICE · THIS SESSION', X1 - 230, Y0 + 8);
   }
 });

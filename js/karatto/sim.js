@@ -88,14 +88,14 @@ function tick(S, corp, ctx, live) {
   if (P.train && idle > 1 && pop.c < C.jobsC) { retrained = Math.min(idle * .01, C.jobsC - pop.c); pop.w -= retrained; pop.c += retrained; S.retr += retrained; }
   /* power, production, goods */
   const boost = S.boost && S.boost.until > S.t ? S.boost.mw : 0, pmw = (S.proj || []).reduce((n, p) => n + (p.mw || 0), 0);
-  const demand = work * .12 * hm + C.robots * .08 + total * .06 + pmw, supply = 90 + (ctx.tier >= 1 ? 60 : 0) + boost;
+  const demand = work * .12 * hm + C.robots * .08 + total * .06 + pmw, supply = Math.max(10, 90 + (ctx.tier >= 1 ? 60 : 0) + boost - (S.sab && S.sab.until > S.t ? S.sab.mw : 0));
   S.power = supply - demand; const brown = S.power < 0 ? clamp(supply / demand, .5, 1) : 1;
   const prod = (work * .1 * hm + C.robots * .12 * (C.strike ? .85 : 1)) * brown * (fu.conv ? 1.08 : 1);
   const need = total * .012, have = S.goods + prod, eat = Math.min(need, have), short = need > 0 ? 1 - eat / need : 0;
   S.goods = have - eat;                                                       // households first, before any reservation
   fillLots(S);
   /* the market: price no longer follows fame (the first balance pass); fame and contracts widen what it takes */
-  const fameL = Math.floor(Math.sqrt((ctx.fame || 0) / 50)) + 1, price = 6 * (fu.qc ? 1.05 : 1);
+  const fameL = Math.floor(Math.sqrt((ctx.fame || 0) / 50)) + 1, price = 6 * (fu.qc ? 1.05 : 1) * (S.pw && S.pw.until > S.t ? S.pw.k : 1);
   const hold = (S.hold && S.hold.until > S.t ? S.hold.pct : 0), out = C.strike ? .3 : 1 - hold;
   const sold = Math.min((40 + fameL * 5) * out, available(S)); S.goods -= sold;
   /* money */
@@ -287,7 +287,7 @@ export function addGame(save, id, e) {
     power: () => { S.boost = { until: S.t + 24 * H, mw: Math.round((e.grid || 0) * .8) }; return `発電所 grid ${e.grid || 0}% → +${S.boost.mw} MW for 24 h`; },
     lab: () => { corp.research = (corp.research || 0) + (e.research || 0); return `研究所 +${e.research || 0} research`; },
     broadcast: () => { S.aired += e.aired || 0; S.fac.res = clamp(S.fac.res + (e.aired || 0) * .8, 0, 100); S.fameB += (e.aired || 0) * 2; S.stab = clamp(S.stab + (e.aired || 0) * .2, 5, 100); return `放送局 ${e.aired || 0} clips aired`; },
-    exchange: () => `取引所 session move カラット ${e.move >= 0 ? '+' : ''}${(e.move || 0).toFixed(1)}% (shown apart from the share price)`,
+    exchange: () => `取引所 session move 紅葉重工 ${e.move >= 0 ? '+' : ''}${(e.move || 0).toFixed(1)}% (shown apart from the share price)`,
     security: () => { if (e.real) { S.breach.open = null; S.stab = clamp(S.stab + (e.lost ? -e.lost * 2 : 4), 5, 100); } return e.real ? `保安部 breach repelled: ${e.held} held, ${e.lost} lost` : `保安部 drill: ${e.held} held`; },
     hq: () => `本社 board meeting: ${e.items || 0} items` }[id];
   if (txt) log(S, id, txt() + `, +${e.right || 0} data${e.yen ? `, ¥${e.yen.toLocaleString()} in fees` : ''}.`);

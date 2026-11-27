@@ -1,12 +1,13 @@
 /* カラット: 経営, the management console in the core. Overview (the planet's numbers and their last three days),
    policies, factions, quarterly reports, the log. Also the briefing after time away, and the decisions (決裁).
    Marathon-style: black, hairlines, micro labels, the AI's yellow. */
-import { POL, FAC, GROUPS, EVENTS, LEDGER, resolve, setPolicy, dirProgress, capacity, forecast } from './sim.js?v=9';
-import { bureau, bureauKey, bureauClose } from './bureau.js?v=9';
-import { inbox, contracted, spendable, reserve, govOf } from './gov.js?v=9';
-import { ICON } from './icons.js?v=9';
-import { createDiorama } from './diorama.js?v=9';
-import { leafSVG } from './leaf.js?v=9';
+import { POL, FAC, GROUPS, EVENTS, LEDGER, resolve, setPolicy, dirProgress, capacity, forecast } from './sim.js?v=10';
+import { bureau, bureauKey, bureauClose } from './bureau.js?v=10';
+import { inbox, contracted, spendable, reserve, govOf } from './gov.js?v=10';
+import { RIVALS, IDS, rivOf, defOf, costs, fwCost, buyFirewall, ACTS } from './rivals.js?v=10';
+import { ICON } from './icons.js?v=10';
+import { createDiorama } from './diorama.js?v=10';
+import { leafSVG } from './leaf.js?v=10';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const yen = v => (v < 0 ? '−¥' : '¥') + Math.abs(Math.round(v)).toLocaleString();
@@ -28,7 +29,7 @@ const CSS = `
 #mg .tag { background:var(--y); color:#000; font:700 10px var(--mono); letter-spacing:.12em; padding:3px 6px; }
 #mg .ttl { font:600 19px var(--kj); }
 #mg .tabs { display:flex; margin-left:10px; border:1px solid var(--line2); }
-#mg .tab { background:transparent; border:0; border-right:1px solid var(--line2); color:var(--mute); padding:7px 13px; font:700 10px var(--mono); letter-spacing:.12em; cursor:pointer; }
+#mg .tab { background:transparent; border:0; border-right:1px solid var(--line2); color:var(--mute); padding:7px 9px; font:700 10px var(--mono); letter-spacing:.12em; cursor:pointer; }
 #mg .tab:last-child { border-right:0; } #mg .tab b { font:600 14px var(--kj); color:var(--ink); margin-right:7px; letter-spacing:0; }
 #mg .tab.on { background:var(--y); color:#000; } #mg .tab.on b { color:#000; }
 #mg .tab i { font-style:normal; margin-left:7px; background:var(--red); color:#fff; padding:0 5px; }
@@ -119,7 +120,7 @@ let M = null;
 export function openMgmt(c) {
   /* c: { save, ctx(), persist(), onClose(), tab } */
   css(); const root = el('mg'); M = { c, root, tab: c.tab || 'over', base: () => base(), refresh: () => M && render() };
-  root.innerHTML = `<div class="stg"><div class="top">${leafSVG(30)}<span class="tag">MGT-01</span><span class="ttl">経営</span><span class="lb">Management · カラット</span><div class="tabs"></div><span class="clock" id="mg-ck"></span><button class="x" type="button" id="mg-x">閉じる · CLOSE <span class="key">Esc</span></button></div><div class="body"></div></div>`;
+  root.innerHTML = `<div class="stg"><div class="top">${leafSVG(30)}<span class="tag">MGT-01</span><span class="ttl">経営</span><span class="lb">紅葉重工</span><div class="tabs"></div><span class="clock" id="mg-ck"></span><button class="x" type="button" id="mg-x">閉じる · CLOSE <span class="key">Esc</span></button></div><div class="body"></div></div>`;
   root.querySelector('#mg-x').onclick = closeMgmt; root.classList.add('on'); fit(root);
   addEventListener('keydown', mkeys, true); addEventListener('resize', mfit);
   render();
@@ -130,8 +131,8 @@ export const mgmtOpen = () => !!M;
 export function refreshMgmt() { if (M) render(); }
 function mkeys(e) { const mm = document.getElementById('mgm'); if (!M || (mm && mm.classList.contains('on'))) return; e.stopImmediatePropagation();
   if (M.tab === 'fac' && !(e.target && e.target.tagName === 'INPUT') && bureauKey(e)) { e.preventDefault(); return; }
-  if (e.key === 'Escape') { e.preventDefault(); closeMgmt(); } const n = ['1', '2', '3', '4', '5', '6'].indexOf(e.key); if (n >= 0) { M.tab = TABS[n][0]; render(); } }
-const TABS = [['over', '概要', 'Overview'], ['live', '現場', 'Live'], ['pol', '社則', 'Policies'], ['fac', '派閥', 'Factions'], ['rep', '決算', 'Reports'], ['log', '記録', 'Log']];
+  if (e.key === 'Escape') { e.preventDefault(); closeMgmt(); } const n = ['1', '2', '3', '4', '5', '6', '7'].indexOf(e.key); if (n >= 0) { M.tab = TABS[n][0]; render(); } }
+const TABS = [['over', '概要', 'Overview'], ['live', '現場', 'Live'], ['pol', '社則', 'Policies'], ['fac', '派閥', 'Factions'], ['rep', '決算', 'Reports'], ['riv', '敵対', 'Rivals'], ['log', '記録', 'Log']];
 function render() {
   const { save } = M.c, S = save.sim;
   const I = inbox(save, M.c.ctx()), nI = (I.major ? 1 : 0) + I.routine.length;
@@ -140,7 +141,8 @@ function render() {
   M.root.querySelector('#mg-ck').textContent = `Q${S.q.n} · ${new Date(S.t).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
   const B = M.root.querySelector('.body');
   if (M.tab === 'fac') { dioStop(); B.innerHTML = '<div class="bur-host" style="position:absolute;inset:0"></div>'; bureau(B.querySelector('.bur-host'), M); return; }
-  B.innerHTML = { over, live, pol, rep, log }[M.tab]();
+  B.innerHTML = { over, live, pol, rep, riv, log }[M.tab]();
+  if (M.tab === 'riv') wireRiv(B);
   if (M.tab === 'over') { const c = B.querySelector('canvas.dio'); dioStart(c, { x: 0, y: 236, w: 1240, h: 170 }); c.onclick = () => { M.tab = 'live'; render(); }; }
   else if (M.tab === 'live') dioStart(B.querySelector('canvas.live'), { x: 0, y: 0, w: 1240, h: 634 }); else dioStop();
   if (M.tab === 'pol') B.querySelectorAll('[data-p]').forEach(b => {
@@ -194,6 +196,8 @@ function over() {
     S.shackle ? `<div class="st"><i class="r"></i><span>The board locked ${POL[S.shackle.k].j} for ${Math.ceil((S.shackle.until - S.t) / 3600e3)} h</span></div>` : '',
     S.debt > 0 ? `<div class="st"><i class="r"></i><span>融資 Loan: ${yen(S.debt)} (repaid above ¥5,000)${S.fcl === S.q.n ? ' · facility used this quarter' : ''}</span></div>` : '',
     S.power < 0 ? '<div class="st"><i class="r"></i><span>停電 Brownouts: demand is over supply</span></div>' : '',
+    S.sab && S.sab.until > S.t ? `<div class="st"><i class="r"></i><span>送電妨害 ${esc(RIVALS[S.sab.by].corp)} sabotage: −${S.sab.mw} MW for ${Math.ceil((S.sab.until - S.t) / 3600e3)} h</span></div>` : '',
+    S.pw && S.pw.until > S.t ? `<div class="st"><i class="r"></i><span>価格戦争 ${esc(RIVALS[S.pw.by].corp)} price war: −15% for ${Math.ceil((S.pw.until - S.t) / 3600e3)} h</span></div>` : '',
     ...(() => { const I = inbox(save, X); return [I.major ? `<div class="st"><i class="y"></i><span>派閥 ${esc(I.major.m.title[0])} · ${esc(I.major.m.title[1])} (the counter)</span></div>` : '', S.ev.length ? `<div class="st"><i class="y"></i><span>${S.ev.length} decision${S.ev.length > 1 ? 's' : ''} waiting at the counter (派閥) or 本社</span></div>` : '', ...I.status.slice(0, 2).map(t => `<div class="st"><i></i><span>${esc(t)}</span></div>`)]; })(),
     S.hold && S.hold.until > S.t ? `<div class="st"><i class="r"></i><span>出荷停止 Dispatch hold: ${Math.round(S.hold.pct * 100)}% of outbound held for ${Math.ceil((S.hold.until - S.t) / 3600e3)} h</span></div>` : '',
     ...Object.entries(S.fac).filter(([k, v]) => v < 30 && (k !== 'eng' || X.tier >= 2)).map(([k, v]) => `<div class="st"><span class="fico" style="color:var(--red)">${ICON[k](16)}</span><span>${FAC[k][0]} ${FAC[k][1]} unhappy (${v.toFixed(0)})</span></div>`)].join('') || '<div class="st"><i class="g"></i><span>平常運転 Normal operation.</span></div>';
@@ -229,6 +233,36 @@ function rep() {
     ${[{ n: S.q.n, cur: true, led: S.q.led || {}, ship: S.q.ship, stab: Math.round(S.stab), hrs: S.q.hrs }, ...R].map(r => { const L = r.led || { op: r.profit }; const c = v => `<td style="color:${(v || 0) < 0 ? 'var(--red)' : (v || 0) > 0 ? 'var(--ok)' : 'inherit'}">${v ? yen(v) : '—'}</td>`;
       return `<tr><td>Q${r.n} · ${r.cur ? 'in progress' : new Date(r.from).toLocaleDateString('ja-JP')}${r.susp ? ' · <span style="color:var(--mute)">suspended (away)</span>' : ''}</td>${c(L.op)}${c(L.shift)}${c(L.orders)}${c(L.ev)}${c(L.fin)}${c(L.cap)}<td>${r.cur ? '—' : yen(r.dividend || 0)}</td><td>${r.ship}</td><td>${r.stab}</td><td style="color:${r.dir ? (r.dir.neutral ? 'var(--mute)' : r.dir.ok ? 'var(--ok)' : 'var(--red)') : 'inherit'}">${r.cur ? '—' : r.dir ? (r.dir.neutral ? 'NOT JUDGED' : r.dir.ok ? 'MET' : 'MISSED') : '—'}</td></tr>`; }).join('')}
     </table><p class="lb" style="margin-top:14px">DIVIDENDS COME FROM THE OPERATING RESULT ONLY. A WEEK WITH FEWER THAN 120 SIMULATED HOURS IS BOOKED WITHOUT JUDGING THE DIRECTIVE.${R.length ? '' : ' THE FIRST QUARTER CLOSES NEXT MONDAY AT 4:00.'}</p></div></div>`;
+}
+/* 敵対 · the rival megacorporations: what you know of them, what they hold against you, and the way in (侵入) */
+const EMB = { kurogane: c => `<svg viewBox="0 0 40 40" width="54" height="54"><polygon points="20,2 36,11 36,29 20,38 4,29 4,11" fill="none" stroke="${c}" stroke-width="2.5"/><circle cx="20" cy="20" r="7" fill="none" stroke="${c}" stroke-width="2.5"/></svg>`,
+  shirasagi: c => `<svg viewBox="0 0 40 40" width="54" height="54"><polygon points="20,2 36,11 36,29 20,38 4,29 4,11" fill="none" stroke="${c}" stroke-width="2.5"/><path d="M8 24 L20 12 L32 24 M13 29 L20 22 L27 29" fill="none" stroke="${c}" stroke-width="2.5"/></svg>` };
+function riv() {
+  const { save, ctx } = M.c, S = save.sim, X = ctx(), R = rivOf(save), sp = spendable(save);
+  const bar = (v, red) => `<div class="bar"><s class="${red ? 'r' : ''}" style="width:${Math.round(v)}%"></s></div>`;
+  const cards = IDS.map((k, i) => { const P = RIVALS[k], r = R.r[k], d = defOf(save, k, X), c = costs(save, k, X), L = r.last;
+    return `<div class="mgp" style="left:${i * 416}px;top:0;width:404px;height:440px"><div class="ph"><span><b>${k === 'kurogane' ? 'KGN' : 'SRG'}</b> ${P.en}</span><span>RIVAL ${i + 1}</span></div><div class="in">
+      <div style="display:flex;gap:14px;align-items:center">${EMB[k](P.col)}<div><div class="kj" style="font-size:26px;color:${P.col}">${P.corp}</div><div class="lb">AI · <span class="kj" style="font-size:14px;color:var(--ink)"><ruby>${P.ai}<rt>${P.air}</rt></ruby></span> ${P.aien}</div></div></div>
+      <p style="color:#B8BCC6;margin:10px 0">${esc(P.style)}</p>
+      <div class="pl"><span>防御 Defense</span><b>${'■'.repeat(d)}${'□'.repeat(9 - d)} ${d}/9</b></div>
+      <div class="pl"><span>資金 Treasury</span><b>${r.intel >= 30 ? yen(r.cash || 0) : '??? · intel 30+'}</b></div>
+      <div class="pl"><span>侵入 Raids · core breaches</span><b>${r.raids} · ${r.cores}</b></div>
+      <div class="lb" style="margin-top:8px">恨み GRUDGE ${Math.round(r.grudge)} · THEIR CHANCE TO ANSWER ON A VISIT ≈ ${Math.round(r.grudge * (1 - R.fw * .15))}%</div>${bar(r.grudge, true)}
+      <div class="lb" style="margin-top:8px">情報 INTEL ${Math.round(r.intel)} · EVERY 34 LOWERS THEIR DEFENSE</div>${bar(r.intel)}
+      <div class="lb" style="margin-top:8px">LAST RUN</div><div style="min-height:34px">${L ? `${L.core ? '<b style="color:var(--y)">中枢侵害 core breached</b>' : L.traced ? '<b style="color:var(--red)">逆探知 traced</b>' : '離脱 jacked out'} · ${L.nodes} nodes · ${yen(L.yen)} · ${L.data} data` : '<span class="lb">NEVER ATTACKED</span>'}</div>
+      <button type="button" class="seg" data-hack="${k}" style="margin-top:10px;width:100%;background:var(--y);color:#000;border:0;padding:12px;font:700 12px var(--mono);letter-spacing:.1em;cursor:pointer">侵入 · LAUNCH AN INTRUSION · ENTRY ${yen(c.entry)}</button></div></div>`; }).join('');
+  const fc = fwCost(save, X), act = [S.breach && S.breach.open ? `侵入警報 ${S.breach.open.rival} is in your memory: 保安部 Security` : '', S.sab && S.sab.until > S.t ? `送電妨害 −${S.sab.mw} MW, ${Math.ceil((S.sab.until - S.t) / 3600e3)} h left` : '', S.pw && S.pw.until > S.t ? `価格戦争 −15% price, ${Math.ceil((S.pw.until - S.t) / 3600e3)} h left` : ''].filter(Boolean);
+  return cards + `<div class="mgp" style="left:832px;top:0;width:408px;height:440px"><div class="ph"><span><b>DEF</b> 防壁 · YOUR FIREWALL</span><span>LEVEL ${R.fw}/5</span></div><div class="in">
+      <div class="big" style="font:700 40px var(--num)">${'■'.repeat(R.fw)}${'□'.repeat(5 - R.fw)}</div>
+      <p style="color:#B8BCC6">Each level cuts the rivals' chance to answer by 15%. They act only on your attended visits: at most one act a visit and two a week. A breach never deletes a word; it marks words compromised until you reverify them.</p>
+      <button type="button" data-fw="1" ${R.fw >= 5 || sp < fc ? 'disabled' : ''} style="width:100%;background:transparent;color:var(--ink);border:1px solid var(--y);padding:10px;font:700 11px var(--mono);letter-spacing:.08em;cursor:pointer;${R.fw >= 5 || sp < fc ? 'opacity:.35;cursor:not-allowed' : ''}">${R.fw >= 5 ? 'FIREWALL AT MAXIMUM' : `防壁強化 · UPGRADE · ${yen(fc)}${sp < fc ? ' · ABOVE THE RESERVE: ' + yen(sp) : ''}`}</button>
+      <div class="lb" style="margin-top:14px">IN EFFECT</div>${act.map(t => `<div class="st"><i class="r"></i><span>${esc(t)}</span></div>`).join('') || '<div class="st"><i class="g"></i><span>Nothing from the rivals right now.</span></div>'}
+      <div class="lb" style="margin-top:10px">WHAT THEY CAN DO</div>${Object.values(ACTS).map(a => `<div class="pl"><span class="kj" style="white-space:nowrap;margin-right:10px">${a[0]}</span><span style="color:#B8BCC6;font-size:11px">${esc(a[2])}</span></div>`).join('')}</div></div>
+    <div class="mgp" style="left:0;top:452px;width:1240px;height:182px;overflow:auto"><div class="ph"><span><b>LOG</b> 敵対記録 · RAIDS AND ANSWERS</span></div><div class="in">${R.log.slice().reverse().map(l => `<div class="lg"><span>${new Date(l.t).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span><span>${esc(l.txt)}</span></div>`).join('') || '<p class="lb">NO CONTACT YET. THE FIRST MOVE IS YOURS.</p>'}</div></div>`;
+}
+function wireRiv(B) {
+  B.querySelectorAll('[data-hack]').forEach(b => b.onclick = () => { const q = new URLSearchParams(location.search); M.c.persist(); location.href = `hack/?target=${b.dataset.hack}${q.has('embed') ? '&embed=1' : ''}${q.has('demo') ? '&demo' : ''}&v=10`; });
+  const f = B.querySelector('[data-fw]'); if (f) f.onclick = () => { if (buyFirewall(M.c.save, M.c.ctx(), spendable(M.c.save))) { M.c.persist(); render(); } };
 }
 function log() {
   const S = M.c.save.sim;

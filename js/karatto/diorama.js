@@ -6,7 +6,7 @@
    quarter's close, night, weather, the season).
    createDiorama(canvas, get, view): get() → { S, corp, X (ctx), C (capacity) }; view = { x, y, w, h } in world px. */
 
-import { drawLeaf } from './leaf.js?v=9';
+import { drawLeaf } from './leaf.js?v=10';
 const W = 1240, H = 634, GY = 372, CELL = 16, GC0 = 96, GC1 = 1224, ROWS = 14;
 const Y = '#FFE600', RED = '#FF3B30', L1 = '#A3ABBA', L2 = '#7C8492', D1 = '#2A2E36', D2 = '#1D2026', D3 = '#14161A', INK = '#ECEEF2', MUTE = '#6E7582', BG = '#050608';
 const GREY = ['#1A1D23', '#20232A', '#262A32', '#15171C', '#2C3038', '#101216', '#30343D'];
@@ -149,7 +149,7 @@ function draw(cx, g, st, dt) {
   cx.fillStyle = L1; cx.fillRect(qx, qy + 30, 74, qh - 30); cx.fillRect(qx + 12, qy, 50, 30); cx.fillStyle = L2; cx.fillRect(qx + 66, qy + 30, 8, qh - 30);
   windows(cx, qx + 4, qy + 40, 58, qh - 60, 4, night ? .35 + happy * .5 : .12, brown, T, 777);
   checker(cx, qx, qy + 30, 74, 8, 8, '#0B0C0F', '#E8ECF2');
-  cx.fillStyle = '#0B0C0F'; cx.fillRect(qx + 12, qy + 2, 50, 26); drawLeaf(cx, qx + 14, qy + 3, 1.6, { N: 15, pulse: T * 3 }); cx.fillStyle = Y; cx.font = '700 9px "M PLUS 1", sans-serif'; cx.fillText('カラット', qx + 32, qy + 19);
+  cx.fillStyle = '#0B0C0F'; cx.fillRect(qx + 12, qy + 2, 50, 26); drawLeaf(cx, qx + 14, qy + 3, 1.6, { N: 15, pulse: T * 3 }); cx.fillStyle = Y; cx.font = '700 9px "M PLUS 1", sans-serif'; cx.fillText('紅葉重工', qx + 30, qy + 19);
   if (S.ev.length && Math.sin(T * 5) > -.3) { cx.fillStyle = INK; cx.fillRect(qx + 60, qy - 26, 1, 26); cx.fillStyle = Y; cx.fillRect(qx + 61, qy - 26, 14, 9); }
   if (qclose) { cx.fillStyle = Y; cx.fillRect(qx - 4, qy + 70, 82, 16); cx.fillStyle = '#000'; cx.font = '700 10px "M PLUS 1", sans-serif'; cx.fillText('四半期決算  Q' + S.reports[S.reports.length - 1].n, qx, qy + 82); }
   if (S.pol.watch >= 2 && night) { cx.fillStyle = 'rgba(255,230,0,.07)'; const a = Math.sin(T * .6) * .6; cx.beginPath(); cx.moveTo(qx + 37, qy); cx.lineTo(qx + 37 + Math.sin(a - .12) * 400, qy - Math.cos(a - .12) * 400); cx.lineTo(qx + 37 + Math.sin(a + .12) * 400, qy - Math.cos(a + .12) * 400); cx.fill(); }
@@ -249,7 +249,7 @@ function draw(cx, g, st, dt) {
   cx.fillText('M', 66, 34);
   const nm = '社宅街'; [...nm].forEach((ch, i) => { cx.fillStyle = INK; cx.fillRect(18, 44 + i * 30, 26, 28); cx.fillStyle = '#000'; cx.font = '800 18px "M PLUS 1", sans-serif'; cx.fillText(ch, 22, 65 + i * 30); });
   drawLeaf(cx, GC0 - 2, 14, 1.4, { N: 15, pulse: T * 2 }); cx.fillStyle = INK; cx.font = '800 20px Tektur, sans-serif'; cx.fillText('TAU JEFFY VI', GC0 + 26, 34); cx.font = F9; cx.fillStyle = INK; cx.fillText('ENV-LIVE', GC0 + 196, 34);
-  cx.fillStyle = MUTE; cx.textAlign = 'right'; cx.fillText(`カラット  ·  COMPANY TOWN  ·  LIVE  ·  Q${S.q.n}  ·  ${new Date(S.t).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}  ·  ${night ? 'NIGHT' : 'DAY'}${rainy ? (snowy ? '  ·  SNOW' : '  ·  RAIN') : ''}`, GC1, 34); cx.textAlign = 'left';
+  cx.fillStyle = MUTE; cx.textAlign = 'right'; cx.fillText(`紅葉重工  ·  MOMIJI CORP  ·  COMPANY TOWN  ·  LIVE  ·  Q${S.q.n}  ·  ${new Date(S.t).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}  ·  ${night ? 'NIGHT' : 'DAY'}${rainy ? (snowy ? '  ·  SNOW' : '  ·  RAIN') : ''}`, GC1, 34); cx.textAlign = 'left';
   const by = GY + ROWS * CELL + 10; for (let k = 0; k < 10; k++) { cx.fillStyle = k % 2 ? D1 : L1; cx.fillRect(GC0 + k * 32, by, 32, 4); } cx.fillStyle = MUTE; cx.font = F8; cx.fillText('0', GC0, by + 14); cx.fillText('50', GC0 + 150, by + 14); cx.fillText('100 M', GC0 + 300, by + 14); cx.fillText('1 CELL = 5 M', GC0 + 340, by + 7);
   cx.textAlign = 'right'; cx.fillText(`POP ${Math.round(pop)}  ·  ROBOTS ${C.robots}  ·  HAPPY ${S.happy.toFixed(0)}  ·  STAB ${S.stab.toFixed(0)}  ·  COORD 31°E / TAU VI`, GC1, by + 22); cx.textAlign = 'left';
   /* the ticker of what is happening */

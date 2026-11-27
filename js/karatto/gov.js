@@ -8,9 +8,9 @@
    - Clocks: governance deadlines count ATTENDED visits (one per Japan-time day, when Management opens or a shift ends).
      Absence never burns a deadline, never breaks a promise that needed the player.
    - Everything that changes money or state goes through once(): a stable id, applied at most once (reloads, retries). */
-import { migrate, book, log, available, reserved, FLOOR, capacity, forecast, essentials, newDir, projX, RUN } from './sim.js?v=9';
-import { day } from './evidence.js?v=9';
-import { ARCS, MOTIONS, CLAUSES } from './gov-arc.js?v=9';
+import { migrate, book, log, available, reserved, FLOOR, capacity, forecast, essentials, newDir, projX, RUN } from './sim.js?v=10';
+import { day } from './evidence.js?v=10';
+import { ARCS, MOTIONS, CLAUSES } from './gov-arc.js?v=10';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export { MOTIONS, CLAUSES, ARCS };
@@ -68,8 +68,10 @@ export function visit(save, ctx, now = Date.now()) {
     old.forEach(([, w]) => { w.comp = Date.now(); }); S.breach.open = null;
     log(S, 'breach', `侵入 The breach window closed undefended: ${b.rival} copied ${old.length} old keys. They stay certified, marked compromised until reverified.`); } }
   progress(save, ctx);
+  for (const f of visitHooks) f(save, ctx);
   return true;
 }
+export const visitHooks = [];
 
 /* ---------------- money: the reserve, what's spendable, escrow ---------------- */
 export function reserve(save) {

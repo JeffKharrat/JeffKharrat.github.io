@@ -7,13 +7,14 @@
    evidence for the word; a late one scraps it with no change to the evidence. Words already in memory are handled by
    the AI's own robots (blue, 自動). First attempt per word and skill in a shift only. At the end of the shift: the daily
    report, the yen, and the files the evidence now supports, sent to the audit in the core. */
-import { loadKanji } from './model.js?v=9';
-import * as store from './store.js?v=9';
-import { deckWord, buildPool, traps, shuffle } from './words.js?v=9';
-import { record, updateFlags, SKILL_J, day, payRate } from './evidence.js?v=9';
-import { addShift, book } from './sim.js?v=9';
-import { once, visit, progress } from './gov.js?v=9';
-import { leafSVG, leafFavicon } from './leaf.js?v=9';
+import { loadKanji } from './model.js?v=10';
+import * as store from './store.js?v=10';
+import { deckWord, buildPool, traps, shuffle } from './words.js?v=10';
+import { record, updateFlags, SKILL_J, day, payRate } from './evidence.js?v=10';
+import { addShift, book } from './sim.js?v=10';
+import './rivals.js?v=10';
+import { once, visit, progress } from './gov.js?v=10';
+import { leafSVG, leafFavicon } from './leaf.js?v=10';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;

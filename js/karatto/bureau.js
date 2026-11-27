@@ -3,11 +3,11 @@
    draft from desk to desk, ask the chair for a hearing. The room is a picture with three layers (wall, people, the
    counter in front of them) and a gentle pointer parallax; everything said is Japanese first, with furigana and the
    English underneath. The logic is gov.js; this file only draws it and sends the player's actions there. */
-import { EVENTS, resolve, POL, FAC, capacity, LEDGER } from './sim.js?v=9';
-import * as gov from './gov.js?v=9';
-import { AUTH, STANCE, REPLY, SAY, need, mood } from './gov-arc.js?v=9';
-import { ICON } from './icons.js?v=9';
-import { leafSVG } from './leaf.js?v=9';
+import { EVENTS, resolve, POL, FAC, capacity, LEDGER } from './sim.js?v=10';
+import * as gov from './gov.js?v=10';
+import { AUTH, STANCE, REPLY, SAY, need, mood } from './gov-arc.js?v=10';
+import { ICON } from './icons.js?v=10';
+import { leafSVG } from './leaf.js?v=10';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const yen = v => (v < 0 ? '−¥' : '¥') + Math.abs(Math.round(v)).toLocaleString();
@@ -151,7 +151,7 @@ function room() {
   const fr = S.hold && S.hold.until > S.t ? `<div class="fr" style="left:1128px;top:452px" title="freight queued by the hold">${'<s></s>'.repeat(5)}</div>` : '';
   return `<div class="lay far"><img alt="The negotiations bureau: a records wall, the counter, a glass meeting room" src="bureau/room.webp" draggable="false"></div>
     ${B.flash ? `<div class="flash${B.flash.r ? ' r' : ''}"><b>${esc(B.flash.j)}</b>${esc(B.flash.en)}</div>` : ''}<div class="cast">${reps}</div><div class="lay desk near"><img alt="" src="bureau/room.webp" draggable="false"></div>${plates}${stamp}${lamp}${fr}${inb}${ob}
-    <div class="hint">← → CHOOSE · ENTER TALK · H HEARING · 1–6 TABS</div>
+    <div class="hint">← → CHOOSE · ENTER TALK · H HEARING · 1–7 TABS</div>
     <div class="roster" role="list">${gov.ORDER.map((k, i) => `<button type="button" role="listitem" class="${B.sel === i ? 'sel' : ''}" data-r="${i}">${esc(gov.CAST[k].j)}<small>${esc(gov.roleOf(k, X.tier)[1].split(' ')[0])}</small></button>`).join('')}</div>`;
 }
 const fmtT = t => (t > 0 ? '+' : '') + Math.round(t || 0);
