@@ -4,10 +4,10 @@
    A wrong shop is a misdelivery: the truck goes there and back for nothing, and that skill's evidence is wiped.
    A rival AI works the same district from its own depot at the top of the map: if its truck reaches a shop first, the
    order is theirs (横取り). The faster you read, the fewer they take. */
-import { game, panel, esc, clamp, ease, Y, RED, OK, sfx, $, overlap } from './game.js?v=16';
-import { available } from './sim.js?v=16';
-import { activeLot, sendLot } from './gov.js?v=16';
-import { RIVALS, LINES, rubyHTML, pickRival, matchResult, rivalDef } from './rivals.js?v=16';
+import { game, panel, esc, clamp, ease, Y, RED, OK, sfx, $, overlap } from './game.js?v=17';
+import { available } from './sim.js?v=17';
+import { activeLot, sendLot } from './gov.js?v=17';
+import { RIVALS, LINES, rubyHTML, pickRival, matchResult, rivalDef } from './rivals.js?v=17';
 
 const COLS = [400, 640, 880], ROWS = [150, 310, 470], VX = [520, 520, 760], DEP = { x: 640, y: 616 };
 const shopPos = n => ({ c: n % 3, r: 2 - Math.floor(n / 3) });                       // numpad: 1 2 3 bottom row, 7 8 9 top

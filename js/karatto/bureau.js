@@ -3,11 +3,11 @@
    draft from desk to desk, ask the chair for a hearing. The room is a picture with three layers (wall, people, the
    counter in front of them) everything said is Japanese first, with furigana and the
    English underneath. The logic is gov.js; this file only draws it and sends the player's actions there. */
-import { EVENTS, resolve, POL, FAC, capacity, LEDGER } from './sim.js?v=16';
-import * as gov from './gov.js?v=16';
-import { AUTH, STANCE, REPLY, SAY, need, mood } from './gov-arc.js?v=16';
-import { ICON } from './icons.js?v=16';
-import { leafSVG } from './leaf.js?v=16';
+import { EVENTS, resolve, POL, FAC, capacity, LEDGER } from './sim.js?v=17';
+import * as gov from './gov.js?v=17';
+import { AUTH, STANCE, REPLY, SAY, need, mood } from './gov-arc.js?v=17';
+import { ICON } from './icons.js?v=17';
+import { leafSVG } from './leaf.js?v=17';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const yen = v => (v < 0 ? '−¥' : '¥') + Math.abs(Math.round(v)).toLocaleString();
@@ -380,7 +380,7 @@ export function demoArc(save, ctx, branch) {
   save.corp.funds = Math.max(save.corp.funds, 6000); gov.visit(save, ctx, Date.now()); gov.progress(save, ctx);
   const C = gov.caseOf(save, 'line'); if (!C) return;
   const next = () => { g.visit.day = null; gov.visit(save, ctx, Date.now()); };
-  if (branch === 'proxy') { g.cases.line = { id: 'line', st: 'done', outcome: 'demo' }; save.riv = undefined; import('./rivals.js?v=16').then(R => { const r = R.rivOf(save); r.r.kurogane.cores = 1; r.r.kurogane.grudge = 65; gov.progress(save, ctx); }); return; }
+  if (branch === 'proxy') { g.cases.line = { id: 'line', st: 'done', outcome: 'demo' }; save.riv = undefined; import('./rivals.js?v=17').then(R => { const r = R.rivOf(save); r.r.kurogane.cores = 1; r.r.kurogane.grudge = 65; gov.progress(save, ctx); }); return; }
   if (branch === 'stack') { g.cases.line = { id: 'line', st: 'done', outcome: 'demo' }; S.poll = 70; S.pHi = 14; gov.progress(save, ctx); return; }
   if (branch === 'm1') return;
   if (branch === 'rescue') { gov.submit(save, ctx, 'line', 'demo:fail'); return; }
