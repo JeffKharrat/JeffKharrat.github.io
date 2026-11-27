@@ -1,7 +1,7 @@
 /* カラット: the words the games are played with. Deck words (from ジェフの日本語, read-only) normalised, and a pool of
    common words from the kanji data to draw traps from: same kanji, same sound, close in look, never a second right answer. */
-import { parseFurigana } from './align.js?v=17';
-import { kata2hira } from './kana.js?v=17';
+import { parseFurigana } from './align.js?v=18';
+import { kata2hira } from './kana.js?v=18';
 
 const isKanji = c => /[一-鿿々]/.test(c);
 export const clean = m => (m || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();

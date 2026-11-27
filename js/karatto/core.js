@@ -2,16 +2,16 @@
    cavity wall is its memory, a keyboard of every JLPT kanji. Two views: the base view (the AI and the corporation's
    panels) and the wall view (on the gantry, looking around the wall). Clicking a key presses it and opens its file. */
 import * as THREE from '../vendor/three.module.min.js';
-import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=17';
-import * as store from './store.js?v=17';
-import { files, updateFlags } from './evidence.js?v=17';
-import { openAudit } from './audit.js?v=17';
-import { leafSVG, leafFavicon } from './leaf.js?v=17';
-import { leafSweep } from './leaf-sweep.js?v=17';
-import { advance, hourOf } from './sim.js?v=17';
-import { openMgmt, briefing, decide, mgmtOpen, refreshMgmt } from './mgmt.js?v=17';
-import './rivals.js?v=17';
-import { visit, progress as govProgress, inbox, govOf } from './gov.js?v=17';
+import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=18';
+import * as store from './store.js?v=18';
+import { files, updateFlags } from './evidence.js?v=18';
+import { openAudit } from './audit.js?v=18';
+import { leafSVG, leafFavicon } from './leaf.js?v=18';
+import { leafSweep } from './leaf-sweep.js?v=18';
+import { advance, hourOf } from './sim.js?v=18';
+import { openMgmt, briefing, decide, mgmtOpen, refreshMgmt } from './mgmt.js?v=18';
+import './rivals.js?v=18';
+import { visit, progress as govProgress, inbox, govOf } from './gov.js?v=18';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;   // embed: opened over the site from Tau Jeffy VI
@@ -598,7 +598,7 @@ function frame(now) {
   /* the hours since the last visit */
   if (DEMO) advance(SAVE, simCtx(), Date.now() - 30 * 3600e3);
   const sum = advance(SAVE, simCtx(), Date.now(), false); govProgress(SAVE, simCtx()); persist(); ui();
-  if (DEMO && QS.get('arc')) { const { demoArc } = await import('./bureau.js?v=17'); demoArc(SAVE, simCtx(), QS.get('arc')); }
+  if (DEMO && QS.get('arc')) { const { demoArc } = await import('./bureau.js?v=18'); demoArc(SAVE, simCtx(), QS.get('arc')); }
   if (sum.hours >= 2 && !QS.has('audit')) briefing(sum, nextDecision, inbox(SAVE, simCtx())); else nextDecision();
   if (!DECK && !DEMO) toast(ANKI_OK ? 'Anki found: open Settings to read your deck.' : 'No deck yet: open Anki, then Settings → Read the deck.', 6000);
   if (EMBED) parent.postMessage('karatto:ready', location.origin);

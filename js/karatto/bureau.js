@@ -3,11 +3,11 @@
    draft from desk to desk, ask the chair for a hearing. The room is a picture with three layers (wall, people, the
    counter in front of them) everything said is Japanese first, with furigana and the
    English underneath. The logic is gov.js; this file only draws it and sends the player's actions there. */
-import { EVENTS, resolve, POL, FAC, capacity, LEDGER } from './sim.js?v=17';
-import * as gov from './gov.js?v=17';
-import { AUTH, STANCE, REPLY, SAY, need, mood } from './gov-arc.js?v=17';
-import { ICON } from './icons.js?v=17';
-import { leafSVG } from './leaf.js?v=17';
+import { EVENTS, resolve, POL, FAC, capacity, LEDGER } from './sim.js?v=18';
+import * as gov from './gov.js?v=18';
+import { AUTH, STANCE, REPLY, SAY, need, mood } from './gov-arc.js?v=18';
+import { ICON } from './icons.js?v=18';
+import { leafSVG } from './leaf.js?v=18';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const yen = v => (v < 0 ? '−¥' : '¥') + Math.abs(Math.round(v)).toLocaleString();
@@ -28,6 +28,8 @@ const CSS = `
 @keyframes bBr { 0%,100% { transform:translateY(0); } 50% { transform:translateY(1px); } }
 #mg .bur .rep:hover img, #mg .bur .rep.sel img, #mg .bur .rep:focus-visible img { filter:drop-shadow(0 0 0 #FFE600) drop-shadow(1px 0 0 #FFE600) drop-shadow(-1px 0 0 #FFE600) drop-shadow(0 -1px 0 #FFE600); }
 #mg .bur .rep:focus-visible { outline:none; }
+#mg .bur .rep img.h { position:absolute; left:0; bottom:0; opacity:0; }   /* the hover pose: swapped in while the pointer is over the rep */
+#mg .bur .rep:hover img.h { opacity:1; } #mg .bur .rep:hover img:not(.h) { opacity:0; }
 #mg .bur .chip { position:absolute; left:50%; top:-24px; transform:translateX(-50%); font:700 9.5px var(--mono); letter-spacing:.1em; padding:2px 6px; white-space:nowrap; background:#0A0B0D; border:1px solid var(--line2); color:var(--mute); }
 #mg .bur .chip.y { background:var(--y); color:#000; border-color:var(--y); } #mg .bur .chip.r { background:var(--red); color:#fff; border-color:var(--red); }
 #mg .bur .dot { position:absolute; right:14px; top:8px; width:9px; height:9px; background:var(--y); box-shadow:0 0 0 2px #000; animation:bDot 1.1s steps(2) infinite; }
@@ -129,7 +131,7 @@ function room() {
   const reps = gov.ORDER.map((k, i) => {
     const P = gov.CAST[k], role = gov.roleOf(k, X.tier), v = T && T.seats[k], has = repNews(k, I);
     const chip = v ? `<span class="chip ${VOTE[v.vote][2] === 'y' ? 'y' : VOTE[v.vote][2] === 'r' ? 'r' : ''}">${VOTE[v.vote][0]} ${VOTE[v.vote][1]}</span>` : P.seat ? '' : '<span class="chip">顧問 ADVISOR</span>';
-    return `<button type="button" class="rep${B.sel === i ? ' sel' : ''}" data-r="${i}" style="left:${i * 131}px" aria-label="${esc(P.j)} · ${esc(role[1])}">${chip}${has ? '<i class="dot"></i>' : ''}<img alt="" src="${IMG(k)}" draggable="false"></button>`;
+    return `<button type="button" class="rep${B.sel === i ? ' sel' : ''}" data-r="${i}" style="left:${i * 131}px" aria-label="${esc(P.j)} · ${esc(role[1])}">${chip}${has ? '<i class="dot"></i>' : ''}<img alt="" src="${IMG(k)}" draggable="false"><img class="h" alt="" src="${IMG(k).replace('.webp', '-h.webp')}" draggable="false"></button>`;
   }).join('');
   const plates = gov.ORDER.map((k, i) => { const P = gov.CAST[k], role = gov.roleOf(k, X.tier); return `<div class="plate" style="left:${161 + i * 131}px"><span>${esc(P.j)}</span><small>${esc(role[1])}</small></div>`; }).join('');
   /* the counter's inbox: one major case, two routine decisions, the rest as status */
@@ -380,7 +382,7 @@ export function demoArc(save, ctx, branch) {
   save.corp.funds = Math.max(save.corp.funds, 6000); gov.visit(save, ctx, Date.now()); gov.progress(save, ctx);
   const C = gov.caseOf(save, 'line'); if (!C) return;
   const next = () => { g.visit.day = null; gov.visit(save, ctx, Date.now()); };
-  if (branch === 'proxy') { g.cases.line = { id: 'line', st: 'done', outcome: 'demo' }; save.riv = undefined; import('./rivals.js?v=17').then(R => { const r = R.rivOf(save); r.r.kurogane.cores = 1; r.r.kurogane.grudge = 65; gov.progress(save, ctx); }); return; }
+  if (branch === 'proxy') { g.cases.line = { id: 'line', st: 'done', outcome: 'demo' }; save.riv = undefined; import('./rivals.js?v=18').then(R => { const r = R.rivOf(save); r.r.kurogane.cores = 1; r.r.kurogane.grudge = 65; gov.progress(save, ctx); }); return; }
   if (branch === 'stack') { g.cases.line = { id: 'line', st: 'done', outcome: 'demo' }; S.poll = 70; S.pHi = 14; gov.progress(save, ctx); return; }
   if (branch === 'm1') return;
   if (branch === 'rescue') { gov.submit(save, ctx, 'line', 'demo:fail'); return; }

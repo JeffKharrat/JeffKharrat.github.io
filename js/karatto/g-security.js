@@ -2,7 +2,7 @@
    you committed to memory (weighted toward old ones you rarely see): type its reading before the encryption bar
    fills. A word lost in a real breach becomes compromised until you prove it again in any game. Without a breach
    on the planet, the room runs drills (nothing is lost). Skill: reading, typed. */
-import { game, panel, typer, sameReading, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=17';
+import { game, panel, typer, sameReading, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=18';
 
 let TG = [], k = 0, enc = 0, fw = 100, T, real = false, rival = '', done = false, FX = [], RACK = [];
 const ENC = api => 7 * (api.tech.fire ? 1.3 : 1);

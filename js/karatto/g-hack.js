@@ -4,10 +4,10 @@
    back and sends hunters down your path. Money buys the entry and proxies, Data buys zero-days and decoys. Reach the
    core and breach it: their money and data are yours, and they will remember. Traced at 100%: disconnected.
    Skills: reading (typed), meaning. */
-import { game, panel, typer, keycaps, sameReading, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=17';
-import { RIVALS, IDS, rivOf, costs, canStart, pay, settleRaid, lootOf, defOf, TOOLS } from './rivals.js?v=17';
-import { spendable } from './gov.js?v=17';
-import { drawLeaf } from './leaf.js?v=17';
+import { game, panel, typer, keycaps, sameReading, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=18';
+import { RIVALS, IDS, rivOf, costs, canStart, pay, settleRaid, lootOf, defOf, TOOLS } from './rivals.js?v=18';
+import { spendable } from './gov.js?v=18';
+import { drawLeaf } from './leaf.js?v=18';
 
 const QS = new URLSearchParams(location.search);
 let TGT = IDS.includes(QS.get('target')) ? QS.get('target') : 'kurogane', KIT = { proxy: 1, zero: 0, decoy: 0 };
