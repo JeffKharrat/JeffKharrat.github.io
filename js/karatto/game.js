@@ -2,15 +2,15 @@
    report, the deck and the word pool, evidence (first attempt per word and skill per shift), the typing bar, the keycaps,
    sound, saving, and the link to the planet's simulation. Each game supplies its scene and its rules:
    game({ id, code, jp, en, site, tier, skills, dur, lead, how, stats, init, start, tick, draw, key, end, shop }). */
-import { loadKanji } from './model.js?v=19';
-import * as store from './store.js?v=19';
-import { deckWord, buildPool, traps, shuffle, overlap } from './words.js?v=19';
-import { toKana, sameReading } from './kana.js?v=19';
-import { record as rec0, updateFlags, SKILL_J, day, payRate } from './evidence.js?v=19';
-import { addGame, advance, book } from './sim.js?v=19';
-import './rivals.js?v=19';
-import { once, visit, progress, govOf } from './gov.js?v=19';
-import { leafSVG, leafFavicon } from './leaf.js?v=19';
+import { loadKanji } from './model.js?v=20';
+import * as store from './store.js?v=20';
+import { deckWord, buildPool, traps, shuffle, overlap } from './words.js?v=20';
+import { toKana, sameReading } from './kana.js?v=20';
+import { record as rec0, updateFlags, SKILL_J, day, payRate } from './evidence.js?v=20';
+import { addGame, advance, book } from './sim.js?v=20';
+import './rivals.js?v=20';
+import { once, visit, progress, govOf } from './gov.js?v=20';
+import { leafSVG, leafFavicon } from './leaf.js?v=20';
 
 export { shuffle, toKana, sameReading, SKILL_J, overlap };
 export const $ = s => document.querySelector(s);

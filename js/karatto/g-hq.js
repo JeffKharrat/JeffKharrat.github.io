@@ -3,8 +3,8 @@
    it right and the item's background is revealed (who stands where); wrong, and the translation is shown. Every option
    stays open either way: this is reading practice tied to the actual dispute, not a gate. Decisions resolve through
    the same command as the counter in 経営 → 派閥 (sim.resolve). No word evidence. */
-import { game, panel, esc, clamp, Y, RED, OK, sfx, $, shuffle } from './game.js?v=19';
-import { EVENTS, resolve, setPolicy, dirProgress } from './sim.js?v=19';
+import { game, panel, esc, clamp, Y, RED, OK, sfx, $, shuffle } from './game.js?v=20';
+import { EVENTS, resolve, setPolicy, dirProgress } from './sim.js?v=20';
 const EN = {
   strike: 'The labour union is demanding higher wages. It says that if the company does not agree, it will stop the factory from tomorrow.',
   protest: 'Residents have gathered in front of the headquarters to oppose the pollution and the surveillance. They want an explanation from the company.',
@@ -13,8 +13,8 @@ const EN = {
   order: 'A big company has placed an order. They want 150 units of goods sent right away.',
   accident: 'This morning there was an accident on the factory line. One worker was injured.' };
 const BG = { strike: 'Background: the union (赤城) is at 30 or below; a raise or talks settle it, a refusal stops work and 70% of outbound dispatch for a day.', protest: 'Background: residents (緑川) are at 30 or below; PR costs money, ignoring costs stability.', shackle: 'Background: the board (九条) is at 30 or below; refusing raises 暴走度.', lawsuit: 'Background: pollution is over 60; legal (紫藤) recommends settling.', order: 'Background: finance (銅島) set the 150 goods aside before the market could sell them.', accident: 'Background: operations (黒田) blames the hours and the safety level.' };
-import { ICON } from './icons.js?v=19';
-import { drawLeaf } from './leaf.js?v=19';
+import { ICON } from './icons.js?v=20';
+import { drawLeaf } from './leaf.js?v=20';
 
 const rb = s => s.replace(/\[([^|\]]+)\|([^\]]+)\]/g, '<ruby>$1<rt>$2</rt></ruby>');
 const TXT = {
