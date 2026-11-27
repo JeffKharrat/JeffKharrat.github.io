@@ -1,4 +1,4 @@
-import { leafSVG } from './leaf.js?v=7';
+import { leafSVG } from './leaf.js?v=8';
 /* カラット: pictograms. Flat, square, one colour (currentColor), drawn on a 24-unit grid. */
 const svg = (b, s = 24) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="currentColor" aria-hidden="true">${b}</svg>`;
 export const ICON = {

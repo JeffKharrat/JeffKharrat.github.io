@@ -1,7 +1,7 @@
 /* カラット: 研究所, the R&D lab. An intercepted word resolves cell by cell on the holo table. Buzz (Space) the
    moment you recognise it, then pick its meaning (1–4): the earlier the buzz, the more research. A wrong buzz costs
    more than waiting. Research buys techs that change the other buildings. Skill: meaning (form recognition). */
-import { game, panel, keycaps, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=7';
+import { game, panel, keycaps, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=8';
 
 const CW = 9, GW = 72, GH = 38, REVEAL = 8;
 let cur = null, cells = [], order = [], phase = 'idle', tt = 0, res = 0, hits = 0, miss = 0, K, RAIN = [], gap = 0;
@@ -26,7 +26,7 @@ function answer(api, i) {
   if (phase !== 'answer' || !cur) return; const o = cur.opts[i]; if (!o) return; K.press(i);
   const ok = o.right, m = mult(); api.record(cur.w, 'meaning', ok, 'pick');
   cur.opts.forEach((x, n) => x.right && K.mark(n, 'good')); if (!ok) K.mark(i, 'bad');
-  if (ok) { const g = Math.round(40 * m); res += g; hits++; api.G.yen += Math.round(g / 2); sfx('ok'); api.log(cur.w.w, `${Math.round(frac() * 100)}% ×${m.toFixed(1)}`, '+' + g, 'y'); }
+  if (ok) { const g = api.pay(40 * m); res += g; hits++; api.G.yen += Math.round(g / 2); sfx('ok'); api.log(cur.w.w, `${Math.round(frac() * 100)}% ×${m.toFixed(1)}`, '+' + g, 'y'); }
   else { res = Math.max(0, res - 30); miss++; sfx('ng'); api.log(cur.w.w, '✗ ' + cur.w.s, '−30', 'r'); }
   phase = 'shown'; tt = REVEAL; gap = ok ? 1.1 : 2.2; order.forEach(n => cells[n].on = 1); side(api);
 }

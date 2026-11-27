@@ -1,10 +1,12 @@
 /* カラット: 経営, the management console in the core. Overview (the planet's numbers and their last three days),
    policies, factions, quarterly reports, the log. Also the briefing after time away, and the decisions (決裁).
    Marathon-style: black, hairlines, micro labels, the AI's yellow. */
-import { POL, FAC, GROUPS, EVENTS, resolve, setPolicy, dirProgress, capacity, forecast } from './sim.js?v=7';
-import { ICON } from './icons.js?v=7';
-import { createDiorama } from './diorama.js?v=7';
-import { leafSVG } from './leaf.js?v=7';
+import { POL, FAC, GROUPS, EVENTS, LEDGER, resolve, setPolicy, dirProgress, capacity, forecast } from './sim.js?v=8';
+import { bureau, bureauKey, bureauClose } from './bureau.js?v=8';
+import { inbox, contracted, spendable, reserve, govOf } from './gov.js?v=8';
+import { ICON } from './icons.js?v=8';
+import { createDiorama } from './diorama.js?v=8';
+import { leafSVG } from './leaf.js?v=8';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const yen = v => (v < 0 ? '−¥' : '¥') + Math.abs(Math.round(v)).toLocaleString();
@@ -116,25 +118,29 @@ const delta = (hist, k) => { const a = hist[Math.max(0, hist.length - 25)], b = 
 let M = null;
 export function openMgmt(c) {
   /* c: { save, ctx(), persist(), onClose(), tab } */
-  css(); const root = el('mg'); M = { c, root, tab: c.tab || 'over' };
+  css(); const root = el('mg'); M = { c, root, tab: c.tab || 'over', base: () => base(), refresh: () => M && render() };
   root.innerHTML = `<div class="stg"><div class="top">${leafSVG(30)}<span class="tag">MGT-01</span><span class="ttl">経営</span><span class="lb">Management · カラット</span><div class="tabs"></div><span class="clock" id="mg-ck"></span><button class="x" type="button" id="mg-x">閉じる · CLOSE <span class="key">Esc</span></button></div><div class="body"></div></div>`;
   root.querySelector('#mg-x').onclick = closeMgmt; root.classList.add('on'); fit(root);
   addEventListener('keydown', mkeys, true); addEventListener('resize', mfit);
   render();
 }
 const mfit = () => M && fit(M.root);
-export function closeMgmt() { if (!M) return; dioStop(); removeEventListener('keydown', mkeys, true); removeEventListener('resize', mfit); M.root.classList.remove('on'); const c = M.c; M = null; c.onClose && c.onClose(); }
+export function closeMgmt() { if (!M) return; dioStop(); bureauClose(); removeEventListener('keydown', mkeys, true); removeEventListener('resize', mfit); M.root.classList.remove('on'); const c = M.c; M = null; c.onClose && c.onClose(); }
 export const mgmtOpen = () => !!M;
 export function refreshMgmt() { if (M) render(); }
-function mkeys(e) { const mm = document.getElementById('mgm'); if (!M || (mm && mm.classList.contains('on'))) return; e.stopImmediatePropagation(); if (e.key === 'Escape') { e.preventDefault(); closeMgmt(); } const n = ['1', '2', '3', '4', '5', '6'].indexOf(e.key); if (n >= 0) { M.tab = TABS[n][0]; render(); } }
+function mkeys(e) { const mm = document.getElementById('mgm'); if (!M || (mm && mm.classList.contains('on'))) return; e.stopImmediatePropagation();
+  if (M.tab === 'fac' && !(e.target && e.target.tagName === 'INPUT') && bureauKey(e)) { e.preventDefault(); return; }
+  if (e.key === 'Escape') { e.preventDefault(); closeMgmt(); } const n = ['1', '2', '3', '4', '5', '6'].indexOf(e.key); if (n >= 0) { M.tab = TABS[n][0]; render(); } }
 const TABS = [['over', '概要', 'Overview'], ['live', '現場', 'Live'], ['pol', '社則', 'Policies'], ['fac', '派閥', 'Factions'], ['rep', '決算', 'Reports'], ['log', '記録', 'Log']];
 function render() {
   const { save } = M.c, S = save.sim;
-  M.root.querySelector('.tabs').innerHTML = TABS.map(([k, j, e], i) => `<button type="button" class="tab${M.tab === k ? ' on' : ''}" data-t="${k}"><b>${j}</b>${e.toUpperCase()}${k === 'fac' && Object.values(S.fac).some(v => v < 30) ? '<i>!</i>' : ''}</button>`).join('');
+  const I = inbox(save, M.c.ctx()), nI = (I.major ? 1 : 0) + I.routine.length;
+  M.root.querySelector('.tabs').innerHTML = TABS.map(([k, j, e], i) => `<button type="button" class="tab${M.tab === k ? ' on' : ''}" data-t="${k}"><b>${j}</b>${e.toUpperCase()}${k === 'fac' && nI ? `<i>${nI}</i>` : ''}</button>`).join('');
   M.root.querySelectorAll('.tab').forEach(b => b.onclick = () => { M.tab = b.dataset.t; render(); });
   M.root.querySelector('#mg-ck').textContent = `Q${S.q.n} · ${new Date(S.t).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
   const B = M.root.querySelector('.body');
-  B.innerHTML = { over, live, pol, fac, rep, log }[M.tab]();
+  if (M.tab === 'fac') { dioStop(); B.innerHTML = '<div class="bur-host" style="position:absolute;inset:0"></div>'; bureau(B.querySelector('.bur-host'), M); return; }
+  B.innerHTML = { over, live, pol, rep, log }[M.tab]();
   if (M.tab === 'over') { const c = B.querySelector('canvas.dio'); dioStart(c, { x: 0, y: 236, w: 1240, h: 170 }); c.onclick = () => { M.tab = 'live'; render(); }; }
   else if (M.tab === 'live') dioStart(B.querySelector('canvas.live'), { x: 0, y: 0, w: 1240, h: 634 }); else dioStop();
   if (M.tab === 'pol') B.querySelectorAll('[data-p]').forEach(b => {
@@ -152,8 +158,8 @@ function over() {
   const pop = S.pop.w + S.pop.c + S.pop.e, hourly = (L.R || 0) - (L.K || 0);
   const d24 = (k, f = v => v, n = 0, invert) => { const v = delta(h, k); return { v: invert ? -v : v, t: (v >= 0 ? '▲ ' : '▼ ') + f(Math.abs(v)) + ' / 24H' }; };
   const tiles = [
-    ['資金', 'Funds', yen(corp.funds), { v: hourly, t: (hourly >= 0 ? '▲ ' : '▼ ') + yen(Math.abs(hourly)) + ' / HOUR' }, 'f', corp.funds < 0, 'Revenue minus costs, every hour. Below zero the main bank lends ¥3,000 (the board hates it).', yen(F.funds)],
-    ['株価', 'Share price', yen(S.share), d24('x', yen), 'x', false, 'Follows funds, fame, the board\'s mood and stability.', yen(F.share)],
+    ['資金', 'Funds', yen(corp.funds), { v: hourly, t: (hourly >= 0 ? '▲ ' : '▼ ') + yen(Math.abs(hourly)) + ' / HOUR' }, 'f', corp.funds < 0, 'Revenue minus costs, every hour. Below zero: one recovery facility of ¥3,000 per quarter; past it, the optional spending winds down. The 24H figure is an operating estimate.', yen(F.funds)],
+    ['株価', 'Share price', yen(S.share), d24('x', yen), 'x', false, 'An indicator: follows funds, fame, the board\'s mood and stability. The Exchange\'s session moves are shown apart.', yen(F.share)],
     ['安定度', 'Stability', S.stab.toFixed(0), d24('s', v => v.toFixed(1)), 's', S.stab < 30, 'The master stat: happiness, minus pollution, plus surveillance, minus strikes and debt. Low stability stops growth.', F.stab],
     ['人口', 'Population', Math.round(pop).toLocaleString(), d24('p', v => Math.round(v)), 'p', false, 'Grows toward the jobs, within the housing the online districts provide, faster when stable.', F.pop],
     ['生活物資', 'Goods', Math.round(S.goods).toLocaleString(), d24('g', v => Math.round(v)), 'g', L.short > 0, 'Made by the workers and robots (and the Great Factory\'s shifts), eaten by the population; the surplus over 100 is sold.', F.goods],
@@ -177,17 +183,19 @@ function over() {
   html += `<div class="mgp" style="left:416px;top:${Y0}px;width:404px;height:${PH}px"><div class="ph"><span><b>P&amp;L</b> 時間収支 · THIS HOUR</span><span>Q${S.q.n} ${yen(S.q.rev - S.q.cost)}</span></div><div class="in" style="padding-top:6px">
     ${Object.entries(R).map(([k, v]) => `<div class="pl"><span>${NR[k]}</span><b class="up">+${yen(v)}</b></div>`).join('')}
     ${Object.entries(K).filter(([, v]) => v > .01).map(([k, v]) => `<div class="pl"><span>${NK[k]}</span><b class="dn">−${yen(v)}</b></div>`).join('')}
-    <div class="tot"><span>NET / HOUR · NEXT 24H AVG ${yen(base().v.net)}</span><span class="${hourly >= 0 ? 'up' : 'dn'}">${hourly >= 0 ? '+' : '−'}${yen(Math.abs(hourly))}</span></div>
+    <div class="tot"><span>NET / HOUR · OPERATING ESTIMATE 24H ${yen(base().v.net)}</span><span class="${hourly >= 0 ? 'up' : 'dn'}">${hourly >= 0 ? '+' : '−'}${yen(Math.abs(hourly))}</span></div>
+    ${(() => { const K2 = contracted(save); return `<div class="pl" title="Signed agreements, apart from the operating estimate"><span>契約 Contracted · escrow ${yen(K2.escrow)}${K2.lots.length ? ` · ${K2.lots.length} lot${K2.lots.length > 1 ? 's' : ''} (${yen(K2.lots.reduce((n, l) => n + l.pay, 0))} on delivery)` : ''}</span><b>${K2.recurring ? '−' + yen(K2.recurring) + '/H' : '—'}</b></div><div class="pl"><span>予備 Reserve ${yen(reserve(save))} · spendable</span><b class="${spendable(save) < 0 ? 'dn' : ''}">${yen(spendable(save))}</b></div>`; })()}
   </div></div>`;
   const dp = dirProgress(S, corp, X), qEnd = S.q.start + 7 * 24 * 3600e3, left = Math.max(0, (qEnd - S.t) / 3600e3);
   const pct = dp ? Math.min(100, dp.D.k === 'poll' ? (dp.v <= dp.goal ? 100 : Math.max(0, 100 - (dp.v - dp.goal) * 2)) : dp.v / dp.goal * 100) : 0;
   const status = [
     S.breach && S.breach.open ? `<div class="st"><i class="r"></i><span>侵入警報 Breach: ${esc(S.breach.open.rival)} is attacking the memory · 保安部</span></div>` : '',
-    S.strike > S.t ? `<div class="st"><i class="r"></i><span>ストライキ中 Strike: the factory is stopped for ${Math.ceil((S.strike - S.t) / 3600e3)} h</span></div>` : '',
+    S.strike > S.t ? `<div class="st"><i class="r"></i><span>ストライキ中 Strike: work and 70% of dispatch stopped for ${Math.ceil((S.strike - S.t) / 3600e3)} h (jobs kept)</span></div>` : '',
     S.shackle ? `<div class="st"><i class="r"></i><span>The board locked ${POL[S.shackle.k].j} for ${Math.ceil((S.shackle.until - S.t) / 3600e3)} h</span></div>` : '',
-    S.debt > 0 ? `<div class="st"><i class="r"></i><span>融資 Loan: ${yen(S.debt)} (repaid above ¥5,000)</span></div>` : '',
+    S.debt > 0 ? `<div class="st"><i class="r"></i><span>融資 Loan: ${yen(S.debt)} (repaid above ¥5,000)${S.fcl === S.q.n ? ' · facility used this quarter' : ''}</span></div>` : '',
     S.power < 0 ? '<div class="st"><i class="r"></i><span>停電 Brownouts: demand is over supply</span></div>' : '',
-    S.ev.length ? `<div class="st"><i class="y"></i><span>${S.ev.length} decision${S.ev.length > 1 ? 's' : ''} waiting (決裁 · 本社)</span></div>` : '',
+    ...(() => { const I = inbox(save, X); return [I.major ? `<div class="st"><i class="y"></i><span>派閥 ${esc(I.major.m.title[0])} · ${esc(I.major.m.title[1])} (the counter)</span></div>` : '', S.ev.length ? `<div class="st"><i class="y"></i><span>${S.ev.length} decision${S.ev.length > 1 ? 's' : ''} waiting at the counter (派閥) or 本社</span></div>` : '', ...I.status.slice(0, 2).map(t => `<div class="st"><i></i><span>${esc(t)}</span></div>`)]; })(),
+    S.hold && S.hold.until > S.t ? `<div class="st"><i class="r"></i><span>出荷停止 Dispatch hold: ${Math.round(S.hold.pct * 100)}% of outbound held for ${Math.ceil((S.hold.until - S.t) / 3600e3)} h</span></div>` : '',
     ...Object.entries(S.fac).filter(([k, v]) => v < 30 && (k !== 'eng' || X.tier >= 2)).map(([k, v]) => `<div class="st"><span class="fico" style="color:var(--red)">${ICON[k](16)}</span><span>${FAC[k][0]} ${FAC[k][1]} unhappy (${v.toFixed(0)})</span></div>`)].join('') || '<div class="st"><i class="g"></i><span>平常運転 Normal operation.</span></div>';
   html += `<div class="mgp" style="left:832px;top:${Y0}px;width:408px;height:${PH}px"><div class="ph"><span><b>DIR</b> 取締役会の指令 · DIRECTIVE</span><span>${left.toFixed(0)} H LEFT</span></div><div class="in">
     ${dp ? `<div class="kj" style="font-size:18px">${dp.D.j}</div><div style="margin:2px 0 6px">${esc(dp.txt)}</div><div class="bar"><s style="width:${pct}%"></s></div><div class="lb" style="margin-top:5px">${dp.ok ? 'ON TRACK · +¥500 AND THE BOARD\'S FAVOUR' : 'NOT YET · MISSING IT ANGERS THE BOARD'}</div>` : ''}
@@ -214,26 +222,13 @@ function polCast(k, v) {
   el.innerHTML = `24H IF ${POL[k].o[v][1].toUpperCase()}: ` + d('FUNDS ', A.s.funds, b.s.funds, n => '¥' + Math.round(n).toLocaleString()) + d('STAB ', A.s.stab, b.s.stab) + d('HAPPY ', A.s.happy, b.s.happy) + d('POLL ', A.s.poll, b.s.poll, undefined, true) +
     Object.keys(FAC).map(f => d(FAC[f][1].toUpperCase() + ' ', A.fac[f], b.fac[f])).join('') + d('暴走 ', A.bousou, b.bousou, n => n.toFixed(1), true);
 }
-function fac() {
-  const { save, ctx } = M.c, S = save.sim, X = ctx(), T = S.drivers || {};
-  const WHY = { union: 'Wages, hours, safety, idle workers, training.', board: 'Hourly profit, dividends, debt, the directive.', res: 'Pollution, PR, surveillance, stability.', eng: 'Wages and work for engineers (N3+).' };
-  const DO = { union: 'Below 30 they threaten to strike.', board: 'Below 30 they lock a policy.', res: 'Below 30 they protest at HQ.', eng: 'Below 30 they leave (later).' };
-  return Object.entries(FAC).map(([k, [j, en]], i) => { const v = S.fac[k], t = T[k] == null ? v : T[k], off = k === 'eng' && X.tier < 2;
-    return `<div class="mgp fc" style="left:${i * 310}px;top:0;opacity:${off ? .4 : 1}"><div class="ph"><span><b>${k.toUpperCase()}</b> ${en.toUpperCase()}</span><span class="bc"></span></div><div class="in">
-      <div class="kj t"><span class="fico" style="color:${v < 30 ? 'var(--red)' : 'var(--y)'}">${ICON[k](30)}</span>${j}</div><div class="big" style="color:${v < 30 ? 'var(--red)' : 'inherit'}">${v.toFixed(0)}<small>/ 100 · drifting to ${Math.round(Math.max(0, Math.min(100, t)))}</small></div>
-      <div class="bar"><s class="${v < 30 ? 'r' : ''}" style="width:${v}%"></s><em style="left:30%"></em><u style="left:${Math.max(0, Math.min(100, t))}%"></u></div>
-      <p style="color:#B8BCC6;margin:14px 0 6px">${WHY[k]}</p><p class="lb" style="color:${v < 30 ? 'var(--red)' : 'var(--mute)'}">${off ? 'OPENS AT N3' : DO[k]}</p></div></div>`; }).join('') +
-    `<div class="mgp" style="left:0;top:316px;width:1240px;height:318px"><div class="ph"><span><b>INFO</b> 派閥 · HOW IT WORKS</span></div><div class="in" style="color:#B8BCC6;line-height:1.7">
-      Each faction's approval drifts every hour toward a target set by your policies and the planet's state (the white mark on each bar). The red line is the danger threshold.<br>
-      Decisions (決裁) come up when a faction is unhappy, after accidents, lawsuits or orders. While you're away the AI's autopilot decides anything that has waited 12 hours, with cautious defaults; while you're here, decisions wait for you up to a day.</div></div>`;
-}
 function rep() {
   const S = M.c.save.sim, R = S.reports.slice().reverse();
   return `<div class="mgp" style="left:0;top:0;width:1240px;height:634px"><div class="ph"><span><b>REP</b> 四半期決算 · QUARTERLY REPORTS</span><span>A QUARTER IS A REAL WEEK, FROM MONDAY 4:00</span></div><div class="in">
-    <table><tr><th>QUARTER</th><th>REVENUE</th><th>COSTS</th><th>PROFIT</th><th>DIVIDEND</th><th>SHIPPED</th><th>SHARE</th><th>STABILITY</th><th>POP</th><th>DIRECTIVE</th></tr>
-    <tr><td>Q${S.q.n} · in progress</td><td>${yen(S.q.rev)}</td><td>${yen(S.q.cost)}</td><td>${yen(S.q.rev - S.q.cost)}</td><td>—</td><td>${S.q.ship}</td><td>${yen(S.share)}</td><td>${S.stab.toFixed(0)}</td><td>${Math.round(S.pop.w + S.pop.c + S.pop.e)}</td><td>—</td></tr>
-    ${R.map(r => `<tr><td>Q${r.n} · ${new Date(r.from).toLocaleDateString('ja-JP')}</td><td>${yen(r.rev)}</td><td>${yen(r.cost)}</td><td style="color:${r.profit < 0 ? 'var(--red)' : 'var(--ok)'}">${yen(r.profit)}</td><td>${yen(r.dividend)}</td><td>${r.ship}</td><td>${yen(r.share)}</td><td>${r.stab}</td><td>${r.pop}</td><td style="color:${r.dir ? (r.dir.ok ? 'var(--ok)' : 'var(--red)') : 'inherit'}">${r.dir ? (r.dir.ok ? 'MET' : 'MISSED') : '—'}</td></tr>`).join('')}
-    </table>${R.length ? '' : '<p class="lb" style="margin-top:14px">THE FIRST QUARTER CLOSES NEXT MONDAY AT 4:00</p>'}</div></div>`;
+    <table><tr><th>QUARTER</th><th>OPERATING</th><th>SHIFT FEES</th><th>ORDERS</th><th>EVENTS</th><th>FINANCE</th><th>CAPITAL</th><th>DIVIDEND</th><th>SHIPPED</th><th>STABILITY</th><th>DIRECTIVE</th></tr>
+    ${[{ n: S.q.n, cur: true, led: S.q.led || {}, ship: S.q.ship, stab: Math.round(S.stab), hrs: S.q.hrs }, ...R].map(r => { const L = r.led || { op: r.profit }; const c = v => `<td style="color:${(v || 0) < 0 ? 'var(--red)' : (v || 0) > 0 ? 'var(--ok)' : 'inherit'}">${v ? yen(v) : '—'}</td>`;
+      return `<tr><td>Q${r.n} · ${r.cur ? 'in progress' : new Date(r.from).toLocaleDateString('ja-JP')}${r.susp ? ' · <span style="color:var(--mute)">suspended (away)</span>' : ''}</td>${c(L.op)}${c(L.shift)}${c(L.orders)}${c(L.ev)}${c(L.fin)}${c(L.cap)}<td>${r.cur ? '—' : yen(r.dividend || 0)}</td><td>${r.ship}</td><td>${r.stab}</td><td style="color:${r.dir ? (r.dir.neutral ? 'var(--mute)' : r.dir.ok ? 'var(--ok)' : 'var(--red)') : 'inherit'}">${r.cur ? '—' : r.dir ? (r.dir.neutral ? 'NOT JUDGED' : r.dir.ok ? 'MET' : 'MISSED') : '—'}</td></tr>`; }).join('')}
+    </table><p class="lb" style="margin-top:14px">DIVIDENDS COME FROM THE OPERATING RESULT ONLY. A WEEK WITH FEWER THAN 120 SIMULATED HOURS IS BOOKED WITHOUT JUDGING THE DIRECTIVE.${R.length ? '' : ' THE FIRST QUARTER CLOSES NEXT MONDAY AT 4:00.'}</p></div></div>`;
 }
 function log() {
   const S = M.c.save.sim;
@@ -242,13 +237,15 @@ function log() {
 }
 
 /* ================= the briefing after time away ================= */
-export function briefing(sum, done) {
+export function briefing(sum, done, I) {
   css(); const r = el('mgm'), a = sum.before, b = sum.after;
   const dd = (j, en, k, f = v => v, inv) => { const d = b[k] - a[k]; return `<div><span class="lb">${j} ${en}</span><b>${f(b[k])}</b><span class="${(inv ? -d : d) > 0 ? 'up' : (inv ? -d : d) < 0 ? 'dn' : 'lb'}">${d >= 0 ? '▲' : '▼'} ${f(Math.abs(d))}</span></div>`; };
   r.innerHTML = `<div class="stg" style="display:flex;align-items:center;justify-content:center"><div class="card"><div class="bar"><span>BRIEFING // 留守中の報告</span><span>${sum.hours} H SIMULATED${sum.hours >= 72 ? ' (CAPPED)' : ''}</span></div>
     <div style="float:right;margin:4px 0 0 16px">${leafSVG(96, { N: 23 })}</div><h2>おかえりなさい。</h2><div style="color:#B8BCC6">While you were away, the corporation ran on your policies; the autopilot handled what couldn't wait.</div>
     <div class="dl">${dd('資金', 'FUNDS', 'funds', yen)}${dd('安定度', 'STABILITY', 'stab')}${dd('人口', 'POPULATION', 'pop')}${dd('生活物資', 'GOODS', 'goods')}${dd('株価', 'SHARE', 'share', yen)}${dd('公害', 'POLLUTION', 'poll', v => v, true)}${dd('幸福度', 'HAPPINESS', 'happy')}${dd('データ', 'DATA', 'data')}</div>
     ${sum.log.length ? `<div class="lb">WHAT HAPPENED</div><div class="ev">${sum.log.slice(-14).reverse().map(l => `<div>${esc(l.text)}</div>`).join('')}</div>` : ''}
+    ${I && (I.major || I.routine.length) ? `<div class="lb" style="margin-top:12px">ON THE COUNTER · 経営 → 派閥</div><div class="ev" style="max-height:90px">${I.major ? `<div><b class="kj" style="color:var(--y)">${esc(I.major.m.title[0])}</b> ${esc(I.major.m.title[1])}</div>` : ''}${I.routine.map(e => `<div><span class="kj">${EVENTS[e.k].j}</span> ${esc(EVENTS[e.k].en)}</div>`).join('')}</div>` : ''}
+    ${sum.reports && sum.reports.some(r => r.susp) ? '<div class="lb" style="margin-top:8px">THE WEEKS YOU MISSED ARE BOOKED AS ONE SUSPENDED PERIOD: NO DIRECTIVE JUDGED, NO PENALTY.</div>' : ''}
     <button class="go" type="button" id="mgm-ok">了解 · UNDERSTOOD <span class="key">Enter</span></button></div></div>`;
   open(r, () => { r.classList.remove('on'); done && done(); }, ['Enter', 'Escape']);
 }
@@ -275,5 +272,5 @@ let DIO = null;
 function dioStop() { if (DIO) { DIO.stop(); DIO = null; } }
 function dioStart(cv, view) {
   dioStop(); if (!cv || !M) return;
-  DIO = createDiorama(cv, () => { if (!M) return null; const S = M.c.save.sim, X = M.c.ctx(); return { S, corp: M.c.save.corp, X, C: capacity(S, X) }; }, view);
+  DIO = createDiorama(cv, () => { if (!M) return null; const S = M.c.save.sim, X = M.c.ctx(); return { S, corp: M.c.save.corp, X, C: capacity(S, X), G: govOf(M.c.save) }; }, view);
 }

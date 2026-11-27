@@ -2,13 +2,14 @@
    cavity wall is its memory, a keyboard of every JLPT kanji. Two views: the base view (the AI and the corporation's
    panels) and the wall view (on the gantry, looking around the wall). Clicking a key presses it and opens its file. */
 import * as THREE from '../vendor/three.module.min.js';
-import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=7';
-import * as store from './store.js?v=7';
-import { files, updateFlags } from './evidence.js?v=7';
-import { openAudit } from './audit.js?v=7';
-import { leafSVG, leafFavicon } from './leaf.js?v=7';
-import { advance, hourOf } from './sim.js?v=7';
-import { openMgmt, briefing, decide, mgmtOpen, refreshMgmt } from './mgmt.js?v=7';
+import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=8';
+import * as store from './store.js?v=8';
+import { files, updateFlags } from './evidence.js?v=8';
+import { openAudit } from './audit.js?v=8';
+import { leafSVG, leafFavicon } from './leaf.js?v=8';
+import { advance, hourOf } from './sim.js?v=8';
+import { openMgmt, briefing, decide, mgmtOpen, refreshMgmt } from './mgmt.js?v=8';
+import { visit, progress as govProgress, inbox, govOf } from './gov.js?v=8';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;   // embed: opened over the site from Tau Jeffy VI
@@ -17,8 +18,10 @@ const sm5 = t => { t = Math.min(1, Math.max(0, t)); return t * t * t * (t * (t *
 
 /* ---------------- renderer, scene ---------------- */
 const canvas = $('#k3');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+/* without WebGL the core still works in 2D: the panels, Management and the audit room are HTML; only the cavity is skipped */
+let renderer, NO3D = false;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); }
+catch (e) { NO3D = true; renderer = { setPixelRatio() {}, setSize() {}, render() {} }; document.body.classList.add('no3d'); }
 const scene = new THREE.Scene(); scene.background = new THREE.Color('#050608');
 const camera = new THREE.PerspectiveCamera(56, 1, .3, 1000);
 const UT = { value: 0 };
@@ -431,7 +434,8 @@ function summary() {
   const lev = {}; for (const [l, v] of Object.entries(PROG.lev)) lev[l] = { a: v.a, n: v.n, m: v.m };
   const div = {}; for (const v of Object.values(PROG.div)) (div[v.l] = div[v.l] || [])[v.d] = Math.round(v.a / v.n * 100) / 100;
   const counts = [0, 0, 0, 0, 0]; S.forEach(s => counts[s.lvl]++);
-  try { localStorage.setItem('karatto.summary', JSON.stringify({ t: Date.now(), tier: PROG.tier, lev, div, counts, corp: SAVE.corp })); } catch (e) {}
+  if (DEMO) return;                                                       // the demo never speaks for the real save
+  try { localStorage.setItem('karatto.summary', JSON.stringify({ t: Date.now(), tier: PROG.tier, lev, div, counts, corp: SAVE.corp, ctx: SAVE.sim ? simCtx() : null })); } catch (e) {}
 }
 
 /* ---------------- the corporation's panels ---------------- */
@@ -485,12 +489,18 @@ function settings() {
       <p>Paste any text: every JLPT kanji in it is marked acquired (the minimum). Words you commit to memory later take them further. Batch mode on the wall does the same one key at a time.</p>
       <textarea id="s-kan" rows="3" placeholder="日本語、学生、先生…"></textarea>
       <button class="btn" id="s-kan-go">Mark these acquired</button> <button class="btn" id="s-kan-clear">Clear all hand marks</button></div>
-    <div class="grp"><b>Backup</b><p>A copy of your save as a file.</p><button class="btn" id="s-exp">Export save</button></div>`;
+    <div class="grp"><b>Backup</b><p>A copy of your save as a file.</p><button class="btn" id="s-exp">Export save</button></div>
+    ${store.conflict.get() ? `<div class="grp"><b style="color:#FF3B30">Sync conflict</b><p>${store.conflict.get().tab ? 'Another tab of this browser saved while this one was open.' : 'Both PCs played since the last sync.'} The active save is the one you are using; the other (${new Date(store.conflict.get().save.updated).toLocaleString('ja-JP')}) is kept here.</p><button class="btn" id="s-cf-exp">Export the other copy</button> <button class="btn" id="s-cf-use">Switch to it</button> <button class="btn" id="s-cf-x">Discard it</button></div>` : ''}`;
   $('#set').classList.add('on');
   $('#s-anki').onclick = async () => { try { toast('Reading the deck…', 60000); DECK = await store.loadDeckFromAnki((a, b) => toast(`Reading the deck… ${a}/${b}`, 60000)); store.store(SAVE, DECK); applyState(); toast(`Deck read: ${DECK.length} words.`); } catch (e) { toast('Anki not reachable: ' + e.message, 5000); } };
   $('#s-save').onclick = () => { const v = $('#s-tok').value.trim(); if (v && !v.startsWith('•')) { store.token.set(v); store.push(SAVE, DECK).then(() => toast('Synced to your private gist.')).catch(e => toast('GitHub refused the token: ' + e.message, 5000)); } links(); };
   $('#s-clear').onclick = () => { store.token.set(''); links(); toast('Token forgotten on this PC.'); };
   $('#s-exp').onclick = () => store.exportSave(SAVE);
+  if (store.conflict.get()) {
+    $('#s-cf-exp').onclick = () => store.exportSave(store.conflict.get().save);
+    $('#s-cf-use').onclick = () => { const o = store.conflict.get().save; if (!confirm('Switch to the other copy? The current save is exported first.')) return; store.exportSave(SAVE); store.conflict.clear(); SAVE = o; persist(); location.reload(); };
+    $('#s-cf-x').onclick = () => { store.conflict.clear(); settings(); };
+  }
   $('#s-kan-go').onclick = () => { const ks = [...new Set([...$('#s-kan').value].filter(c => KD.byK.has(c)))]; const n = setManual(ks, true); toast(`${n} kanji marked acquired (${ks.length - n} were already).`); settings(); };
   $('#s-kan-clear').onclick = () => { if (!confirm('Remove every hand mark? Words in memory are kept.')) return; const n = setManual(Object.keys(SAVE.kanji || {}), false); toast(n + ' hand marks removed.'); settings(); };
 }
@@ -510,14 +520,16 @@ function fameOf() {
 }
 function simCtx() {
   const counts = [0, 0, 0, 0, 0], fc = SAVE.corp.factory || {}; S.forEach(s => counts[s.lvl]++);
-  return { mem: certifiedSet().size, acq: counts[2] + counts[3] + counts[4], tier: PROG.tier, div: Object.values(PROG.div).filter(d => d.a / d.n >= .8).length, up: (fc.conv ? 1 : 0) + (fc.qc ? 1 : 0) + (fc.ext ? 1 : 0), fame: fameOf(), tech: SAVE.corp.tech || {} };
+  return { mem: certifiedSet().size, acq: counts[2] + counts[3] + counts[4], tier: PROG.tier, div: Object.values(PROG.div).filter(d => d.a / d.n >= .8).length, up: (fc.conv ? 1 : 0) + (fc.qc ? 1 : 0) + (fc.ext ? 1 : 0), fu: { conv: !!fc.conv, qc: !!fc.qc, ext: !!fc.ext }, fame: fameOf(), tech: SAVE.corp.tech || {} };
 }
 function simDir() { const d = SAVE.sim.dir; return { funds: `funds ¥${d.goal.toLocaleString()}`, stab: `stability ${d.goal}+`, ship: `ship ${d.goal} products`, mem: `${d.goal} words in memory`, poll: `pollution ≤ ${d.goal}` }[d.k] + ' this quarter'; }
 const busy = () => document.body.classList.contains('audit') || mgmtOpen() || (document.getElementById('mgm') || { classList: { contains: () => false } }).classList.contains('on');
-function nextDecision() { const e = SAVE.sim && SAVE.sim.ev[0]; if (!e || busy()) return; decide(SAVE, e, persist, () => { ui(); refreshMgmt(); setTimeout(nextDecision, 300); }); }
+/* no pop-up chain: decisions wait at the counter in 派閥 (Factions); the core only points at them */
+function nextDecision() { if (!SAVE.sim || busy()) return; const I = inbox(SAVE, simCtx()); const n = (I.major ? 1 : 0) + I.routine.length; if (n && nextDecision.n !== n) { nextDecision.n = n; toast(`派閥 · ${I.major ? I.major.m.title[0] + ' and ' : ''}${I.routine.length} decision${I.routine.length === 1 ? '' : 's'} waiting at the counter (経営 → 派閥).`, 6000); } }
 function mgmt(tab) {
   closeFile(); document.body.classList.add('audit');
-  openMgmt({ save: SAVE, ctx: simCtx, persist, tab, onClose: () => { document.body.classList.remove('audit'); ui(); nextDecision(); } });
+  visit(SAVE, simCtx()); persist();                                        // opening Management is an attended visit (once per day)
+  openMgmt({ save: SAVE, ctx: simCtx, persist, tab, demo: DEMO, onClose: () => { document.body.classList.remove('audit'); ui(); nextDecision(); } });
 }
 $('#b-mgmt').onclick = () => mgmt();
 /* every half minute: run the hours that have passed */
@@ -543,7 +555,7 @@ addEventListener('resize', resize);
 let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
-  if (document.body.classList.contains('audit')) { last = now; return; }      // the audit room covers the core: don't render under it
+  if (document.body.classList.contains('audit') || NO3D) { last = now; return; }      // the audit room covers the core: don't render under it
   const dt = Math.min(.05, (now - last) / 1000); last = now; UT.value += dt;
   /* camera */
   const P = poseNow();
@@ -582,10 +594,11 @@ function frame(now) {
   applyState();
   /* the hours since the last visit */
   if (DEMO) advance(SAVE, simCtx(), Date.now() - 30 * 3600e3);
-  const sum = advance(SAVE, simCtx(), Date.now(), false); persist(); ui();
-  if (sum.hours >= 2 && !QS.has('audit')) briefing(sum, nextDecision); else nextDecision();
+  const sum = advance(SAVE, simCtx(), Date.now(), false); govProgress(SAVE, simCtx()); persist(); ui();
+  if (DEMO && QS.get('arc')) { const { demoArc } = await import('./bureau.js?v=8'); demoArc(SAVE, simCtx(), QS.get('arc')); }
+  if (sum.hours >= 2 && !QS.has('audit')) briefing(sum, nextDecision, inbox(SAVE, simCtx())); else nextDecision();
   if (!DECK && !DEMO) toast(ANKI_OK ? 'Anki found: open Settings to read your deck.' : 'No deck yet: open Anki, then Settings → Read the deck.', 6000);
   if (EMBED) parent.postMessage('karatto:ready', location.origin);
   if (QS.has('audit')) audit();
-  window.__k = { go, pressKey, audit, mgmt, save: () => SAVE, advance: h => { advance(SAVE, simCtx(), Date.now() + h * 3600e3, true); ui(); refreshMgmt(); }, view: VIEW, state: () => ({ tier: PROG.tier, deck: (DECK || []).length }), yaw: (y, p, f) => { VIEW.yaw = y; VIEW.pitch = p || 0; if (f) VIEW.fov = f; }, sec: i => { const s = WALL.L.sections[i]; return WALL.L.angle(s.c0 + 8, 0).t; } };
+  window.__k = { go, pressKey, audit, mgmt, ctx: () => simCtx(), no3d: NO3D, save: () => SAVE, advance: h => { advance(SAVE, simCtx(), Date.now() + h * 3600e3, true); ui(); refreshMgmt(); }, view: VIEW, state: () => ({ tier: PROG.tier, deck: (DECK || []).length }), yaw: (y, p, f) => { VIEW.yaw = y; VIEW.pitch = p || 0; if (f) VIEW.fov = f; }, sec: i => { const s = WALL.L.sections[i]; return WALL.L.angle(s.c0 + 8, 0).t; } };
 })();

@@ -1,11 +1,20 @@
 /* カラット: 本社, headquarters. The boardroom at the top of the crown. Board meetings take the planet's waiting
    decisions (決裁) and put them on the table in Japanese, with furigana. A comprehension check comes first: answer
-   it right and every option is open; wrong, and only the safe one is left. With nothing waiting, the board holds a
-   routine review. Reading practice: no word evidence, but the choices move the planet. */
-import { game, panel, esc, clamp, Y, RED, OK, sfx, $, shuffle } from './game.js?v=7';
-import { EVENTS, resolve, setPolicy, dirProgress } from './sim.js?v=7';
-import { ICON } from './icons.js?v=7';
-import { drawLeaf } from './leaf.js?v=7';
+   it right and the item's background is revealed (who stands where); wrong, and the translation is shown. Every option
+   stays open either way: this is reading practice tied to the actual dispute, not a gate. Decisions resolve through
+   the same command as the counter in 経営 → 派閥 (sim.resolve). No word evidence. */
+import { game, panel, esc, clamp, Y, RED, OK, sfx, $, shuffle } from './game.js?v=8';
+import { EVENTS, resolve, setPolicy, dirProgress } from './sim.js?v=8';
+const EN = {
+  strike: 'The labour union is demanding higher wages. It says that if the company does not agree, it will stop the factory from tomorrow.',
+  protest: 'Residents have gathered in front of the headquarters to oppose the pollution and the surveillance. They want an explanation from the company.',
+  shackle: 'The board thinks the dividends are too small. It wants them set to high for one week.',
+  lawsuit: 'People living near the factory say the air is dirty, and they have sued the company.',
+  order: 'A big company has placed an order. They want 150 units of goods sent right away.',
+  accident: 'This morning there was an accident on the factory line. One worker was injured.' };
+const BG = { strike: 'Background: the union (赤城) is at 30 or below; a raise or talks settle it, a refusal stops work and 70% of outbound dispatch for a day.', protest: 'Background: residents (緑川) are at 30 or below; PR costs money, ignoring costs stability.', shackle: 'Background: the board (九条) is at 30 or below; refusing raises 暴走度.', lawsuit: 'Background: pollution is over 60; legal (紫藤) recommends settling.', order: 'Background: finance (銅島) set the 150 goods aside before the market could sell them.', accident: 'Background: operations (黒田) blames the hours and the safety level.' };
+import { ICON } from './icons.js?v=8';
+import { drawLeaf } from './leaf.js?v=8';
 
 const rb = s => s.replace(/\[([^|\]]+)\|([^\]]+)\]/g, '<ruby>$1<rt>$2</rt></ruby>');
 const TXT = {
@@ -19,16 +28,16 @@ const SEATS = [['会長', 'The chair', 'board'], ['組合長', 'Union', 'union']
 let ITEMS = [], k = 0, step = 'read', choice = null, checked = null, done = 0;
 
 function routine(api) {
-  const S = api.SAVE.sim, f = Math.round(api.SAVE.corp.funds), st = Math.round(S.stab), dp = dirProgress(S, api.SAVE.corp, { mem: api.MEM.length });
+  const S = api.SAVE.sim, f = Math.round(api.SAVE.corp.funds), st = Math.round(S.stab), dp = dirProgress(S, api.SAVE.corp, (api.summary && api.summary.ctx) || { mem: api.MEM.length });
   const opts = [String(st), String(clamp(st + 17, 0, 100)), String(clamp(st - 13, 0, 100)), String(clamp(100 - st, 0, 100))].filter((v, i, a) => a.indexOf(v) === i);
   while (opts.length < 4) opts.push(String((st + opts.length * 7) % 100));
   return { k: 'routine', jp: `[定例|ていれい][会議|かいぎ]です。[安定度|あんていど]は${st}、[資金|しきん]は${f.toLocaleString()}[円|えん]です。[人口|じんこう]は${Math.round(S.pop.w + S.pop.c + S.pop.e)}[人|にん]。${S.poll > 40 ? '[公害|こうがい]が[増|ふ]えていると[住民|じゅうみん]が[心配|しんぱい]しています。' : '[今|いま]のところ[大|おお]きな[問題|もんだい]はありません。'}`,
-    q: 'What is the stability right now?', a: opts.slice(0, 4), def: 0,
+    q: 'What is the stability right now?', a: opts.slice(0, 4), def: 0, en: `A routine meeting. Stability is ${st} and the funds are ¥${f.toLocaleString()}. The population is ${Math.round(S.pop.w + S.pop.c + S.pop.e)}. ${S.poll > 40 ? 'Residents are worried that pollution is rising.' : 'For now there are no major problems.'}`, bg: 'Background: nothing waits on the table.',
     o: [['現状維持', 'Keep the course', 'Nothing changes.'], ['広報を始める', 'Start a PR campaign', '社則: PR → Campaign'], ['公害対策を強化', 'Strengthen pollution control', '社則: pollution control one step up']] };
 }
 function build(api) {
   const S = api.SAVE.sim; ITEMS = [];
-  if (S && S.v === 2) { for (const e of S.ev.slice(0, 3)) { const T = TXT[e.k]; if (T) ITEMS.push({ k: e.k, id: e.id, jp: T[0], q: T[1], a: T[2], o: EVENTS[e.k].o, def: EVENTS[e.k].def }); } if (!ITEMS.length) ITEMS.push(routine(api)); }
+  if (S && S.v === 2) { for (const e of S.ev.slice(0, 3)) { const T = TXT[e.k]; if (T) ITEMS.push({ k: e.k, id: e.id, jp: T[0], q: T[1], a: T[2], o: EVENTS[e.k].o, def: EVENTS[e.k].def, en: EN[e.k], bg: BG[e.k] }); } if (!ITEMS.length) ITEMS.push(routine(api)); }
   ITEMS.forEach(it => { it.order = shuffle(it.a.map((_, i) => i)); });
   k = 0; step = 'read'; checked = null;
 }
@@ -39,14 +48,14 @@ function show(api) {
   P.innerHTML = `<div class="nh"><span>役員会議 · BOARD MEETING · ITEM ${k + 1} OF ${ITEMS.length}</span><span>${it.k === 'routine' ? '定例 ROUTINE' : EVENTS[it.k].j + ' · ' + EVENTS[it.k].en.toUpperCase()}</span></div>
     <div class="jp kj">${rb(it.jp)}</div>
     ${step === 'read' ? `<div class="q"><b>確認 · CHECK</b> ${esc(it.q)}</div><div class="ops">${it.order.map((i, n) => `<button type="button" class="op" data-n="${n}"><span class="key">${n + 1}</span>${esc(it.a[i])}</button>`).join('')}</div>`
-      : `<div class="q"><b>${checked ? '理解 · UNDERSTOOD' : '誤解 · MISREAD'}</b> ${checked ? 'every option is on the table.' : `it was “${esc(it.a[0])}”. Only the safe option is left.`}</div>
-      <div class="ops">${E.map(([j, en, d], i) => { const open = checked || i === it.def; return `<button type="button" class="op dec${open ? '' : ' lock'}" data-i="${i}" ${open ? '' : 'disabled'}><span class="key">${String.fromCharCode(65 + i)}</span><span><b class="kj">${j}</b> ${en}<br><small>${esc(d)}</small></span></button>`; }).join('')}</div>`}`;
+      : `<div class="q"><b>${checked ? '理解 · UNDERSTOOD' : '誤解 · MISREAD'}</b> ${checked ? esc(it.bg || '') : `it was “${esc(it.a[0])}”. Translation: ${esc(it.en || '')}`}</div>
+      <div class="ops">${E.map(([j, en, d], i) => `<button type="button" class="op dec" data-i="${i}"><span class="key">${String.fromCharCode(65 + i)}</span><span><b class="kj">${j}</b> ${en}<br><small>${esc(d)}${i === it.def ? ' · the autopilot\'s choice' : ''}</small></span></button>`).join('')}</div>`}`;
   P.querySelectorAll('[data-n]').forEach(b => b.onclick = () => check(api, +b.dataset.n));
   P.querySelectorAll('[data-i]').forEach(b => b.onclick = () => decide(api, +b.dataset.i));
 }
-function check(api, n) { const it = ITEMS[k]; if (step !== 'read') return; checked = it.order[n] === 0; step = 'decide'; sfx(checked ? 'ok' : 'ng'); api.log(it.k === 'routine' ? '定例' : EVENTS[it.k].j, checked ? '読解 ✓' : '読解 ✗', checked ? 'all options' : 'safe only', checked ? 'y' : 'r'); show(api); }
+function check(api, n) { const it = ITEMS[k]; if (step !== 'read') return; checked = it.order[n] === 0; step = 'decide'; sfx(checked ? 'ok' : 'ng'); api.log(it.k === 'routine' ? '定例' : EVENTS[it.k].j, checked ? '読解 ✓' : '読解 ✗', checked ? 'background' : 'translation', checked ? 'y' : 'r'); show(api); }
 function decide(api, i) {
-  const it = ITEMS[k]; if (step !== 'decide' || !(checked || i === it.def)) return;
+  const it = ITEMS[k]; if (step !== 'decide' || !it.o[i]) return;
   if (it.k === 'routine') { if (i === 1) setPolicy(api.SAVE, 'pr', 1); if (i === 2) setPolicy(api.SAVE, 'eco', Math.min(2, api.SAVE.sim.pol.eco + 1)); }
   else resolve(api.SAVE, it.id, i);
   done++; api.persist(); sfx('coin'); api.log(it.o[i][0], it.o[i][1], 'decided', 'y'); seats(api);
@@ -61,8 +70,8 @@ function seats(api) {
 game({
   id: 'hq', site: 'hq', tier: 4, code: 'HQ-09', jp: '本社', en: 'Headquarters', sub: 'THE BOARDROOM · THE TOP OF THE CROWN', title: '役員会議', dur: 0,
   skills: [],
-  lead: 'The board puts the planet\'s waiting decisions on the table, written in Japanese with furigana. Read the item and answer the check (<span class="key">1</span>–<span class="key">4</span>): right, and every option is open; wrong, and only the safe one is left (<span class="key">A</span>–<span class="key">C</span>). The choices move factions, stability, funds and 暴走度. With nothing waiting, the board holds a routine review.',
-  how: [['READ · 読解', '議題を読む', 'Each item in Japanese, furigana on every kanji.'], ['CHECK · 確認', '理解を示す', 'One question in English about what you just read.'], ['DECIDE · 決定', '選択肢', 'Understood: all options. Misread: only the safe one.']],
+  lead: 'The board puts the planet\'s waiting decisions on the table, written in Japanese with furigana. Read the item and answer the check (<span class="key">1</span>–<span class="key">4</span>): right, and the background is revealed; wrong, and you see the translation. Then decide (<span class="key">A</span>–<span class="key">C</span>): every option stays open. The same decisions wait at the counter in 経営 → 派閥.',
+  how: [['READ · 読解', '議題を読む', 'Each item in Japanese, furigana on every kanji.'], ['CHECK · 確認', '理解を示す', 'One question in English about what you just read.'], ['DECIDE · 決定', '選択肢', 'Understood: the background. Misread: the translation. All options either way.']],
   stats: [['議題', 'ITEMS', () => `${Math.min(k + 1, ITEMS.length)}/${ITEMS.length}`], ['決定', 'DECIDED', () => done]],
   goLabel: '開会 · Open the meeting', againLabel: '次の会議 · Next meeting', clock: () => 'MEETING',
   blocked: api => !(api.SAVE.sim && api.SAVE.sim.v === 2),

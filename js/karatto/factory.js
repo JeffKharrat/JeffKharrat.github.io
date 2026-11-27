@@ -7,12 +7,13 @@
    evidence for the word; a late one scraps it with no change to the evidence. Words already in memory are handled by
    the AI's own robots (blue, 自動). First attempt per word and skill in a shift only. At the end of the shift: the daily
    report, the yen, and the files the evidence now supports, sent to the audit in the core. */
-import { loadKanji } from './model.js?v=7';
-import * as store from './store.js?v=7';
-import { deckWord, buildPool, traps, shuffle } from './words.js?v=7';
-import { record, updateFlags, SKILL_J, day } from './evidence.js?v=7';
-import { addShift } from './sim.js?v=7';
-import { leafSVG, leafFavicon } from './leaf.js?v=7';
+import { loadKanji } from './model.js?v=8';
+import * as store from './store.js?v=8';
+import { deckWord, buildPool, traps, shuffle } from './words.js?v=8';
+import { record, updateFlags, SKILL_J, day, payRate } from './evidence.js?v=8';
+import { addShift, book } from './sim.js?v=8';
+import { once, visit, progress } from './gov.js?v=8';
+import { leafSVG, leafFavicon } from './leaf.js?v=8';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;
@@ -358,16 +359,17 @@ function answer(i) {
 }
 function resolve(c, kind, bi = -1) {
   c.done = true; const s = c.s, w = c.word, el = c.el;
+  let r = null;
   if (kind === 'ok' || kind === 'ng') {
     G.tried.add(s.skill + w.id);
-    const r = record(SAVE, w.id, s.skill, kind === 'ok', 'factory', 'factory');
+    r = record(SAVE, w.id, s.skill, kind === 'ok', 'pick', 'factory');
     const T = G.touched.get(w.id) || { w, res: {} }; T.res[s.skill] = kind === 'ok' ? (r === 'new' ? 'new' : 'same') : 'miss'; G.touched.set(w.id, T);
   }
   const ans = () => `<div class="ans"><b>${esc(w.w)}</b><span>${esc(w.r)} · ${esc(w.s)}</span></div>`;
   const stamp = document.createElement('div');
   if (kind === 'ok' || kind === 'auto') {
     stamp.className = 'ok'; stamp.innerHTML = `<div class="sx"><span>${kind === 'auto' ? 'AUTO // HANDLED BY THE AI' : 'PASS // PART FITTED'}</span><b>${kind === 'auto' ? '自動' : '良品'}</b></div>${ans('')}`;
-    if (kind === 'ok') { G.streak++; G.best = Math.max(G.best, G.streak); const y = 15 + (5 - lvlOf(w)) * 5; G.yen += y; logL(w.w, SKILL_J[s.skill], '+¥' + y, 'y'); sfx('ok'); }
+    if (kind === 'ok') { G.streak++; G.best = Math.max(G.best, G.streak); const y = Math.round((15 + (5 - lvlOf(w)) * 5) * payRate(r)); if (r !== 'new') G.prac = (G.prac || 0) + 1; G.yen += y; logL(w.w, SKILL_J[s.skill], '+¥' + y, 'y'); sfx('ok'); }
     else { G.yen += 10; G.auto++; logL(w.w, '自動', '+¥10', 'a'); }
     launch(s, c, bi);
   } else {
@@ -484,9 +486,9 @@ function hud() {
 
 /* ---------------- the shift: brief, start, end, report ---------------- */
 const UPG = [
-  { id: 'conv', name: '高速コンベア', en: 'Fast conveyor', cost: 600, d: 'Plates come in faster: more cards, more yen.' },
-  { id: 'qc', name: '品質管理', en: 'Quality control', cost: 900, d: 'The first defect of a shift costs no yen. Evidence is still wiped.' },
-  { id: 'ext', name: 'シフト延長', en: 'Longer shift', cost: 500, d: 'Shifts run 4 minutes instead of 3.' }];
+  { id: 'conv', name: '高速コンベア', en: 'Fast conveyor', cost: 600, d: 'Plates come in faster: more cards, more yen. On the planet: +8% production.' },
+  { id: 'qc', name: '品質管理', en: 'Quality control', cost: 900, d: 'The first defect of a shift costs no yen. Evidence is still wiped. On the planet: +5% on the sale price.' },
+  { id: 'ext', name: 'シフト延長', en: 'Longer shift', cost: 500, d: 'Shifts run 4 minutes instead of 3. On the planet: +50 factory jobs.' }];
 function left() {
   const nW = LEARN.length, nM = MEM.length;
   $('#left').innerHTML = `<div class="hd"><span class="lb">LINE 01 · SHIFT ${String(FC.shifts + 1).padStart(3, '0')}</span><span class="bc"></span></div>
@@ -512,7 +514,7 @@ function brief() {
 function start() {
   try { AC = AC || new AudioContext(); AC.resume(); } catch (e) {}
   $('#ov-brief').classList.remove('on'); $('#ov-report').classList.remove('on');
-  Object.assign(G, { run: true, T0: FC.ext ? 240 : 180, ship: 0, def: 0, yen: 0, spawnT: 0, focus: null, lock: 0, tried: new Set(), touched: new Map(), forgive: 0, streak: 0, auto: 0 });
+  Object.assign(G, { run: true, rid: 'factory:' + Date.now().toString(36) + ':' + Math.random().toString(36).slice(2, 6), prac: 0, T0: FC.ext ? 240 : 180, ship: 0, def: 0, yen: 0, spawnT: 0, focus: null, lock: 0, tried: new Set(), touched: new Map(), forgive: 0, streak: 0, auto: 0 });
   G.T = G.T0; G.target = Math.round((FC.ext ? 240 : 180) / (FC.conv ? 15 : 18));
   PRODS = []; PARTS = []; ST.forEach(s => { s.prod = null; s.card = null; s.act = null; }); CARDS.innerHTML = ''; $('#log').innerHTML = '<div class="hd"><span class="lb">LOG · 作業ログ</span><span class="bc"></span></div>';
   makeBins(); left();
@@ -523,8 +525,10 @@ function endShift() {
   setTimeout(() => { CARDS.innerHTML = ''; }, 500); BIN.forEach(b => b.classList.add('off'));
   const flagged = updateFlags(SAVE);
   const answers = [...G.touched.values()].reduce((n, x) => n + Object.values(x.res).filter(v => v !== 'miss').length, 0);
-  addShift(SAVE, G.ship, answers);
-  SAVE.corp.funds = (SAVE.corp.funds || 0) + G.yen; FC.shifts++; FC.best = Math.max(FC.best || 0, G.ship);
+  /* the shift's result applies once (reloads, a second click): goods, shipments, fees, then the governance clock */
+  if (!DEMO) once(SAVE, 'game:' + G.rid, () => { addShift(SAVE, G.ship, answers, G.yen); const ctx = summaryCtx(); if (ctx) { visit(SAVE, ctx); progress(SAVE, ctx); } });
+  else addShift(SAVE, G.ship, answers, G.yen);
+  FC.shifts++; FC.best = Math.max(FC.best || 0, G.ship);
   (SAVE.log = SAVE.log || []).push({ t: Date.now(), k: 'factory', ship: G.ship, def: G.def, yen: G.yen, flagged: flagged.length }); if (SAVE.log.length > 200) SAVE.log.splice(0, SAVE.log.length - 200);
   persist();
   setTimeout(() => report(flagged), 1100);
@@ -536,7 +540,7 @@ function report(flagged) {
   const byId = new Map(DECK.map(w => [w.id, w]));
   $('#report').innerHTML = `<div class="bar"><span>FAC-01 // 日報 DAILY REPORT // SHIFT ${String(FC.shifts).padStart(3, '0')}</span><span class="bc" style="opacity:.8"></span></div><h2>${G.ship >= G.target ? '目標達成' : '目標未達'}</h2>
     <div class="row"><div class="stat"><span class="lb">shipped</span><b>${G.ship}<span class="m" style="font-size:16px"> / ${G.target}</span></b></div><div class="stat"><span class="lb">defects</span><b style="color:${G.def ? RED : 'inherit'}">${G.def}</b></div><div class="stat"><span class="lb">earned</span><b style="color:${Y}">¥${G.yen.toLocaleString()}</b></div><div class="stat"><span class="lb">best streak</span><b>${G.best}</b></div></div>
-    <div class="lb">evidence · ${ok} clean, ${ng} wiped${G.auto ? ` · ${G.auto} handled by the AI` : ''}</div>
+    <div class="lb">evidence · ${ok} clean, ${ng} wiped${G.auto ? ` · ${G.auto} handled by the AI` : ''}${G.prac ? ` · ${G.prac} repeat${G.prac > 1 ? 's' : ''} at the practice rate` : ''}${G.ship >= 5 ? ' · <span style="color:#FFE600">shipment run counted</span>' : ' · 5 shipped makes a shipment run'}</div>
     <div class="ev">${rows.slice(0, 16).map(x => `<div><span><span class="kj">${esc(x.w.w)}</span> <span class="m">${esc(x.w.r)}</span></span><span>${Object.entries(x.res).map(([k, v]) => SKILL_J[k] + ' ' + cell(v)).join(' · ')}</span></div>`).join('') || '<div class="m">No card answered.</div>'}</div>
     ${flagged.length ? `<div class="files"><b class="a">${flagged.length} file${flagged.length > 1 ? 's' : ''} sent to the audit</b> · the AI thinks you know <span class="kj">${flagged.slice(0, 6).map(id => esc((byId.get(id) && deckWord(byId.get(id), KD).w) || '')).join('、')}${flagged.length > 6 ? '…' : ''}</span>. Commit or reject them in the core (審査).</div>` : ''}
     <div class="lb" style="margin-top:16px">設備投資 · upgrades · funds ¥${(SAVE.corp.funds || 0).toLocaleString()}</div>
@@ -544,9 +548,10 @@ function report(flagged) {
     <div class="acts"><button class="go" id="b-again" type="button">次のシフト · Next shift <span class="key" style="border-color:#111;color:#111">Enter</span></button><button class="go2" id="b-out2" type="button">Back to the surface</button></div>`;
   $('#ov-report').classList.add('on');
   $('#b-again').onclick = start; $('#b-out2').onclick = exit;
-  $('#report').querySelectorAll('[data-u]').forEach(b => b.onclick = () => { const u = UPG.find(x => x.id === b.dataset.u); if (FC[u.id] || SAVE.corp.funds < u.cost) return; SAVE.corp.funds -= u.cost; FC[u.id] = 1; persist(); report(flagged); });
+  $('#report').querySelectorAll('[data-u]').forEach(b => b.onclick = () => { const u = UPG.find(x => x.id === b.dataset.u); if (FC[u.id] || SAVE.corp.funds < u.cost) return; if (SAVE.sim && SAVE.sim.v === 2) book(SAVE.sim, SAVE.corp, 'cap', -u.cost, `設備投資 ${u.name} ¥${u.cost.toLocaleString()}`); else SAVE.corp.funds -= u.cost; FC[u.id] = 1; persist(); report(flagged); });
 }
 function persist() { if (!DEMO) store.store(SAVE, null); }
+function summaryCtx() { try { return (JSON.parse(localStorage.getItem('karatto.summary') || '{}')).ctx || null; } catch (e) { return null; } }
 function exit() { if (EMBED) parent.postMessage('karatto:surface', location.origin); else location.href = '../' + (DEMO ? '?demo' : ''); }
 
 /* ---------------- input ---------------- */

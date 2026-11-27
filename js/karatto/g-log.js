@@ -2,12 +2,14 @@
    (laid out like the numpad), their signs words from the deck. Order slips give a destination as a reading (skill
    reading) or a meaning (skill recall); pick the shop (click it or its numpad key) and a free truck drives the route.
    A wrong shop is a misdelivery: the truck goes there and back for nothing, and that skill's evidence is wiped. */
-import { game, panel, esc, clamp, ease, Y, RED, OK, sfx, $, overlap } from './game.js?v=7';
+import { game, panel, esc, clamp, ease, Y, RED, OK, sfx, $, overlap } from './game.js?v=8';
+import { available } from './sim.js?v=8';
+import { activeLot, sendLot } from './gov.js?v=8';
 
 const COLS = [400, 640, 880], ROWS = [150, 310, 470], VX = [520, 520, 760], DEP = { x: 640, y: 616 };
 const shopPos = n => ({ c: n % 3, r: 2 - Math.floor(n / 3) });                       // numpad: 1 2 3 bottom row, 7 8 9 top
 const center = n => { const { c, r } = shopPos(n); return { x: COLS[c], y: ROWS[r] }; };
-let SH = [], ORD = [], TR = [], FX = [], PEDS = [], sel = 0, spawnT = 0, st = { del: 0, mis: 0, late: 0 };
+let SH = [], ORD = [], TR = [], FX = [], PEDS = [], sel = 0, spawnT = 0, st = { del: 0, mis: 0, late: 0, lot: 0, fr: 0, tr: 0 }, FR = { lot: 0, stock: 0, id: null, name: '' };
 
 function route(n) {
   const { c, r } = shopPos(n), x = COLS[c], y = ROWS[r] + 80, vx = VX[c];
@@ -54,7 +56,7 @@ function dispatch(api, n) {
   const o = ORD[sel]; if (!o) return api.toast('No order selected');
   const t = TR.find(t => t.st === 'idle'); if (!t) { sfx('buzz'); return api.toast('全車出動中 · every truck is out'); }
   const ok = SH[n].w && SH[n].w.w === o.w.w;
-  api.record(o.w, o.skill, ok, 'pick');
+  api.record(o.w, o.skill, ok, 'pick'); o.rate = api.G.rate;
   ORD.splice(sel, 1); o.dest = n; o.ok = ok; o.disp = api.t;
   Object.assign(t, { st: 'out', o, P: route(n), d: 0 }); t.L = plen(t.P);
   if (!ok) { api.log(o.w.w, o.skill === 'reading' ? '読み ✗' : '意味 ✗', 'misdelivery', 'r'); FX.push({ k: 'right', n: SH.findIndex(s => s.w && s.w.w === o.w.w), t: 0 }); sfx('ng'); api.toast(`誤配送 · it was ${o.w.w} (${o.w.r}, ${o.w.s})`, 3000); }
@@ -68,6 +70,8 @@ game({
   lead: 'Order slips come in on the left: a destination given as a <b>reading</b> or a <b>meaning</b>, with a time window and a fee. Find the shop whose sign is that word and press its numpad key (or click it). A free truck takes the route. A wrong shop is a misdelivery: the trip is wasted and that skill\'s evidence for the word is wiped.',
   how: [['READING · 読み', '読み → 看板', 'The slip shows the reading: find the written word on the signs.'], ['MEANING · 意味', '意味 → 看板', 'The slip shows the meaning: find the word it names.'], ['FLEET · 車両', '三台の車', 'Three trucks. Tab switches slips; late deliveries pay half. The district is re-signed as you go.']],
   stats: [['配達', 'DEL', () => st.del], ['誤配', 'MIS', () => st.mis], ['¥', '', a => a.G.yen.toLocaleString()]],
+  notes: api => { const S = api.SAVE.sim, L = S && S.v === 2 ? activeLot(S) : null, fr = S && S.v === 2 ? Math.floor(available(S) / 4) : 0;
+    return `<div class="note">${L ? `<b class="y">契約 ${esc(L.j || L.id)}</b> · ${Math.ceil((L.qty - L.sent) / L.units)} deliveries left on a ${L.kind} lot (${L.held} goods held${L.pay ? `, ¥${L.pay} on completion` : ''}). They go first. ` : ''}Warehouse: ${fr} freight loads free above the household floor${fr ? '' : ' (deliveries beyond them are training runs at a 40% service fee)'}.</div>`; },
   shop: [{ id: 'truck4', name: '四台目', en: 'A fourth truck', cost: 700, d: 'One more truck in the fleet.' }, { id: 'fast', name: '高速トラック', en: 'Faster trucks', cost: 600, d: 'Trucks drive a third faster.' }, { id: 'longer', name: 'シフト延長', en: 'Longer shift', cost: 500, d: 'Shifts run 4 minutes.' }],
   init(api) {
     const css = document.createElement('style'); css.textContent = `
@@ -88,7 +92,10 @@ game({
       for (let n = 0; n < 9; n++) { const c = center(n); if (Math.abs(x - c.x) < 95 && Math.abs(y - c.y) < 60) return dispatch(api, n); } });
   },
   start(api) {
-    signAll(api); ORD = []; FX = []; sel = 0; spawnT = 1; st = { del: 0, mis: 0, late: 0 };
+    signAll(api); ORD = []; FX = []; sel = 0; spawnT = 1; st = { del: 0, mis: 0, late: 0, lot: 0, fr: 0, tr: 0 };
+    /* the cargo for this shift: a contract lot that's held in the warehouse, then the free stock above the household floor */
+    const S = api.SAVE.sim, L = S && S.v === 2 && !api.preview ? activeLot(S) : null;
+    FR = { id: L ? L.id : null, name: L ? `${L.j || L.id} (${L.en || ''})` : '', lot: L ? Math.min(Math.floor((L.held || 0) / L.units), Math.ceil((L.qty - L.sent) / L.units)) : 0, stock: S && S.v === 2 && !api.preview ? Math.floor(available(S) / 4) : 0 };
     TR = Array.from({ length: api.U.truck4 ? 4 : 3 }, (_, i) => ({ st: 'idle', i })); newOrder(api); fleet(api); $('#g-log').innerHTML = '';
   },
   tick(dt, api) {
@@ -110,13 +117,20 @@ game({
     if (e.key === 'Tab') { sel = ORD.length ? (sel + 1) % ORD.length : 0; slips(api); return true; }
   },
   end(api) {
-    return { title: st.del >= 10 ? '配送完了' : '業務終了', rows: [['delivered', st.del, 'y'], ['misdelivered', st.mis, st.mis ? 'r' : ''], ['expired', st.late]], effect: { delivered: st.del } };
+    return { title: st.del >= 10 ? '配送完了' : '業務終了', rows: [['delivered', st.del, 'y'], ['misdelivered', st.mis, st.mis ? 'r' : ''], [st.lot ? 'contract lot' : 'training runs', st.lot ? st.lot : st.tr]], effect: { delivered: st.del, freight: st.fr, lot: st.lot, training: st.tr, lotId: FR.id },
+      extra: `<div class="note">${st.lot ? `<b class="y">契約 ${st.lot} contract deliveries</b> against ${esc(FR.name)}. ` : ''}${st.fr} freight deliveries from the warehouse${st.tr ? `; ${st.tr} training runs (no stock to carry: a 40% service fee)` : ''}.</div>` };
+  },
+  settle(api, res, rid) { if (res.effect.lot && FR.id) sendLot(api.SAVE, FR.id, res.effect.lot, rid);
   },
   draw(cx, t, dt, api) { scene(cx, t, api); }
 });
 function arrive(api, t) {
   const o = t.o, c = center(o.dest);
-  if (o.ok) { const late = api.t - o.born > o.T, fee = late ? Math.round(o.fee / 2) : o.fee; api.G.yen += fee; st.del++; FX.push({ k: 'pay', n: o.dest, t: 0, txt: '+¥' + fee }); sfx('coin'); api.log(o.w.w, o.skill === 'reading' ? '読み ✓' : '意味 ✓', '+¥' + fee, 'y');
+  if (o.ok) {
+    /* what the truck carried: a contract lot first, then freight from the warehouse, else a training run at a service fee */
+    const kind = FR.lot > 0 ? 'lot' : FR.stock > 0 ? 'freight' : 'training'; if (kind === 'lot') { FR.lot--; st.lot++; } else if (kind === 'freight') { FR.stock--; st.fr++; } else st.tr++;
+    const late = api.t - o.born > o.T, base = late ? Math.round(o.fee / 2) : o.fee, fee = Math.round(base * (o.rate || 1) * (kind === 'training' ? .4 : 1));
+    api.G.yen += fee; st.del++; FX.push({ k: 'pay', n: o.dest, t: 0, txt: '+¥' + fee }); sfx('coin'); api.log(o.w.w, (o.skill === 'reading' ? '読み ✓' : '意味 ✓') + ' · ' + { lot: '契約 LOT', freight: '貨物 FREIGHT', training: '訓練 TRAINING' }[kind], '+¥' + fee, kind === 'training' ? 'm' : 'y');
     if (Math.random() < .55) setTimeout(() => resign(api, o.dest), 700); }
   else { st.mis++; FX.push({ k: 'miss', n: o.dest, t: 0 }); }
   fleet(api);

@@ -2,7 +2,7 @@
    you committed to memory (weighted toward old ones you rarely see): type its reading before the encryption bar
    fills. A word lost in a real breach becomes compromised until you prove it again in any game. Without a breach
    on the planet, the room runs drills (nothing is lost). Skill: reading, typed. */
-import { game, panel, typer, sameReading, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=7';
+import { game, panel, typer, sameReading, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=8';
 
 let TG = [], k = 0, enc = 0, fw = 100, T, real = false, rival = '', done = false, FX = [], RACK = [];
 const ENC = api => 7 * (api.tech.fire ? 1.3 : 1);
@@ -25,7 +25,7 @@ function lose(api, t, quiet) {
 function submit(api, v) {
   const t = TG[k]; if (!t || t.st !== 'cur' || done) return;
   const ok = sameReading(v, [t.w.r]); api.record(t.w, 'reading', ok, 'typed'); T.flash(ok);
-  if (ok) { t.st = 'held'; api.G.yen += real ? 60 : 20; sfx('ok'); api.log(t.w.w, t.w.r, 'held', 'y'); k++; next(api); }
+  if (ok) { t.st = 'held'; api.G.yen += api.pay(real ? 60 : 20); sfx('ok'); api.log(t.w.w, t.w.r, 'held', 'y'); k++; next(api); }
   else { fw = Math.max(0, fw - 6); T.clear(); sfx('buzz'); if (fw <= 0) next(api); }
 }
 

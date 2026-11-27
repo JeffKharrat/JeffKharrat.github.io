@@ -5,10 +5,10 @@
      申告 Claim         a word you know that the games haven't proven: always spot-checked. 40 a day after the founding.
      創業監査 Founding  before the corporation exists: your deck's easiest words, 20 at a time, each one spot-checked.
    The AI argues; Jeff decides. Nothing here touches Anki. */
-import { deckWord, buildPool, traps, shuffle } from './words.js?v=7';
-import { toKana, sameReading } from './kana.js?v=7';
-import { leafSVG } from './leaf.js?v=7';
-import { SKILLS, SKILL_J, files, commit, snooze, record, claimsLeft, useClaim, skillsClean, day } from './evidence.js?v=7';
+import { deckWord, buildPool, traps, shuffle } from './words.js?v=8';
+import { toKana, sameReading } from './kana.js?v=8';
+import { leafSVG } from './leaf.js?v=8';
+import { SKILLS, SKILL_J, files, commit, snooze, record, claimsLeft, useClaim, skillsClean, day, compromised, reverify, eligible as eligibleNow } from './evidence.js?v=8';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const SK_EN = { meaning: 'Meaning', reading: 'Reading', recall: 'Recall', context: 'Context', listen: 'Listening' };
@@ -186,7 +186,9 @@ function foundBatch() {
   cand.sort((a, b) => (b.lvl || 0) - (a.lvl || 0) || a.w.length - b.w.length || a.id - b.id);   // N5 first, short first
   A.batch = cand.slice(0, 20); A.bi = 0; return A.batch;
 }
+function rvList() { return compromised(save()).map(f => A.byId.get(f.id)).filter(Boolean); }
 function current() {
+  if (A.tab === 'rv') { const L = rvList(); A.sel = Math.min(A.sel, Math.max(0, L.length - 1)); return L[A.sel] || null; }
   if (A.tab === 'files') { const L = fileList(); A.sel = Math.min(A.sel, Math.max(0, L.length - 1)); return L[A.sel] || null; }
   if (A.tab === 'found') { const B = foundBatch(); return B[A.bi] || null; }
   return A.claim || null;
@@ -194,7 +196,8 @@ function current() {
 
 function render() {
   const s = save(), nF = fileList().length, left = claimsLeft(s, A.ctx.founding);
-  $a('.tabs').innerHTML = [['files', '審査待ち', 'Files', nF], ['claim', '申告', 'Claim'], ...(A.ctx.founding ? [['found', '創業監査', 'Founding audit']] : [])]
+  const nR = rvList().length;
+  $a('.tabs').innerHTML = [['files', '審査待ち', 'Files', nF], ['claim', '申告', 'Claim'], ...(nR || A.tab === 'rv' ? [['rv', '復旧', 'Reverify', nR]] : []), ...(A.ctx.founding ? [['found', '創業監査', 'Founding audit']] : [])]
     .map(([id, j, e, n]) => `<button type="button" class="tab${A.tab === id ? ' on' : ''}" data-t="${id}"><b>${j}</b>${e.toUpperCase()}${n ? `<i>${n}</i>` : ''}</button>`).join('');
   A.root.querySelectorAll('.tab').forEach(b => b.onclick = () => { if (A.busy) return; A.tab = b.dataset.t; A.check = null; A.claim = null; render(); });
   $a('#au-cl').textContent = A.tab === 'claim' ? (left === Infinity ? 'claims · unlimited during the founding' : `claims left today · ${left}/40`) : '';
@@ -211,6 +214,10 @@ function cabinet() {
   if (A.tab === 'files') {
     const F = fileList(); $a('#au-ch').innerHTML = '<b>QUEUE</b> 審査待ち'; $a('#au-cn').innerHTML = String(F.length).padStart(3, '0') + ' WAITING <span class="bc"></span>';
     L.innerHTML = F.map((w, i) => `<div class="fo${i === A.sel ? ' sel' : ''}" data-i="${i}"><span class="n">${idx(i)}</span><b>${esc(w.w)}<small>${esc(w.r)}</small></b><span class="pp">${pips(w)}</span></div>`).join('') || '<div class="empty">QUEUE EMPTY.<br>The AI flags a word once it has clean evidence in 3 skills over 2 different days. Run shifts in the Great Factory.</div>';
+    L.querySelectorAll('.fo').forEach(f => f.onclick = () => { if (A.busy) return; A.sel = +f.dataset.i; A.check = null; render(); });
+  } else if (A.tab === 'rv') {
+    const F = rvList(); $a('#au-ch').innerHTML = '<b>BREACH</b> 復旧'; $a('#au-cn').innerHTML = String(F.length).padStart(3, '0') + ' COMPROMISED <span class="bc"></span>';
+    L.innerHTML = F.map((w, i) => `<div class="fo${i === A.sel ? ' sel' : ''}" data-i="${i}"><span class="n">${idx(i)}</span><b>${esc(w.w)}</b><span class="lb" style="color:var(--red)">COMP</span></div>`).join('') || '<div class="empty">Nothing compromised. Words lost in a breach come here: they stay in memory, marked, until you prove them again.</div>';
     L.querySelectorAll('.fo').forEach(f => f.onclick = () => { if (A.busy) return; A.sel = +f.dataset.i; A.check = null; render(); });
   } else if (A.tab === 'found') {
     const B = foundBatch(); $a('#au-ch').innerHTML = '<b>BATCH</b> 創業監査'; $a('#au-cn').textContent = idx(Math.min(A.bi, Math.max(0, B.length - 1))) + ' / ' + String(B.length).padStart(3, '0');
@@ -242,7 +249,7 @@ function desk() {
     D.innerHTML = `<div class="paper in"><div class="ph"><span><b>REC —</b> IDLE</span><span class="bc"></span></div><div class="done-big"><span class="lb">${A.tab === 'files' ? 'QUEUE CLEARED' : 'BATCH COMPLETE'}</span><b>${A.tab === 'files' ? '処理完了' : '監査完了'}</b><span class="lb">${A.tab === 'found' && A.words.length ? 'PRESS Y FOR THE NEXT BATCH' : 'NO RECORD LOADED'}</span></div></div>`;
     say(A.tab === 'files' ? 'Nothing left to argue about. Go make evidence: the factory is open.' : 'The batch is done. Another twenty whenever you want.'); return;
   }
-  const kind = A.tab === 'files' ? 'ADMISSION 審査' : A.tab === 'found' ? 'FOUNDING 創業監査' : 'CLAIM 申告';
+  const kind = A.tab === 'files' ? 'ADMISSION 審査' : A.tab === 'rv' ? 'REVERIFY 復旧' : A.tab === 'found' ? 'FOUNDING 創業監査' : 'CLAIM 申告';
   const done = A.check && A.check.step === 'done';
   D.innerHTML = `<div class="paper in">${paperHTML(w, { kind, hide: A.tab !== 'files' ? !done : !!A.check && !done })}${A.check ? slipHTML() : ''}</div>`;
   if (A.check) wireSlip();
@@ -251,6 +258,7 @@ function desk() {
 function finding(w) {
   const r = save().words[w.id] || {}, cl = skillsClean(r), days = new Set(); cl.forEach(k => r.ev[k].d.forEach(d => days.add(d)));
   if (A.check) return A.check.step === 'reading' ? 'Spot check. Type the reading in romaji, then Enter. No furigana on the file now.' : A.check.step === 'meaning' ? 'Reading accepted. Now its meaning: 1 to 4.' : A.check.msg;
+  if (A.tab === 'rv') { const r2 = save().words[w.id] || {}; return `Compromised on ${new Date(r2.comp).toLocaleDateString('ja-JP')}: a rival copied this key. It stays certified. Prove it again, no furigana: the reading, typed, then the meaning. Fail and it stays marked, still yours.`; }
   if (A.tab === 'files') return `${cl.length} skills clean (${cl.map(k => SKILL_J[k]).join('・')}) over ${days.size} days. ${r.snooze ? 'Deferred ' + r.snooze.n + ' time' + (r.snooze.n > 1 ? 's' : '') + ' before; the evidence is fresh. ' : ''}I believe you know ${w.w}. Commit it to memory?`;
   if (A.tab === 'found') return `Founding audit. ${w.w}: do you know it? Y and I spot-check it, N and it waits for the games.`;
   return `A claim. ${cl.length ? cl.length + ' skill' + (cl.length > 1 ? 's' : '') + ' on file.' : 'No evidence on file.'} Every claim is spot-checked.`;
@@ -266,6 +274,10 @@ function actions() {
       <button class="bt" type="button" id="au-no" ${w ? '' : 'disabled'}><b>保留</b><span class="m">DEFER · AGAIN IN ${[3, 7, 14][Math.min(2, n - 1)]} DAYS</span><span class="key">N</span></button>
       <button class="bt" type="button" id="au-nx" ${fileList().length > 1 ? '' : 'disabled'}><b>次</b><span class="m">NEXT RECORD</span><span class="key">→</span></button>`;
     $a('#au-y').onclick = yes; $a('#au-no').onclick = no; $a('#au-nx').onclick = () => move(1);
+  } else if (A.tab === 'rv') {
+    X.innerHTML = `<button class="bt y" type="button" id="au-y" ${w ? '' : 'disabled'}><b>再検証</b><span class="m">REVERIFY · NO FURIGANA</span><span class="key">Y</span></button>
+      <button class="bt" type="button" id="au-nx" ${rvList().length > 1 ? '' : 'disabled'}><b>次</b><span class="m">NEXT RECORD</span><span class="key">→</span></button>`;
+    $a('#au-y').onclick = yes; $a('#au-nx').onclick = () => move(1);
   } else if (A.tab === 'found') {
     X.innerHTML = `<button class="bt y" type="button" id="au-y" ${w || A.words.length ? '' : 'disabled'}><b>${w ? '知ってる' : '次の束'}</b><span class="m">${w ? 'I KNOW IT · VERIFY' : 'NEXT BATCH OF 20'}</span><span class="key">Y</span></button>
       <button class="bt" type="button" id="au-no" ${w ? '' : 'disabled'}><b>まだ</b><span class="m">NOT YET · LEAVE IT TO THE GAMES</span><span class="key">N</span></button>`;
@@ -315,13 +327,13 @@ function wireSlip() {
 }
 function readAns(v) {
   const c = A.check, ok = sameReading(v, [c.w.r]);
-  record(save(), c.w.id, 'reading', ok, 'audit', 'audit');
+  record(save(), c.w.id, 'reading', ok, 'typed', 'audit', A.tab === 'rv');
   if (!ok) return endCheck(false, `Read as 「${toKana(v, true).kana}」. It is 「${c.w.r}」.`);
   c.step = 'meaning'; render();
 }
 function meanAns(i) {
   const c = A.check; if (c.step !== 'meaning') return; const ok = c.opts[i].right;
-  record(save(), c.w.id, 'meaning', ok, 'audit', 'audit');
+  record(save(), c.w.id, 'meaning', ok, 'pick', 'audit', A.tab === 'rv');
   const bs = A.root.querySelectorAll('.opt'); c.opts.forEach((o, j) => { if (o.right) bs[j].classList.add('good'); }); if (!ok) bs[i].classList.add('bad');
   setTimeout(() => endCheck(ok, ok ? 'Reading and meaning confirmed.' : `It means: ${c.w.s}.`), ok ? 350 : 900);
 }
@@ -335,7 +347,9 @@ function yes() {
   if (A.busy || A.check) return; const w = current();
   if (A.tab === 'found' && !w) { A.batch = null; render(); return; }
   if (!w) return;
+  if (A.tab === 'rv') return startCheck(w, pass => { reverify(save(), w.id, pass); A.ctx.persist(); say(pass ? `${w.w} restored. The key is clean again.` : `Not this time. ${w.w} stays in memory, still marked. Try again later, or answer it in any game.`); render(); });
   if (A.tab === 'files') {
+    const fw = save().words[w.id]; if (!eligibleNow(fw)) { commit(save(), w.id, 'audit'); A.ctx.persist(); say(`The evidence changed since the flag (a miss): ${w.w} goes back to training.`); return render(); }
     A.since++; const spot = A.since >= 5 || Math.random() < .2;
     if (spot) { A.since = 0; return startCheck(w, pass => pass ? stampIt(w, 'audit') : rejectIt(w, true)); }
     return stampIt(w, 'audit');
@@ -349,7 +363,7 @@ function no() {
   if (A.tab === 'found' && w) { A.skipped = A.skipped || new Set(); A.skipped.add(w.id); A.bi++; return render(); }
   if (A.tab === 'claim') { A.claim = null; render(); }
 }
-function move(d) { if (A.busy || A.check || A.tab !== 'files') return; const n = fileList().length; if (n < 2) return; A.sel = (A.sel + d + n) % n; render(); }
+function move(d) { if (A.busy || A.check || (A.tab !== 'files' && A.tab !== 'rv')) return; const n = (A.tab === 'rv' ? rvList() : fileList()).length; if (n < 2) return; A.sel = (A.sel + d + n) % n; render(); }
 function stampIt(w, how) {
   A.busy = true; const P = $a('.paper'), D = $a('.desk');
   P.insertAdjacentHTML('beforeend', `<div class="band"><b>記憶</b><span>${how === 'claim' ? 'CLAIMED' : how === 'founding' ? 'FOUNDED' : 'COMMITTED'}<br>TO MEMORY // REC #${String(w.id).slice(-6)}</span></div>`);

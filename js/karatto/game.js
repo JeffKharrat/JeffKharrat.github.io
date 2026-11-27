@@ -2,13 +2,14 @@
    report, the deck and the word pool, evidence (first attempt per word and skill per shift), the typing bar, the keycaps,
    sound, saving, and the link to the planet's simulation. Each game supplies its scene and its rules:
    game({ id, code, jp, en, site, tier, skills, dur, lead, how, stats, init, start, tick, draw, key, end, shop }). */
-import { loadKanji } from './model.js?v=7';
-import * as store from './store.js?v=7';
-import { deckWord, buildPool, traps, shuffle, overlap } from './words.js?v=7';
-import { toKana, sameReading } from './kana.js?v=7';
-import { record as rec0, updateFlags, SKILL_J, day } from './evidence.js?v=7';
-import { addGame, advance } from './sim.js?v=7';
-import { leafSVG, leafFavicon } from './leaf.js?v=7';
+import { loadKanji } from './model.js?v=8';
+import * as store from './store.js?v=8';
+import { deckWord, buildPool, traps, shuffle, overlap } from './words.js?v=8';
+import { toKana, sameReading } from './kana.js?v=8';
+import { record as rec0, updateFlags, SKILL_J, day, payRate } from './evidence.js?v=8';
+import { addGame, advance, book } from './sim.js?v=8';
+import { once, visit, progress, govOf } from './gov.js?v=8';
+import { leafSVG, leafFavicon } from './leaf.js?v=8';
 
 export { shuffle, toKana, sameReading, SKILL_J, overlap };
 export const $ = s => document.querySelector(s);
@@ -39,7 +40,7 @@ addEventListener('resize', fit);
 
 /* ---------------- the shell ---------------- */
 export async function game(cfg) {
-  const G = { run: false, T: 0, T0: cfg.dur || 180, yen: 0, tried: new Set(), touched: new Map(), streak: 0, best: 0, right: 0, wrong: 0 };
+  const G = { run: false, T: 0, T0: cfg.dur || 180, yen: 0, tried: new Set(), touched: new Map(), streak: 0, best: 0, right: 0, wrong: 0, rate: 1, prac: 0, rid: null };
   const api = { G, cfg, cx, W, H, sfx, esc, clamp, ease, $, DEMO, EMBED, get R() { return R; } };
   stage.insertAdjacentHTML('beforeend', `
     <div id="top"><div class="t"><span class="lf">${leafSVG(30)}</span><span class="tag" id="g-tag">${cfg.code}</span><b>${cfg.jp}</b><span class="lb">${cfg.en}</span></div>
@@ -69,16 +70,17 @@ export async function game(cfg) {
   let summary = {}; try { summary = JSON.parse(localStorage.getItem('karatto.summary') || '{}'); } catch (e) {}
   const tier = typeof summary.tier === 'number' ? summary.tier : -1;
   const preview = !DEMO && (QS.has('preview') || (cfg.tier != null && cfg.tier > tier + 1));
-  Object.assign(api, { KD, SAVE, DECK, words, POOL, preview, tier, U: SAVE.corp[cfg.id], tech: SAVE.corp.tech || {},
+  Object.assign(api, { KD, SAVE, DECK, words, POOL, preview, tier, summary, U: SAVE.corp[cfg.id], tech: SAVE.corp.tech || {},
     get LEARN() { return words.filter(w => !isMem(w)); }, get MEM() { return words.filter(isMem); }, isMem });
   if (preview) { $('#g-tag').classList.add('pv'); $('#g-tag').textContent = cfg.code + ' · PREVIEW 見学'; }
 
-  /* evidence: first attempt per word and skill per shift; a right answer clears a compromised word */
-  api.record = (w, skill, ok, how = 'pick') => {
+  /* evidence: first attempt per word and skill per shift; a right, unhinted answer clears a compromised word.
+     The pay for the answer follows it: full for the first clean answer of the day, a practice rate for repeats (api.pay) */
+  api.record = (w, skill, ok, how = 'pick', hinted = false) => {
     const k = skill + w.id; if (G.tried.has(k)) return null; G.tried.add(k);
-    const r = rec0(SAVE, w.id, skill, ok, how, cfg.id);
+    const was = SAVE.words[w.id] && SAVE.words[w.id].comp, r = rec0(SAVE, w.id, skill, ok, how, cfg.id, hinted); G.rate = payRate(r); if (ok && r !== 'new') G.prac++;
     const T = G.touched.get(w.id) || { w, res: {} }; T.res[skill] = ok ? (r === 'new' ? 'new' : 'same') : 'miss'; G.touched.set(w.id, T);
-    if (ok) { G.right++; G.streak++; G.best = Math.max(G.best, G.streak); const sw = SAVE.words[w.id]; if (sw && sw.comp) { delete sw.comp; api.log(w.w, '復旧', 'restored', 'y'); } }
+    if (ok) { G.right++; G.streak++; G.best = Math.max(G.best, G.streak); if (was && !SAVE.words[w.id].comp) api.log(w.w, '復旧', 'restored', 'y'); }
     else { G.wrong++; G.streak = 0; }
     return r;
   };
@@ -96,6 +98,7 @@ export async function game(cfg) {
   api.opts = (w, mode, by, n) => shuffle([w, ...traps(w, mode, by, n - 1, POOL)]).map(e => ({ w: e.w, r: e.r, s: e.s, right: e.w === w.w }));
   api.toast = (t, ms = 2200) => { const e = $('#toast'); e.textContent = t; e.classList.add('on'); clearTimeout(api.toast.h); api.toast.h = setTimeout(() => e.classList.remove('on'), ms); };
   api.log = (a, b, c, cls) => { const L = $('#g-log'); if (!L) return; const d = document.createElement('div'); d.className = 'e'; d.innerHTML = `<span><span class="kj">${esc(a)}</span> <span class="m">${esc(b)}</span></span><span class="${cls}">${esc(c)}</span>`; L.insertBefore(d, L.firstChild); while (L.children.length > 9) L.lastChild.remove(); };
+  api.pay = base => Math.round(base * G.rate);
   api.persist = () => { if (!DEMO) store.store(SAVE, null); };
   api.end = () => endShift();
 
@@ -118,14 +121,16 @@ export async function game(cfg) {
   }
   function start() {
     audio(); $('#ov-brief').classList.remove('on'); $('#ov-report').classList.remove('on');
-    Object.assign(G, { run: true, T0: (cfg.dur || 180) + (api.U.longer ? 60 : 0), yen: 0, tried: new Set(), touched: new Map(), streak: 0, best: 0, right: 0, wrong: 0 }); G.T = G.T0;
+    Object.assign(G, { run: true, T0: (cfg.dur || 180) + (api.U.longer ? 60 : 0), yen: 0, tried: new Set(), touched: new Map(), streak: 0, best: 0, right: 0, wrong: 0, rate: 1, prac: 0, rid: cfg.id + ':' + Date.now().toString(36) + ':' + Math.random().toString(36).slice(2, 6) }); G.T = G.T0;
     cfg.start(api); stats();
   }
   function endShift() {
     if (!G.run) return; G.run = false;
     const res = cfg.end(api) || {}, flagged = updateFlags(SAVE);
     api.U.shifts++;
-    if (!preview) { SAVE.corp.funds = (SAVE.corp.funds || 0) + G.yen; addGame(SAVE, cfg.id, { ...(res.effect || {}), right: G.right, yen: G.yen }); }
+    /* the result applies once, whatever reloads or retries happen; a preview or a demo never touches the company */
+    if (!preview && !DEMO) once(SAVE, 'game:' + G.rid, () => { addGame(SAVE, cfg.id, { ...(res.effect || {}), right: G.right, yen: G.yen }); cfg.settle && cfg.settle(api, res, G.rid); const ctx = summary.ctx; if (ctx) { visit(SAVE, ctx); progress(SAVE, ctx); } });
+    else if (DEMO) { addGame(SAVE, cfg.id, { ...(res.effect || {}), right: G.right, yen: G.yen }); cfg.settle && cfg.settle(api, res, G.rid); }
     (SAVE.log = SAVE.log || []).push({ t: Date.now(), k: cfg.id, yen: G.yen, right: G.right, wrong: G.wrong, flagged: flagged.length }); if (SAVE.log.length > 200) SAVE.log.splice(0, SAVE.log.length - 200);
     api.persist(); setTimeout(() => report(res, flagged), 900);
   }
@@ -135,13 +140,13 @@ export async function game(cfg) {
     $('#report').innerHTML = `<div class="bar"><span>${cfg.code} // 日報 REPORT // SHIFT ${String(api.U.shifts).padStart(3, '0')}</span><span class="bc" style="opacity:.8"></span></div><h2>${res.title || '業務終了'}</h2>
       <div class="row">${(res.rows || []).slice(0, 3).map(([l, v, c]) => `<div class="stat"><span class="lb">${l}</span><b class="${c || ''}">${v}</b></div>`).join('')}<div class="stat"><span class="lb">earned${preview ? ' · preview' : ''}</span><b class="y">${preview ? '—' : '¥' + G.yen.toLocaleString()}</b></div></div>
       ${res.extra || ''}
-      <div class="lb">evidence · ${G.right} clean, ${G.wrong} wiped · best streak ${G.best}</div>
+      <div class="lb">evidence · ${G.right} clean, ${G.wrong} wiped · best streak ${G.best}${G.prac ? ` · ${G.prac} repeat${G.prac > 1 ? 's' : ''} paid at the practice rate (${Math.round(payRate('same-day') * 100)}%)` : ''}</div>
       <div class="ev">${rows.slice(0, 16).map(x => `<div><span><span class="kj">${esc(x.w.w)}</span> <span class="m">${esc(x.w.r)}</span></span><span>${Object.entries(x.res).map(([k, v]) => SKILL_J[k] + ' ' + cell(v)).join(' · ')}</span></div>`).join('') || '<div class="m">No word answered.</div>'}</div>
       ${flagged.length ? `<div class="note"><b class="y">${flagged.length} file${flagged.length > 1 ? 's' : ''} sent to the audit</b> · <span class="kj">${flagged.slice(0, 6).map(id => esc((byId.get(id) || {}).w || '')).join('、')}${flagged.length > 6 ? '…' : ''}</span>. Commit them in the core (審査).</div>` : ''}
       ${cfg.shop ? `<div class="lb" style="margin-top:16px">設備投資 · upgrades · funds ¥${Math.round(SAVE.corp.funds || 0).toLocaleString()}</div><div class="shop">${cfg.shop.map(u => `<button type="button" data-u="${u.id}" ${api.U[u.id] || (SAVE.corp.funds || 0) < u.cost || preview ? 'disabled' : ''}><b>${u.name}</b>${u.en} · ${api.U[u.id] ? 'installed' : '¥' + u.cost}<br><span class="m">${u.d}</span></button>`).join('')}</div>` : ''}
       <div class="acts"><button class="go" id="b-again" type="button">${cfg.againLabel || '次 · Again'} <span class="key">Enter</span></button><button class="go2" id="b-out2" type="button">Back to the surface</button></div>`;
     $('#ov-report').classList.add('on'); $('#b-again').onclick = () => { if (cfg.blocked && cfg.blocked(api)) { $('#ov-report').classList.remove('on'); brief(); } else start(); }; $('#b-out2').onclick = exit;
-    $('#report').querySelectorAll('[data-u]').forEach(b => b.onclick = () => { const u = cfg.shop.find(x => x.id === b.dataset.u); if (api.U[u.id] || SAVE.corp.funds < u.cost) return; SAVE.corp.funds -= u.cost; api.U[u.id] = 1; api.persist(); report(res, flagged); });
+    $('#report').querySelectorAll('[data-u]').forEach(b => b.onclick = () => { const u = cfg.shop.find(x => x.id === b.dataset.u); if (api.U[u.id] || SAVE.corp.funds < u.cost) return; if (SAVE.sim && SAVE.sim.v === 2) book(SAVE.sim, SAVE.corp, 'cap', -u.cost, `設備投資 ${u.name} ¥${u.cost.toLocaleString()}`); else SAVE.corp.funds -= u.cost; api.U[u.id] = 1; api.persist(); report(res, flagged); });
   }
   function exit() { if (EMBED) parent.postMessage('karatto:surface', location.origin); else location.href = '../' + (DEMO ? '?demo' : ''); }
 

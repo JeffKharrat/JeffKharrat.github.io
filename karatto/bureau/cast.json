@@ -1,0 +1,9 @@
+[
+  { "id": "union", "seat": "union", "faction": "union", "role": "Union negotiator", "file": "union.webp", "original": "Amber-eyed union negotiator-1.png" },
+  { "id": "res", "seat": "civic", "faction": "res", "role": "Residents envoy", "file": "res.webp", "original": "Graphite Envoy with Acid-Lime Eyes-2.png" },
+  { "id": "eng", "seat": "ops", "faction": "eng", "role": "Operations (and, from N3, engineering) director", "file": "eng.webp", "original": "Slate-Suited Director with Red Eyes-2.png" },
+  { "id": "board", "seat": "chair", "faction": "board", "role": "Board chair", "file": "board.webp", "original": "Faceless board chair with glowing eyes-3.png" },
+  { "id": "finance", "seat": "fin", "faction": "board", "role": "Finance delegate", "file": "finance.webp", "original": "Pixel-art orbital executive with copper slit eyes-1.png" },
+  { "id": "legal", "seat": null, "faction": null, "role": "Legal counsel (advisor, no vote)", "file": "legal.webp", "original": "Ivory-Suited Lawyer with Violet Eyes-4.png" },
+  { "id": "audit", "seat": null, "faction": null, "role": "Audit commissioner (advisor, no vote)", "file": "audit.webp", "original": "Pixel Audit Commissioner in Listening Pose-3.png" }
+]

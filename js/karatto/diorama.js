@@ -6,7 +6,7 @@
    quarter's close, night, weather, the season).
    createDiorama(canvas, get, view): get() → { S, corp, X (ctx), C (capacity) }; view = { x, y, w, h } in world px. */
 
-import { drawLeaf } from './leaf.js?v=7';
+import { drawLeaf } from './leaf.js?v=8';
 const W = 1240, H = 634, GY = 372, CELL = 16, GC0 = 96, GC1 = 1224, ROWS = 14;
 const Y = '#FFE600', RED = '#FF3B30', L1 = '#A3ABBA', L2 = '#7C8492', D1 = '#2A2E36', D2 = '#1D2026', D3 = '#14161A', INK = '#ECEEF2', MUTE = '#6E7582', BG = '#050608';
 const GREY = ['#1A1D23', '#20232A', '#262A32', '#15171C', '#2C3038', '#101216', '#30343D'];
@@ -176,6 +176,20 @@ function draw(cx, g, st, dt) {
   /* a strike: pickets and a banner at the gate */
   if (strike) { cx.fillStyle = RED; cx.fillRect(fx + 6, fy + 16, 84, 14); cx.fillStyle = INK; cx.font = '700 9px "M PLUS 1", sans-serif'; cx.fillText('スト決行中  STRIKE', fx + 9, fy + 26);
     for (let i = 0; i < 14; i++) { const x = fx + 8 + i * 6, b = Math.sin(T * 5 + i) * 1.2; person(cx, x, GY - 1, INK, b); if (i % 2 === 0) { cx.fillStyle = RED; cx.fillRect(x - 3, GY - 15 + b, 8, 5); cx.fillStyle = INK; cx.fillRect(x, GY - 10 + b, 1, 4); } } }
+  /* the politics on the street (gov.js): the unattended line, the training annex, a dispatch hold at the depot, an audit marker */
+  const Gv = g.G || {}, sig = Gv.sig || {}, line = (S.proj || []).find(p => p.id === 'line'), hold = S.hold && S.hold.until > S.t, vis = (Gv.visit || {}).n || 0;
+  if (line) { cx.fillStyle = Y; cx.fillRect(fx + fw - 70, fy + 4, 64, 11); cx.fillStyle = '#000'; cx.font = '700 8px "M PLUS 1", sans-serif'; cx.fillText(`夜間無人 +${Math.round(line.robot * 100)}%`, fx + fw - 67, fy + 12);
+    if (night) for (let i = 0; i < 6; i++) { cx.fillStyle = Math.sin(T * 3 + i * 1.7) > .2 ? Y : '#3A3F48'; cx.fillRect(fx + 100 + i * 20, fy + 70, 3, 3); }
+    callout(cx, fx + fw - 38, fy + 4, fx + fw + 8, fy - 64, `NIGHT LINE  ·  ${line.staged ? 'STAGE 1' : line.robot >= .2 ? 'FULL' : 'TRIAL'}  ·  ${line.mw} MW  ·  ¥${line.upkeep}/H`, Y); }
+  if (sig.annex) { const ax = fx + 14, ay = fy - 22; cx.fillStyle = L1; cx.fillRect(ax, ay, 54, 22); cx.fillStyle = L2; cx.fillRect(ax + 48, ay, 6, 22);
+    for (let i = 0; i < 5; i++) { cx.fillStyle = sig.annex === 'lit' ? (night || Math.sin(T + i) > 0 ? Y : '#C9A400') : '#14161A'; cx.fillRect(ax + 4 + i * 9, ay + 6, 6, 8); }
+    if (sig.annex === 'building') { lattice(cx, ax + 27, ay + 22, ay - 10, 54, 'rgba(236,238,242,.35)'); }
+    callout(cx, ax + 20, ay, ax - 4, ay - 30, sig.annex === 'lit' ? '研修棟  TRAINING ANNEX  ·  PLEDGE KEPT' : '研修棟  TRAINING ANNEX  ·  BUILDING', sig.annex === 'lit' ? Y : INK); }
+  if (hold) { for (let i = 0; i < 9; i++) { const x = dx - 64 + (i % 5) * 12, y = GY - 9 - Math.floor(i / 5) * 9; cx.fillStyle = i % 3 ? '#C9A400' : Y; cx.fillRect(x, y, 11, 8); cx.fillStyle = RED; cx.fillRect(x + 7, y + 1, 3, 2); }
+    for (let i = 0; i < 9; i++) { const x = dx + 6 + i * 6, b = Math.sin(T * 5 + i) * 1.2; person(cx, x, GY - 1, INK, b); if (i % 3 === 0) { cx.fillStyle = RED; cx.fillRect(x - 3, GY - 15 + b, 8, 5); } }
+    cx.fillStyle = RED; cx.fillRect(dx + 4, GY - 52, 96, 13); cx.fillStyle = INK; cx.font = '700 9px "M PLUS 1", sans-serif'; cx.fillText(`出荷停止  HOLD ${Math.round(S.hold.pct * 100)}%`, dx + 8, GY - 42); }
+  if (sig.audit >= vis && vis) { const ax = qx + 80, ay = qy + 44, on = Math.sin(T * 4) > -.2; cx.fillStyle = on ? Y : '#5A5320'; cx.beginPath(); cx.moveTo(ax, ay - 14); cx.lineTo(ax + 9, ay + 2); cx.lineTo(ax - 9, ay + 2); cx.fill(); cx.fillStyle = '#000'; cx.fillRect(ax - 1, ay - 9, 2, 6); cx.fillRect(ax - 1, ay - 2, 2, 2);
+    callout(cx, ax, ay - 14, ax + 8, ay - 40, '監査  AUDIT  ·  A BROKEN PROMISE ON RECORD', RED); }
   /* a protest at HQ */
   if (S.fac.res < 35) { for (let i = 0; i < 22; i++) { const x = qx + 6 + (i % 11) * 6, b = Math.sin(T * 6 + i) * 1.4; person(cx, x, GY - 1 - Math.floor(i / 11) * 3, INK, b); if (i % 3 === 0) { cx.fillStyle = Y; cx.fillRect(x - 3, GY - 18 + b, 9, 6); } } cx.fillStyle = Y; cx.font = '700 9px "M PLUS 1", sans-serif'; cx.fillText('抗議', qx + 8, GY - 24); }
   /* surveillance drones and their cones */
@@ -239,7 +253,7 @@ function draw(cx, g, st, dt) {
   const by = GY + ROWS * CELL + 10; for (let k = 0; k < 10; k++) { cx.fillStyle = k % 2 ? D1 : L1; cx.fillRect(GC0 + k * 32, by, 32, 4); } cx.fillStyle = MUTE; cx.font = F8; cx.fillText('0', GC0, by + 14); cx.fillText('50', GC0 + 150, by + 14); cx.fillText('100 M', GC0 + 300, by + 14); cx.fillText('1 CELL = 5 M', GC0 + 340, by + 7);
   cx.textAlign = 'right'; cx.fillText(`POP ${Math.round(pop)}  ·  ROBOTS ${C.robots}  ·  HAPPY ${S.happy.toFixed(0)}  ·  STAB ${S.stab.toFixed(0)}  ·  COORD 31°E / TAU VI`, GC1, by + 22); cx.textAlign = 'left';
   /* the ticker of what is happening */
-  const ev = [strike && ['スト決行中', 'STRIKE AT FAC-01', RED], S.fac.res < 35 && ['抗議', 'RESIDENTS PROTEST AT HQ', RED], brown && ['停電', 'BROWNOUT', RED], S.poll > 60 && ['公害警報', 'SMOG ALERT', RED], breach && ['侵入警報', 'BREACH · ' + breach.rival, RED], accident && ['労災', 'ACCIDENT ON THE LINE', RED],
+  const ev = [strike && ['スト決行中', 'STRIKE AT FAC-01', RED], hold && ['出荷停止', 'DISPATCH HOLD AT LOG-02', RED], line && ['夜間無人', 'THE NIGHT LINE RUNS', Y], sig.annex === 'lit' && ['研修', 'TRAINING ANNEX OPEN', Y], S.fac.res < 35 && ['抗議', 'RESIDENTS PROTEST AT HQ', RED], brown && ['停電', 'BROWNOUT', RED], S.poll > 60 && ['公害警報', 'SMOG ALERT', RED], breach && ['侵入警報', 'BREACH · ' + breach.rival, RED], accident && ['労災', 'ACCIDENT ON THE LINE', RED],
     order && ['大口受注', 'BULK ORDER · CONVOY', Y], building && ['建設中', 'NEW HOUSING BLOCK', Y], boost && ['発電増強', 'POWER BOOST', Y], S.pol.watch && ['監視', S.pol.watch > 1 ? 'TOTAL SURVEILLANCE' : 'DRONE WATCH', Y], S.pol.pr && ['広報', 'PR CAMPAIGN', Y], S.ev.length && ['決裁待ち', S.ev.length + ' DECISIONS AT HQ', Y], qclose && ['決算', 'QUARTER CLOSED', Y], shift && ['交代', 'SHIFT CHANGE', INK], matsuri && ['夏祭り', 'SUMMER FESTIVAL', INK], nenmatsu && ['年末', "YEAR'S END", INK], idle > 10 && ['失業', Math.round(idle) + ' IDLE WORKERS', INK]].filter(Boolean);
   if (!ev.length) ev.push(['平常運転', 'NORMAL OPERATION', '#5CFFA0']);
   let tx = GC0 + 500; cx.font = '700 9px "M PLUS 1", sans-serif';

@@ -59,7 +59,10 @@ async function gistFile(g, name) {
   return (await fetch(f.raw_url)).json();
 }
 
-/* load: the newest of the browser copy and the gist */
+/* load: the newest of the browser copy and the gist. Each save carries a revision (rev) and the gist revision this
+   browser last saw (base). If both sides moved since that base (two PCs played without syncing), the newer wins and
+   the other is kept as a recoverable copy (Settings → Recover), instead of being lost to last-write-wins */
+export const conflict = { get: () => readLS('karatto.conflict'), clear: () => { try { localStorage.removeItem('karatto.conflict'); } catch (e) {} } };
 export async function load() {
   let save = readLS(LS.save), deck = readLS(LS.deck), source = save ? 'local' : 'new';
   if (token.get()) {
@@ -67,7 +70,12 @@ export async function load() {
       const g = await findGist();
       if (g) {
         const rs = await gistFile(g, 'save.json');
-        if (rs && (!save || rs.updated > save.updated)) { save = rs; source = 'gist'; writeLS(LS.save, save); }
+        if (rs && save && (rs.rev || 0) > (save.base || 0) && (save.rev || 0) > (save.base || 0) && rs.dev !== save.dev) {
+          const keep = rs.updated > save.updated ? rs : save, other = keep === rs ? save : rs;
+          writeLS('karatto.conflict', { t: Date.now(), save: other }); source = 'conflict';
+          if (keep === rs) { save = { ...rs, base: rs.rev }; writeLS(LS.save, save); }
+        }
+        else if (rs && (!save || rs.updated > save.updated)) { save = { ...rs, base: rs.rev || 0 }; source = 'gist'; writeLS(LS.save, save); }
         if (!deck || source === 'gist') { const rd = await gistFile(g, 'deck.json'); if (rd) { deck = rd; writeLS(LS.deck, deck); } }
       }
     } catch (e) { source += ' (gist unreachable)'; }
@@ -77,8 +85,11 @@ export async function load() {
 
 /* save: always to the browser; to the gist a few seconds after the last change */
 let pending = null, deckDirty = false;
+const DEV = (() => { try { let d = localStorage.getItem('karatto.dev'); if (!d) { d = Math.random().toString(36).slice(2, 10); localStorage.setItem('karatto.dev', d); } return d; } catch (e) { return 'x'; } })();
 export function store(save, deck) {
-  save.updated = Date.now(); writeLS(LS.save, save); if (deck) { writeLS(LS.deck, deck); deckDirty = true; }
+  /* another tab or frame of this browser wrote a newer save since this view loaded it: keep that copy recoverable */
+  const cur = readLS(LS.save); if (cur && (cur.rev || 0) > (save.rev || 0)) { writeLS('karatto.conflict', { t: Date.now(), save: cur, tab: true }); save.rev = cur.rev; }
+  save.updated = Date.now(); save.rev = (save.rev || 0) + 1; save.dev = DEV; writeLS(LS.save, save); if (deck) { writeLS(LS.deck, deck); deckDirty = true; }
   if (!token.get()) return;
   clearTimeout(pending); pending = setTimeout(() => push(save, deckDirty ? deck : null).catch(() => {}), 4000);
 }
@@ -88,6 +99,7 @@ export async function push(save, deck) {
   const g = await findGist();
   if (g) await gh('/gists/' + g.id, { method: 'PATCH', body: JSON.stringify({ files }) });
   else { const n = await gh('/gists', { method: 'POST', body: JSON.stringify({ description: GIST_DESC, public: false, files: { ...files, 'deck.json': files['deck.json'] || { content: JSON.stringify(deck || []) } } }) }); writeLS(LS.gist, n.id); }
+  save.base = save.rev || 0; writeLS(LS.save, save);
   deckDirty = false;
 }
 export function exportSave(save) {

@@ -13,6 +13,8 @@
 * { box-sizing:border-box; }
 html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:400 14px/1.5 var(--mono); overflow:hidden; }
 canvas#k3 { position:fixed; inset:0; width:100%; height:100%; display:block; cursor:default; }
+body.no3d canvas#k3 { background:#050608 repeating-linear-gradient(0deg, rgba(255,230,0,.04) 0 1px, transparent 1px 40px), repeating-linear-gradient(90deg, rgba(255,230,0,.04) 0 1px, transparent 1px 40px); }
+body.no3d::after { content:'3D UNAVAILABLE · 2D CONSOLE: 経営 MANAGEMENT AND 審査 AUDIT STILL WORK'; position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); font:700 11px "M PLUS 1 Code", monospace; letter-spacing:.16em; color:#8A909C; pointer-events:none; }
 .ui { position:fixed; pointer-events:none; }
 .ui > * { pointer-events:auto; }
 .pnl { background:var(--panel); border:1px solid var(--line); position:relative; }
@@ -124,6 +126,6 @@ body.wall #hint { display:block; }
 <div class="ui pnl" id="file"><button class="x" id="file-x">×</button><div id="file-c"></div></div>
 <div class="ui pnl" id="set"><button class="x" id="set-x">×</button><div id="set-c"></div></div>
 <div class="ui pnl" id="toast"></div>
-<script type="module" src="../js/karatto/core.js?v=7"></script>
+<script type="module" src="../js/karatto/core.js?v=8"></script>
 </body>
 </html>

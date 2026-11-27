@@ -2,7 +2,7 @@
    boilers and the turbine below, fuel rods rolling in on the conveyor, each one a word. Type the front rod's reading
    (romaji turns into kana) and Enter: it burns and adds power for a few seconds. Keep the output inside the band
    round the demand. A wrong reading misfires and the rod goes to the back of the line. Skill: reading, typed. */
-import { game, panel, typer, sameReading, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=7';
+import { game, panel, typer, sameReading, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=8';
 
 const BASE = 300, BURN = 9;
 let RODS = [], LIT = [], WAIT = [], HIST = [], SMOKE = [], inBand = 0, total = 0, burned = 0, misfire = 0, T, rot = 0;
@@ -22,7 +22,7 @@ function submit(api, v) {
   const r = RODS[0]; if (!r || !api.G.run) return;
   const ok = sameReading(v, [r.w.r]); api.record(r.w, 'reading', ok, 'typed');
   T.clear(); T.flash(ok);
-  if (ok) { RODS.shift(); WAIT.push(r); burned++; api.G.yen += 10 + Math.round(r.mw / 4); sfx('up'); api.log(r.w.w, r.w.r, '+' + r.mw + ' MW', 'y'); }
+  if (ok) { RODS.shift(); WAIT.push(r); burned++; api.G.yen += api.pay(10 + Math.round(r.mw / 4)); sfx('up'); api.log(r.w.w, r.w.r, '+' + r.mw + ' MW', 'y'); }
   else { misfire++; RODS.push(RODS.shift()); SMOKE.push({ t: 0 }); sfx('ng'); api.log(r.w.w, '✗ ' + r.w.r, 'misfire', 'r'); api.toast(`不発 misfire · ${r.w.w} reads ${r.w.r}`, 2400); }
   feed(api);
 }
