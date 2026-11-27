@@ -31,21 +31,10 @@ export function leafGrid(N = 31) {
 }
 const COL = { 1: '#A3ABBA', 2: '#2A2E36', 4: '#FFE600' };
 /* an SVG of the leaf. mono: every cell in currentColor, the artery still yellow (for small marks on dark UIs) */
-export function leafSVG(size = 24, { N = size < 40 ? 15 : size < 120 ? 23 : 31, mono = false, artery = true } = {}) {
-  const g = leafGrid(N); let r = '';
-  g.forEach((row, j) => row.forEach((c, i) => { if (!c) return;
-    if (c === 3) { r += `<rect x="${i}" y="${j}" width=".5" height=".5" fill="${mono ? 'currentColor' : COL[1]}"/><rect x="${i + .5}" y="${j + .5}" width=".5" height=".5" fill="${mono ? 'currentColor' : COL[1]}"/>`; return; }
-    const f = c === 4 && artery ? COL[4] : mono ? (c === 2 ? 'currentColor" opacity=".45' : 'currentColor') : COL[c === 4 ? 1 : c];
-    r += `<rect x="${i}" y="${j}" width="${mono ? 1 : .92}" height="${mono ? 1 : .92}" fill="${f}"/>`; }));
-  return `<svg viewBox="0 0 ${N} ${N}" width="${size}" height="${size}" shape-rendering="crispEdges" aria-hidden="true">${r}</svg>`;
-}
-/* draw it on a canvas: (x, y) top-left, s = cell size in px */
-export function drawLeaf(cx, x, y, s, { N = 31, alpha = 1, pulse = 0 } = {}) {
-  const g = leafGrid(N); cx.save(); cx.globalAlpha = alpha;
-  g.forEach((row, j) => row.forEach((c, i) => { if (!c) return; const px = x + i * s, py = y + j * s;
-    if (c === 3) { cx.fillStyle = COL[1]; cx.fillRect(px, py, s / 2, s / 2); cx.fillRect(px + s / 2, py + s / 2, s / 2, s / 2); return; }
-    cx.fillStyle = c === 4 ? `rgba(255,230,0,${.75 + .25 * Math.sin(pulse - j * .4)})` : COL[c]; cx.fillRect(px, py, s - Math.max(.5, s * .08), s - Math.max(.5, s * .08)); }));
-  cx.restore();
-}
-/* a favicon for every カラット page */
-export function leafFavicon() { try { const l = document.querySelector('link[rel=icon]') || document.head.appendChild(Object.assign(document.createElement('link'), { rel: 'icon' })); l.href = 'data:image/svg+xml,' + encodeURIComponent(leafSVG(64, { N: 15 }).replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ')); } catch (e) {} }
+/* Jeff's own pixel leaf (Nov 27): the emblem is his image, as is (karatto/leaf.png); the procedural grid above is kept unused */
+const SRC = new URL('../../karatto/leaf.png', import.meta.url).href, SRC64 = new URL('../../karatto/leaf-64.png', import.meta.url).href;
+let IMG = null; const img = () => { if (!IMG && typeof Image !== 'undefined') { IMG = new Image(); IMG.src = SRC; } return IMG; };
+export function leafSVG(size = 24) { return `<img class="leaf" src="${size <= 64 ? SRC64 : SRC}" width="${size}" height="${size}" alt="" style="image-rendering:auto;display:inline-block;vertical-align:middle">`; }
+/* on a canvas: the same footprint as before (N cells of s pixels) */
+export function drawLeaf(cx, x, y, s, { N = 31, alpha = 1 } = {}) { const i = img(); if (!i || !i.complete || !i.naturalWidth) return; cx.save(); cx.globalAlpha = alpha; cx.drawImage(i, x, y, N * s, N * s); cx.restore(); }
+export function leafFavicon() { try { const l = document.querySelector('link[rel=icon]') || document.head.appendChild(Object.assign(document.createElement('link'), { rel: 'icon' })); l.href = SRC64; } catch (e) {} }

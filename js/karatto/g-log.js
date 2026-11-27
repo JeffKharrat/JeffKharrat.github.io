@@ -2,9 +2,9 @@
    (laid out like the numpad), their signs words from the deck. Order slips give a destination as a reading (skill
    reading) or a meaning (skill recall); pick the shop (click it or its numpad key) and a free truck drives the route.
    A wrong shop is a misdelivery: the truck goes there and back for nothing, and that skill's evidence is wiped. */
-import { game, panel, esc, clamp, ease, Y, RED, OK, sfx, $, overlap } from './game.js?v=8';
-import { available } from './sim.js?v=8';
-import { activeLot, sendLot } from './gov.js?v=8';
+import { game, panel, esc, clamp, ease, Y, RED, OK, sfx, $, overlap } from './game.js?v=9';
+import { available } from './sim.js?v=9';
+import { activeLot, sendLot } from './gov.js?v=9';
 
 const COLS = [400, 640, 880], ROWS = [150, 310, 470], VX = [520, 520, 760], DEP = { x: 640, y: 616 };
 const shopPos = n => ({ c: n % 3, r: 2 - Math.floor(n / 3) });                       // numpad: 1 2 3 bottom row, 7 8 9 top

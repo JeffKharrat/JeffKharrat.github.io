@@ -3,11 +3,11 @@
    draft from desk to desk, ask the chair for a hearing. The room is a picture with three layers (wall, people, the
    counter in front of them) and a gentle pointer parallax; everything said is Japanese first, with furigana and the
    English underneath. The logic is gov.js; this file only draws it and sends the player's actions there. */
-import { EVENTS, resolve, POL, FAC, capacity, LEDGER } from './sim.js?v=8';
-import * as gov from './gov.js?v=8';
-import { AUTH, STANCE, REPLY, SAY, need, mood } from './gov-arc.js?v=8';
-import { ICON } from './icons.js?v=8';
-import { leafSVG } from './leaf.js?v=8';
+import { EVENTS, resolve, POL, FAC, capacity, LEDGER } from './sim.js?v=9';
+import * as gov from './gov.js?v=9';
+import { AUTH, STANCE, REPLY, SAY, need, mood } from './gov-arc.js?v=9';
+import { ICON } from './icons.js?v=9';
+import { leafSVG } from './leaf.js?v=9';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const yen = v => (v < 0 ? '−¥' : '¥') + Math.abs(Math.round(v)).toLocaleString();

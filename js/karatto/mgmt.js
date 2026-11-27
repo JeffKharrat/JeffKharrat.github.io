@@ -1,12 +1,12 @@
 /* カラット: 経営, the management console in the core. Overview (the planet's numbers and their last three days),
    policies, factions, quarterly reports, the log. Also the briefing after time away, and the decisions (決裁).
    Marathon-style: black, hairlines, micro labels, the AI's yellow. */
-import { POL, FAC, GROUPS, EVENTS, LEDGER, resolve, setPolicy, dirProgress, capacity, forecast } from './sim.js?v=8';
-import { bureau, bureauKey, bureauClose } from './bureau.js?v=8';
-import { inbox, contracted, spendable, reserve, govOf } from './gov.js?v=8';
-import { ICON } from './icons.js?v=8';
-import { createDiorama } from './diorama.js?v=8';
-import { leafSVG } from './leaf.js?v=8';
+import { POL, FAC, GROUPS, EVENTS, LEDGER, resolve, setPolicy, dirProgress, capacity, forecast } from './sim.js?v=9';
+import { bureau, bureauKey, bureauClose } from './bureau.js?v=9';
+import { inbox, contracted, spendable, reserve, govOf } from './gov.js?v=9';
+import { ICON } from './icons.js?v=9';
+import { createDiorama } from './diorama.js?v=9';
+import { leafSVG } from './leaf.js?v=9';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const yen = v => (v < 0 ? '−¥' : '¥') + Math.abs(Math.round(v)).toLocaleString();

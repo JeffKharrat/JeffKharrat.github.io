@@ -2,14 +2,14 @@
    cavity wall is its memory, a keyboard of every JLPT kanji. Two views: the base view (the AI and the corporation's
    panels) and the wall view (on the gantry, looking around the wall). Clicking a key presses it and opens its file. */
 import * as THREE from '../vendor/three.module.min.js';
-import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=8';
-import * as store from './store.js?v=8';
-import { files, updateFlags } from './evidence.js?v=8';
-import { openAudit } from './audit.js?v=8';
-import { leafSVG, leafFavicon } from './leaf.js?v=8';
-import { advance, hourOf } from './sim.js?v=8';
-import { openMgmt, briefing, decide, mgmtOpen, refreshMgmt } from './mgmt.js?v=8';
-import { visit, progress as govProgress, inbox, govOf } from './gov.js?v=8';
+import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=9';
+import * as store from './store.js?v=9';
+import { files, updateFlags } from './evidence.js?v=9';
+import { openAudit } from './audit.js?v=9';
+import { leafSVG, leafFavicon } from './leaf.js?v=9';
+import { advance, hourOf } from './sim.js?v=9';
+import { openMgmt, briefing, decide, mgmtOpen, refreshMgmt } from './mgmt.js?v=9';
+import { visit, progress as govProgress, inbox, govOf } from './gov.js?v=9';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;   // embed: opened over the site from Tau Jeffy VI
@@ -595,7 +595,7 @@ function frame(now) {
   /* the hours since the last visit */
   if (DEMO) advance(SAVE, simCtx(), Date.now() - 30 * 3600e3);
   const sum = advance(SAVE, simCtx(), Date.now(), false); govProgress(SAVE, simCtx()); persist(); ui();
-  if (DEMO && QS.get('arc')) { const { demoArc } = await import('./bureau.js?v=8'); demoArc(SAVE, simCtx(), QS.get('arc')); }
+  if (DEMO && QS.get('arc')) { const { demoArc } = await import('./bureau.js?v=9'); demoArc(SAVE, simCtx(), QS.get('arc')); }
   if (sum.hours >= 2 && !QS.has('audit')) briefing(sum, nextDecision, inbox(SAVE, simCtx())); else nextDecision();
   if (!DECK && !DEMO) toast(ANKI_OK ? 'Anki found: open Settings to read your deck.' : 'No deck yet: open Anki, then Settings → Read the deck.', 6000);
   if (EMBED) parent.postMessage('karatto:ready', location.origin);
