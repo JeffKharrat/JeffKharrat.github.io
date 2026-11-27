@@ -8,9 +8,9 @@
    - Clocks: governance deadlines count ATTENDED visits (one per Japan-time day, when Management opens or a shift ends).
      Absence never burns a deadline, never breaks a promise that needed the player.
    - Everything that changes money or state goes through once(): a stable id, applied at most once (reloads, retries). */
-import { migrate, book, log, available, reserved, FLOOR, capacity, forecast, essentials, newDir, projX, RUN } from './sim.js?v=12';
-import { day } from './evidence.js?v=12';
-import { ARCS, MOTIONS, CLAUSES } from './gov-arc.js?v=12';
+import { migrate, book, log, available, reserved, FLOOR, capacity, forecast, essentials, newDir, projX, RUN } from './sim.js?v=14';
+import { day } from './evidence.js?v=14';
+import { ARCS, MOTIONS, CLAUSES } from './gov-arc.js?v=14';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export { MOTIONS, CLAUSES, ARCS };
@@ -167,7 +167,7 @@ export function progress(save, ctx) {
   const G = govOf(save); if (!save.sim || save.sim.v !== 2) return;
   for (const A of Object.values(ARCS)) {
     let C = G.cases[A.id];
-    if (!C) { if (A.entry(save, ctx).ok) { C = G.cases[A.id] = { id: A.id, st: 'm1', v0: G.visit.n, ref: refRate(save.sim, ctx), draft: { motion: A.first, cl: {} }, asked: {}, said: {} }; news(G, { v: G.visit.n, k: 'case', id: A.id }); } continue; }
+    if (!C) { if (A.entry(save, ctx).ok) { C = G.cases[A.id] = { id: A.id, st: 'm1', v0: G.visit.n, ref: refRate(save.sim, ctx), draft: { motion: A.first, cl: {} }, asked: {}, said: {} }; A.open && A.open(save, C); news(G, { v: G.visit.n, k: 'case', id: A.id }); } continue; }
     if (C.st === 'later' && G.visit.n >= C.reV) { C.st = 'm1'; C.v0 = G.visit.n; }
     if (C.ref == null) C.ref = refRate(save.sim, ctx);
     A.step && A.step(save, ctx, C, api);

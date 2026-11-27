@@ -6,7 +6,7 @@
    quarter's close, night, weather, the season).
    createDiorama(canvas, get, view): get() → { S, corp, X (ctx), C (capacity) }; view = { x, y, w, h } in world px. */
 
-import { drawLeaf } from './leaf.js?v=12';
+import { drawLeaf } from './leaf.js?v=14';
 const W = 1240, H = 634, GY = 372, CELL = 16, GC0 = 96, GC1 = 1224, ROWS = 14;
 const Y = '#FFE600', RED = '#FF3B30', L1 = '#A3ABBA', L2 = '#7C8492', D1 = '#2A2E36', D2 = '#1D2026', D3 = '#14161A', INK = '#ECEEF2', MUTE = '#6E7582', BG = '#050608';
 const GREY = ['#1A1D23', '#20232A', '#262A32', '#15171C', '#2C3038', '#101216', '#30343D'];
@@ -136,7 +136,8 @@ function draw(cx, g, st, dt) {
   cx.strokeStyle = L1; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(dx + 4, GY); cx.lineTo(dx + 4, GY - 74); cx.lineTo(dx + 152, GY - 74); cx.lineTo(dx + 152, GY); cx.stroke(); cx.lineWidth = 1;
   const cr = st.crane; cr.x += cr.d * 22 * dt; if (cr.x > 130 || cr.x < 0) cr.d *= -1; const ly = 20 + (Math.sin(T * 1.1) * .5 + .5) * 26;
   cx.fillStyle = Y; cx.fillRect(dx + 10 + cr.x, GY - 78, 12, 6); cx.fillStyle = INK; cx.fillRect(dx + 15 + cr.x, GY - 72, 1, ly); cx.fillStyle = '#5A616D'; cx.fillRect(dx + 8 + cr.x, GY - 72 + ly, 16, 9);
-  callout(cx, dx + 76, GY - 74, dx + 20, GY - 112, 'LOG-02  DEPOT  ·  GANTRY 22 M');
+  callout(cx, dx + 76, GY - 74, dx + 20, GY - 112, S.conc ? `LOG-02  ·  ${S.conc.by === 'kurogane' ? '黒鉄重工' : '白鷺HD'} CONCESSION  ·  25% OF SALES` : 'LOG-02  DEPOT  ·  GANTRY 22 M', S.conc ? RED : INK);
+  if (S.conc) { cx.fillStyle = S.conc.by === 'kurogane' ? RED : '#DDE6F0'; cx.fillRect(dx + 4, GY - 82, 148, 6); }
 
   /* MAST A: the uplink, data climbing it */
   const mx = 1004; lattice(cx, mx, GY, GY - 168, 14, L1); cx.fillStyle = L1; cx.fillRect(mx - 14, GY - 150, 22, 26); cx.fillStyle = L2; cx.fillRect(mx + 4, GY - 150, 4, 26); cx.fillStyle = INK; cx.fillRect(mx - 3, GY - 174, 6, 6);

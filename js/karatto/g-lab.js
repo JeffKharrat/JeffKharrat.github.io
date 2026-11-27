@@ -1,7 +1,7 @@
 /* カラット: 研究所, the R&D lab. An intercepted word resolves cell by cell on the holo table. Buzz (Space) the
    moment you recognise it, then pick its meaning (1–4): the earlier the buzz, the more research. A wrong buzz costs
    more than waiting. Research buys techs that change the other buildings. Skill: meaning (form recognition). */
-import { game, panel, keycaps, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=12';
+import { game, panel, keycaps, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=14';
 
 const CW = 9, GW = 72, GH = 38, REVEAL = 8;
 let cur = null, cells = [], order = [], phase = 'idle', tt = 0, res = 0, hits = 0, miss = 0, K, RAIN = [], gap = 0;

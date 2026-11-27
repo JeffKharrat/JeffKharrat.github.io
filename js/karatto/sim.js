@@ -101,8 +101,9 @@ function tick(S, corp, ctx, live) {
   const fameL = Math.floor(Math.sqrt((ctx.fame || 0) / 50)) + 1, price = 6 * (fu.qc ? 1.05 : 1) * (S.pw && S.pw.until > S.t ? S.pw.k : 1) * PX('priceX');
   const hold = (S.hold && S.hold.until > S.t ? S.hold.pct : 0), out = C.strike ? .3 : 1 - hold;
   const sold = Math.min((40 + fameL * 5) * out, available(S)); S.goods -= sold;
+  const conc = S.conc ? S.conc.cut : 0;                                     // a rival holds the port concession: it keeps a cut of every sale
   /* money */
-  const rev = { sales: sold * price, services: pop.c * .4 };
+  const rev = { sales: sold * price * (1 - conc), services: pop.c * .4 };
   const cost = { wages: (work + pop.c + pop.e) * .3 * [.8, 1, 1.25][P.wage] + idle * .05, safety: [0, .02, .05][P.safety] * total, eco: [0, 4 + prod * .15, 10 + prod * .45][P.eco], watch: [0, 3, 8][P.watch],
     pr: [0, 6][P.pr], train: P.train ? 5 + retrained * 4 : 0, upkeep: 6 + 2 * ctx.div + 2 * (ctx.up || 0), proj: (S.proj || []).reduce((n, p) => n + (p.upkeep || 0), 0), interest: S.debt * .0005 };
   const R = Object.values(rev).reduce((a, b) => a + b, 0), K = Object.values(cost).reduce((a, b) => a + b, 0);
@@ -293,7 +294,7 @@ export function addGame(save, id, e) {
     power: () => { S.pwr = (S.pwr || 0) + 1; S.boost = { until: S.t + 24 * H, mw: Math.round((e.grid || 0) * .8) }; return `発電所 grid ${e.grid || 0}% → +${S.boost.mw} MW for 24 h`; },
     lab: () => { corp.research = (corp.research || 0) + (e.research || 0); return `研究所 +${e.research || 0} research`; },
     broadcast: () => { S.aired += e.aired || 0; S.fac.res = clamp(S.fac.res + (e.aired || 0) * .8, 0, 100); S.fameB += (e.aired || 0) * 2; S.stab = clamp(S.stab + (e.aired || 0) * .2, 5, 100); return `放送局 ${e.aired || 0} clips aired`; },
-    exchange: () => `取引所 session move 紅葉重工 ${e.move >= 0 ? '+' : ''}${(e.move || 0).toFixed(1)}% (shown apart from the share price)`,
+    exchange: () => { S.exch = (S.exch || 0) + (e.move || 0); return `取引所 session move 紅葉重工 ${e.move >= 0 ? '+' : ''}${(e.move || 0).toFixed(1)}% (shown apart from the share price)`; },
     security: () => { if (e.real) { S.breach.open = null; S.stab = clamp(S.stab + (e.lost ? -e.lost * 2 : 4), 5, 100); } return e.real ? `保安部 breach repelled: ${e.held} held, ${e.lost} lost` : `保安部 drill: ${e.held} held`; },
     hq: () => `本社 board meeting: ${e.items || 0} items` }[id];
   if (txt) log(S, id, txt() + `, +${e.right || 0} data${e.yen ? `, ¥${e.yen.toLocaleString()} in fees` : ''}.`);

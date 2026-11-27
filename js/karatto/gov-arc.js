@@ -64,6 +64,27 @@ Object.assign(MOTIONS, {
       civic: () => ({ v: -2, why: ['隠蔽', 'a cover-up'] }),
       ops: () => ({ v: 2, why: ['生産を止めない', 'production keeps going'] }) } } });
 
+/* the third arc: 委任状争奪 · the proxy contest */
+Object.assign(MOTIONS, {
+  refuse: { arc: 'proxy', j: '買収拒否', en: 'Refuse both offers', auto: false, clauses: [], next: 'contest',
+    d: () => 'Refuse the bid and the loan. The bidder goes to the shareholders: a proxy contest decided at the third attended visit. Raids on the bidder\'s core, Exchange gains and kept promises win proxies.',
+    base: {
+      chair: () => ({ v: 1, why: ['支配を守る', 'the board keeps control'] }), fin: () => ({ v: -1, why: ['現金が入らない', 'no cash comes in'] }),
+      union: () => ({ v: 1, why: ['職場を守る', 'the workplace stays ours'] }), civic: () => ({ v: 0, why: ['様子を見る', 'waiting to see'] }),
+      ops: () => ({ v: 1, why: ['港を失えない', 'we can\'t lose the port'] }) } },
+  sell: { arc: 'proxy', j: '運営権売却', en: 'Sell the port concession', auto: false, clauses: [], next: 'lost',
+    d: p => `Take the bidder's cash now (${p.y(20)}). They run LOG-02 and keep 25% of every sale until you buy it back (${p.y(30)}).`,
+    base: {
+      chair: () => ({ v: -1, why: ['支配権の放棄', 'control given away'] }), fin: () => ({ v: 2, why: ['現金が入る', 'cash now'] }),
+      union: () => ({ v: -2, why: ['雇用保証なし', 'no job guarantee'] }), civic: () => ({ v: -1, why: ['公害を気にしない相手', 'a buyer who ignores pollution'] }),
+      ops: () => ({ v: -1, why: ['出荷を取られる', 'they take our shipping'] }) } },
+  finance: { arc: 'proxy', j: '条件付融資', en: 'Take the conditional loan', auto: false, clauses: ['covenant'], next: 'loan',
+    d: p => `The other rival lends ${p.y(20)} now, repaid with 10% at the third visit (${p.y(22)}). Public conditions, checked every visit: pollution 40 or less, dividends not stopped. Break one and they seize the port as collateral.`,
+    base: {
+      chair: () => ({ v: 0, why: ['担保が危険', 'risky collateral'] }), fin: () => ({ v: 2, why: ['資金が入る', 'funds come in'] }),
+      union: () => ({ v: 0, why: ['仕事が残れば', 'if the jobs stay'] }), civic: () => ({ v: 1, why: ['公開条件', 'public conditions'] }),
+      ops: () => ({ v: 0, why: ['設備に使える', 'money for equipment'] }) } } });
+
 /* ---------------- clauses: at most two per proposal, one per sponsor ---------------- */
 export const CLAUSES = {
   inspect: { by: 'chair', j: '独立検査', en: 'Independent inspection', why: ['独立検査', 'independent inspection'], due: 3,
@@ -91,6 +112,9 @@ export const CLAUSES = {
   premium: { by: 'fin', j: '環境表示', en: 'Clean-label premium', why: ['環境表示', 'a clean-label premium'], due: 3, cost: () => 0, judge: () => ({ ok: true }), terms0: {},
     desc: () => 'The capped output sells under a clean label: +10% on the sale price while the cap holds. No cost.',
     contract: () => ({ metric: 'the sale price while the cap holds', qty: 1.1, funding: 'none', to: 'finance', deadline: 'the cap\'s term', remedy: 'ends with the cap' }) },
+  covenant: { by: 'chair', j: '監視条項', en: 'Board oversight covenant', why: ['監視条項', 'an oversight covenant'], due: 3, cost: () => 0, judge: () => ({ ok: true }), terms0: {},
+    desc: () => 'The board sees the loan\'s conditions at every visit, and the chair may call it in early. No cost.',
+    contract: () => ({ metric: 'the loan conditions, checked each visit', qty: 1, funding: 'none', to: 'the board', deadline: 'the loan\'s term', remedy: 'the chair calls the loan in' }) },
   scrub: { by: 'civic', j: '集塵機', en: 'Scrubber commissioned', why: ['集塵機', 'the scrubber'], due: 3, cost: () => 0, judge: () => ({ ok: true }), terms0: {}, desc: () => 'The scrubber runs by the review.', contract: () => ({ metric: 'commissioned', qty: 1, funding: 'escrowed on signing', to: 'the residents', deadline: '3 attended visits', remedy: 'one corrective visit, then broken' }) },
   capheld: { by: 'civic', j: '上限遵守', en: 'Cap held', why: ['上限', 'the cap'], due: 3, cost: () => 0, judge: () => ({ ok: true }), terms0: {}, desc: () => 'The output limit holds until the review.', contract: () => ({ metric: 'production −20%', qty: 1, funding: 'lost sales', to: 'the residents', deadline: '3 attended visits', remedy: '—' }) },
   clean: { by: 'civic', j: '公表上限', en: 'Published cap', why: ['公表上限', 'the published cap'], due: 3, cost: () => 0, judge: () => ({ ok: true }), terms0: {}, desc: () => 'No Factory shift ships more than six until the review.', contract: () => ({ metric: 'Factory shifts shipping more than six', qty: 0, funding: 'none', to: 'the residents', deadline: '3 attended visits', remedy: 'the paper prints the ledger; a supervised clean run or an inspection' }) } };
@@ -271,6 +295,86 @@ ARCS.stack = {
     return { ok: false };
   } };
 
+/* ---------------- the third arc: 委任状争奪 · the proxy contest ----------------
+   Opens at N2, or earlier (N3+) once you have breached a rival's core and it holds a grudge of 50+: you opted into the
+   conflict. The angrier rival bids for the LOG-02 port concession; the other offers a loan with public conditions.
+   Losing the port never touches the AI, its memory or its other buildings: a buyback is always open. */
+const others = k => (k === 'kurogane' ? 'shirasagi' : 'kurogane');
+const CORP = { kurogane: '黒鉄重工', shirasagi: '白鷺HD' };
+ARCS.proxy = {
+  id: 'proxy', j: '委任状争奪', en: 'The proxy contest', first: 'refuse', rescue: 'refuse',
+  entry(save, ctx) {
+    const R = save.riv; if (!R || ctx.tier < 2) return { ok: false, why: null };
+    const k = Object.keys(R.r).sort((a, b) => R.r[b].grudge - R.r[a].grudge)[0], r = R.r[k];
+    if (ctx.tier >= 3 || (r.cores >= 1 && r.grudge >= 50)) return { ok: true };
+    return { ok: false, why: r.cores >= 1 ? `委任状争奪 · ${CORP[k]} is watching your shares (grudge ${Math.round(r.grudge)}/50)` : null };
+  },
+  open(save, C) { const R = save.riv; C.bidder = Object.keys(R.r).sort((a, b) => R.r[b].grudge - R.r[a].grudge)[0]; C.lender = others(C.bidder); },
+  signed(save, ctx, C, api) {
+    const S = save.sim, G = api.govOf(save), v = G.visit.n, p = api.price(C.ref), m = C.acc.motion, R = save.riv;
+    if (m === 'refuse') { const b = R.r[C.bidder]; C.sup = Math.round(Math.max(35, Math.min(65, 50 + (S.stab - 50) * .2 + ((G.trust.chair || 0) + (G.trust.fin || 0)) / 10))); C.base = { cores: b.cores, vaults: b.vaults || 0, exch: S.exch || 0, mwon: b.mwon || 0 }; C.lastV = v; C.countV = v + 3; C.trail = [C.sup]; }
+    if (m === 'sell') { api.book(S, save.corp, 'orders', p(20), `運営権売却 The port concession sold to ${CORP[C.bidder]}: +${p.y(20)}.`); S.conc = { by: C.bidder, cut: .25 }; C.lostV = v; }
+    if (m === 'finance') { api.book(S, save.corp, 'fin', p(20), `条件付融資 ${CORP[C.lender]} lends ${p.y(20)}: repay ${p.y(22)} at the third visit.`); C.loan = { due: v + 3, amt: p(22) }; S.debt += p(20);
+      G.pledges.push({ id: 'proxy:loan', clause: 'covenant', case: 'proxy', to: 'chair', terms: {}, st: 'open', v, dueV: v + 3, base: {} }); }
+  },
+  step(save, ctx, C, api) {
+    const S = save.sim, G = api.govOf(save), v = G.visit.n, R = save.riv;
+    if (C.st === 'contest' && C.lastV !== v) {
+      const b = R.r[C.bidder], d = { cores: b.cores - C.base.cores, vaults: (b.vaults || 0) - C.base.vaults, exch: (S.exch || 0) - C.base.exch, mwon: (b.mwon || 0) - C.base.mwon };
+      const gain = d.cores * 12 + d.vaults * 2 + Math.max(-6, Math.min(10, d.exch * 1.5)) + d.mwon * 2 + (S.stab >= 50 ? 2 : 0), drift = 3 + b.grudge / 30;
+      C.sup = Math.max(5, Math.min(95, Math.round(C.sup + gain - drift))); C.base = { cores: b.cores, vaults: b.vaults || 0, exch: S.exch || 0, mwon: b.mwon || 0 }; C.lastV = v; C.trail.push(C.sup);
+      api.log(S, 'gov', `委任状 Proxy count: ${C.sup}% for the board (${gain >= 0 ? '+' : ''}${Math.round(gain)} from raids, Exchange and contracts; −${Math.round(drift)} bought by ${CORP[C.bidder]}).`);
+      if (v >= C.countV) C.st = 'count';
+    }
+    if (C.st === 'loan' && C.loanV !== v) { C.loanV = v;
+      const bad = S.poll > 40 ? 'pollution over 40' : S.pol.div === 0 ? 'dividends stopped' : null;
+      if (bad && !C.seized) { C.seized = v; S.conc = { by: C.lender, cut: .25 }; C.st = 'lost'; C.lostV = v; S.debt = Math.max(0, S.debt - C.loan.amt / 1.1);
+        api.settle(save, ctx, G.pledges.find(x => x.id === 'proxy:loan'), false, 0); api.news(G, { v, k: 'paper', id: 'proxy:seized' });
+        api.log(S, 'gov', `担保差押 ${CORP[C.lender]} seized the port: ${bad}.`); return; }
+      if (v >= C.loan.due) C.st = 'repay';
+    }
+  },
+  meeting(save, ctx, C, api) {
+    const S = save.sim, G = api.govOf(save), p = api.price(C.ref), R = save.riv;
+    if (!C.bidder) this.open(save, C);
+    if (C.st === 'm1') return { kind: 'vote', n: 1, title: ['委任状争奪', `The proxy contest · ${CORP[C.bidder]} bids for the port`], brief: BRIEF.p1, motions: ['refuse', 'sell', 'finance'] };
+    if (C.st === 'count') return { kind: 'choice', n: 2, title: ['株主総会', 'The shareholders\' meeting'], brief: BRIEF.p2,
+      lines: [[`委任状 ${C.sup}%`, `Proxies for the board, visit by visit: ${C.trail.join('% → ')}%`, C.sup >= 50]],
+      opts: [{ id: 'count', j: '開票', en: 'Count the proxies', d: C.sup >= 50 ? 'The board holds a majority: the bid fails.' : 'The bidder holds a majority: the port goes to them.', ok: true },
+        { id: 'greenmail', j: '買取交渉', en: 'Pay them to withdraw', d: `Buy back their stake before the count: ${p.y(16)}. The port stays yours; they resent it.`, ok: C.sup < 50 && api.spendable(save) >= p(16), why: C.sup >= 50 ? 'Not needed: you hold the majority.' : `Needs ${p.y(16)} above the reserve.` }] };
+    if (C.st === 'repay') return { kind: 'choice', n: 2, title: ['返済', 'The loan falls due'], brief: BRIEF.p2l,
+      lines: [['条件', 'Every visit: pollution 40 or less, dividends paid', true]],
+      opts: [{ id: 'repay', j: '返済', en: `Repay ${p.y(22)}`, d: 'The loan is closed; the covenant is kept.', ok: api.spendable(save) >= C.loan.amt, why: `Needs ${p.y(22)} above the reserve.` },
+        { id: 'default', j: '不履行', en: 'Default', d: 'They take the port as collateral; the debt is written off.', ok: true }] };
+    if (C.st === 'lost' && !(C.snooze >= G.visit.n)) { const h = S.conc ? S.conc.by : C.bidder, cores = (R.r[h].cores || 0) > (C.coresAtLoss != null ? C.coresAtLoss : (C.coresAtLoss = R.r[h].cores || 0));
+      return { kind: 'choice', n: 3, title: ['運営権', `The port is ${CORP[h]}'s`], brief: BRIEF.p3,
+        lines: [['港', `${CORP[h]} runs LOG-02 and keeps 25% of every sale`, false]],
+        opts: [{ id: 'buyback', j: '買い戻し', en: `Buy it back: ${p.y(30)}`, d: 'The concession returns at once.', ok: api.spendable(save) >= p(30), why: `Needs ${p.y(30)} above the reserve.` },
+          { id: 'tender', j: '入札', en: `Win the tender: ${p.y(12)}`, d: `Breach ${CORP[h]}'s core in 侵入 first; then the tender is cheap.`, ok: cores && api.spendable(save) >= p(12), why: cores ? `Needs ${p.y(12)} above the reserve.` : `Breach ${CORP[h]}'s core first (侵入).` },
+          { id: 'later', j: '保留', en: 'Not now', d: 'Off the counter for three visits.', ok: true }] }; }
+    return null;
+  },
+  status(save, ctx, C, api) {
+    const G = api.govOf(save), S = save.sim;
+    if (C.st === 'contest') return `委任状争奪 · ${C.sup}% of proxies for the board vs ${CORP[C.bidder]} · count in ${Math.max(0, C.countV - G.visit.n)} visits (breach their core, win at the Exchange)`;
+    if (C.st === 'loan') return `融資 · ${CORP[C.lender]}'s loan: keep pollution ≤ 40 (now ${Math.round(S.poll)}) and dividends on · due in ${Math.max(0, C.loan.due - G.visit.n)} visits`;
+    if (C.st === 'lost') return `運営権 · ${CORP[(S.conc || {}).by] || ''} holds the port: 25% of sales · buy it back at the counter`;
+    return null;
+  },
+  choose(save, ctx, C, opt, api) {
+    const S = save.sim, G = api.govOf(save), v = G.visit.n, p = api.price(C.ref), R = save.riv, mt = this.meeting(save, ctx, C, api), o = mt && mt.opts.find(x => x.id === opt);
+    if (!o || !o.ok) return { ok: false, why: o ? o.why : 'unknown' };
+    api.remember(G, { v, k: 'meet', id: 'proxy', n: mt.n, opt });
+    if (opt === 'count') { if (C.sup >= 50) { C.st = 'done'; C.outcome = 'won'; S.fameB += 60; R.r[C.bidder].grudge = Math.max(0, R.r[C.bidder].grudge - 20); api.trustAdd(G, 'chair', 6); api.log(S, 'gov', `株主総会 The board holds ${C.sup}%: ${CORP[C.bidder]}'s bid fails.`); }
+      else { C.st = 'lost'; C.lostV = v; S.conc = { by: C.bidder, cut: .25 }; api.log(S, 'gov', `株主総会 ${CORP[C.bidder]} wins ${100 - C.sup}% of the proxies: the port concession is theirs.`); } return { ok: true }; }
+    if (opt === 'greenmail') { api.book(S, save.corp, 'ev', -p(16), `買取 ${CORP[C.bidder]} paid to withdraw: ${p.y(16)}.`); R.r[C.bidder].grudge = Math.min(100, R.r[C.bidder].grudge + 15); C.st = 'done'; C.outcome = 'greenmail'; return { ok: true }; }
+    if (opt === 'repay') { api.book(S, save.corp, 'fin', -C.loan.amt, `返済 The loan to ${CORP[C.lender]} is repaid.`); S.debt = Math.max(0, S.debt - C.loan.amt / 1.1); api.settle(save, ctx, G.pledges.find(x => x.id === 'proxy:loan'), true, 1); C.st = 'done'; C.outcome = 'repaid'; return { ok: true }; }
+    if (opt === 'default') { S.conc = { by: C.lender, cut: .25 }; S.debt = Math.max(0, S.debt - C.loan.amt / 1.1); api.settle(save, ctx, G.pledges.find(x => x.id === 'proxy:loan'), false, 0); C.st = 'lost'; C.lostV = v; return { ok: true }; }
+    if (opt === 'buyback' || opt === 'tender') { api.book(S, save.corp, 'cap', -p(opt === 'buyback' ? 30 : 12), `${opt === 'buyback' ? '買い戻し Buyback' : '入札 Tender won'}: the port concession returns.`); delete S.conc; C.st = 'done'; C.outcome = opt; return { ok: true }; }
+    if (opt === 'later') { C.snooze = v + 3; return { ok: true }; }
+    return { ok: false };
+  } };
+
 /* meeting 3: the inspection. Results first, then the programme's outcome */
 function review(save, ctx, C, api) {
   const S = save.sim, G = api.govOf(save), runs = since(S, C, 'runs'), need = C.need || 6, retr = Math.floor(since(S, C, 'retr'));
@@ -337,6 +441,21 @@ export const BRIEF = {
     en: 'Time has passed since the promise. The residents are coming to check whether the sky got cleaner.',
     q: 'What are the residents coming to check?', a: ['Whether the sky got cleaner', 'Whether wages rose', 'Whether the trains run on time', 'Whether the shops opened'],
     hint: 'Sponsor hint: a broken cap can still be cured by a supervised clean run.' },
+  p1: { jp: '[黒鉄重工|くろがねじゅうこう]が[物流|ぶつりゅう]センターの[運営権|うんえいけん]を[買|か]いたいと[言|い]ってきました。[白鷺|しらさぎ]HDは、[条件付|じょうけんつ]きで[資金|しきん]を[貸|か]すと[提案|ていあん]しています。',
+    en: 'Kurogane Heavy wants to buy the operating rights to the logistics center. Shirasagi HD offers to lend money, with conditions. (The bidder and the lender swap if Shirasagi is the angrier rival.)',
+    q: 'What does the bidder want to buy?', a: ['The operating rights to the logistics center', 'The power plant', 'The headquarters tower', 'The AI'],
+    hint: 'Sponsor hint: refusing passes easily; the contest is then won with raids on the bidder\'s core and gains at the Exchange. The chair backs the loan only with an oversight covenant.' },
+  p2: { jp: '[株主総会|かぶぬしそうかい]の[日|ひ]です。[委任状|いにんじょう]の[数|かず]で、[運営権|うんえいけん]がどちらのものか[決|き]まります。',
+    en: 'It is the day of the shareholders\' meeting. The number of proxies decides who holds the operating rights.',
+    q: 'What decides who holds the rights?', a: ['The number of proxies', 'The CEO\'s choice', 'A court ruling', 'A coin toss'],
+    hint: 'Sponsor hint: below 50%, paying them to withdraw keeps the port.' },
+  p2l: { jp: '[融資|ゆうし]の[返済日|へんさいび]です。[一割|いちわり][増|ま]しで[返|かえ]します。',
+    en: 'The loan falls due. It is repaid with ten percent on top.',
+    q: 'How much extra is repaid?', a: ['Ten percent', 'Half', 'Nothing', 'Double'], hint: 'Sponsor hint: default only if the cash would break the reserve.' },
+  p3: { jp: '[物流|ぶつりゅう]センターは[今|いま]、[他社|たしゃ]が[運営|うんえい]しています。[買|か]い[戻|もど]すことができます。',
+    en: 'Another company now runs the logistics center. You can buy it back.',
+    q: 'Who runs the logistics center now?', a: ['Another company', 'The union', 'The residents', 'Nobody'],
+    hint: 'Sponsor hint: breach the holder\'s core in 侵入 and the tender costs less than half the buyback.' },
   m3: { jp: '[検査|けんさ]の日です。[監査委員|かんさいいん]が[約束|やくそく]の[記録|きろく]を[確|たし]かめます。[守|まも]られていなければ、[新聞|しんぶん]が書くでしょう。',
     en: 'It is inspection day. The audit commissioner checks the record of the promises. If they were not kept, the paper will write about it.',
     q: 'Who checks the record of the promises?', a: ['The audit commissioner', 'The union', 'The newspaper', 'The residents'],
@@ -423,6 +542,30 @@ export const STANCE = {
     fin: [L('[現金|げんきん]は[守|まも]れます。[賛成|さんせい]です。', 'The cash is safe. Yes.'), L('[費用|ひよう]はかかりません。[今|いま]は。', 'It costs nothing. For now.')],
     legal: [L('[公表|こうひょう]を[遅|おく]らせても[違法|いほう]ではありません。', 'Delaying disclosure isn\'t illegal.'), L('ただし[公表|こうひょう]した[上限|じょうげん]は[約束|やくそく]です。', 'But the published cap is a promise.')],
     audit: [L('[出荷|しゅっか]を一[便|びん]ずつ[数|かぞ]えます。', 'I\'ll count every shipment.'), L('六[個|こ]を[超|こ]えた[瞬間|しゅんかん]に[記録|きろく]します。', 'The moment one goes over six, I record it.')] },
+  refuse: {
+    union: [L('[売|う]らせない。[物流|ぶつりゅう]は[俺|おれ]たちの[職場|しょくば]だ。', 'We won\'t let it be sold. Logistics is our workplace.'), L('[戦|たたか]うなら[協力|きょうりょく]する。', 'If you fight, we\'ll help.')],
+    civic: [L('[外|そと]の[会社|かいしゃ]に[街|まち]を[渡|わた]さないでください。', 'Don\'t hand the town to an outside company.'), L('[住民|じゅうみん]も[委任状|いにんじょう]を[持|も]っています。', 'The residents hold proxies too.')],
+    ops: [L('[港|みなと]を[失|うしな]えば[出荷|しゅっか]が[止|と]まる。', 'Lose the port and shipping stops.'), L('[相手|あいて]の[中枢|ちゅうすう]を[叩|たた]けば、[票|ひょう]が[動|うご]く。', 'Hit their core and the votes move.')],
+    chair: [L('[取締役会|とりしまりやくかい]の[支配|しはい]を[守|まも]ります。', 'I\'ll keep the board in control.'), L('[株価|かぶか]が[上|あ]がれば[株主|かぶぬし]は[味方|みかた]です。', 'If the share price rises, the shareholders are with us.')],
+    fin: [L('[現金|げんきん]が[入|はい]らないのは[残念|ざんねん]です。', 'A pity no cash comes in.'), L('[取引所|とりひきじょ]で[勝|か]てば[委任状|いにんじょう]が[集|あつ]まります。', 'Win at the Exchange and proxies gather.')],
+    legal: [L('[委任状争奪|いにんじょうそうだつ]は三[回|かい]の[訪問|ほうもん]で[決|き]まります。', 'The contest is decided in three attended visits.'), L('[買収|ばいしゅう]は[合法|ごうほう]ですが、[防|ふせ]げます。', 'The takeover is legal, but it can be blocked.')],
+    audit: [L('[委任状|いにんじょう]を[一枚|いちまい]ずつ[数|かぞ]えます。', 'I\'ll count the proxies one by one.'), L('[不正|ふせい]は[見逃|みのが]しません。', 'I won\'t overlook fraud.')] },
+  sell: {
+    union: [L('[売|う]るだと?[反対|はんたい]だ。', 'Sell? I\'m against.'), L('[雇用|こよう]の[保証|ほしょう]もないのに。', 'Without even a job guarantee.')],
+    civic: [L('[相手|あいて]は[公害|こうがい]を[気|き]にしません。', 'The buyer doesn\'t care about pollution.'), L('[反対|はんたい]です。', 'I\'m against.')],
+    ops: [L('[売上|うりあげ]の四[分|ぶん]の一を[取|と]られる。', 'They\'d take a quarter of our sales.'), L('[反対|はんたい]だ。', 'I\'m against.')],
+    chair: [L('[支配権|しはいけん]を[手放|てばな]すのは[早|はや]い。', 'Too early to give up control.'), L('[買|か]い[戻|もど]しは[高|たか]くつきます。', 'Buying it back will cost dearly.')],
+    fin: [L('[現金|げんきん]が[今|いま][入|はい]ります。[賛成|さんせい]です。', 'Cash comes in now. Yes.'), L('[買|か]い[戻|もど]しは[入札|にゅうさつ]でもできます。', 'We can win it back by tender too.')],
+    legal: [L('[売却|ばいきゃく]は[可能|かのう]です。', 'A sale is possible.'), L('[買|か]い[戻|もど]し[条項|じょうこう]は[残|のこ]します。', 'I\'ll keep a buyback clause.')],
+    audit: [L('[代金|だいきん]の[受領|じゅりょう]を[確認|かくにん]します。', 'I\'ll confirm the payment.'), L('[以上|いじょう]です。', 'That is all.')] },
+  finance: {
+    union: [L('[借金|しゃっきん]か。[仕事|しごと]が[残|のこ]るならいい。', 'Debt, huh. Fine if the jobs stay.'), L('[条件|じょうけん]を[見|み]せてくれ。', 'Show me the conditions.')],
+    civic: [L('[公害|こうがい]40[以下|いか]が[条件|じょうけん]なら[歓迎|かんげい]します。', 'If pollution under 40 is a condition, welcome.'), L('[公開|こうかい]された[条件|じょうけん]は[良|よ]いことです。', 'Public conditions are a good thing.')],
+    ops: [L('[設備|せつび]に[使|つか]える[金|かね]だ。', 'Money we can spend on equipment.'), L('[公害|こうがい]を40に[抑|おさ]えるのは[大変|たいへん]だぞ。', 'Keeping pollution at 40 is hard work.')],
+    chair: [L('[担保|たんぽ]が[物流|ぶつりゅう]センターです。[危険|きけん]です。', 'The collateral is the logistics center. Risky.'), L('[監視|かんし][条項|じょうこう]があれば[賛成|さんせい]します。', 'With an oversight covenant, I\'ll vote yes.')],
+    fin: [L('[資金|しきん]が[入|はい]ります。[賛成|さんせい]です。', 'Funds come in. Yes.'), L('[返済|へんさい]は三[回|かい][後|ご]に一[割|わり][増|ま]しです。', 'Repay in three visits, plus ten percent.')],
+    legal: [L('[条件|じょうけん]を[破|やぶ]れば[担保|たんぽ]が[取|と]られます。', 'Break the conditions and the collateral is taken.'), L('[公害|こうがい]40[以下|いか]、[配当|はいとう]を[止|と]めないこと。', 'Pollution 40 or less, and dividends must not stop.')],
+    audit: [L('[毎回|まいかい]の[訪問|ほうもん]で[条件|じょうけん]を[確認|かくにん]します。', 'I\'ll check the conditions at every visit.'), L('[違反|いはん]は[即座|そくざ]に[報告|ほうこく]します。', 'Any breach is reported at once.')] },
   defer: {
     union: [L('[急|いそ]がないなら、[文句|もんく]はない。', 'If you\'re not rushing, no complaints.'), L('[延期|えんき]なら[俺|おれ]たちは[動|うご]かない。', 'If it\'s postponed, we don\'t move.')],
     civic: [L('[急|いそ]がない[方|ほう]がいいです。', 'Better not to rush.'), L('[延期|えんき]に[賛成|さんせい]します。', 'I support postponing.')],
@@ -440,6 +583,7 @@ export const REPLY = {
     agreed: L('これなら[署名|しょめい]できる。', 'This I can sign.'), grudging: L('…[仕方|しかた]ない。[覚|おぼ]えておくぞ。', '…Fine. I\'ll remember this.') },
   inspect: { agreed: L('[結構|けっこう]です。[検査|けんさ]は六[便|びん]の[後|あと]に[行|おこな]います。', 'Good. The inspection will follow six shipment runs.') },
   report: { agreed: L('ありがとうございます。[報告|ほうこく]は[放送局|ほうそうきょく]で[流|なが]してください。', 'Thank you. Put the report out through the broadcast station.') },
+  covenant: { agreed: L('[監視|かんし][条項|じょうこう]が[入|はい]れば、[安心|あんしん]です。', 'With the oversight covenant in, I\'m reassured.') },
   grid: { agreed: L('[発電所|はつでんしょ]の[枠|わく]で[試運転|しうんてん]する。それなら[乗|の]る。', 'We commission in a Power window. Then I\'m in.') },
   premium: { agreed: L('[環境|かんきょう][表示|ひょうじ]で一[割|わり][高|たか]く[売|う]れます。[賛成|さんせい]しましょう。', 'A clean label sells ten percent higher. I\'ll vote yes.') },
   stage: { agreed: L('二[段階|だんかい]にしましょう。三[便|びん]の[後|あと]に[全出力|ぜんしゅつりょく]です。', 'Two stages, then. Full output after three runs.') } };

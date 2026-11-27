@@ -1,13 +1,13 @@
 /* カラット: 経営, the management console in the core. Overview (the planet's numbers and their last three days),
    policies, factions, quarterly reports, the log. Also the briefing after time away, and the decisions (決裁).
    Marathon-style: black, hairlines, micro labels, the AI's yellow. */
-import { POL, FAC, GROUPS, EVENTS, LEDGER, resolve, setPolicy, dirProgress, capacity, forecast } from './sim.js?v=12';
-import { bureau, bureauKey, bureauClose } from './bureau.js?v=12';
-import { inbox, contracted, spendable, reserve, govOf } from './gov.js?v=12';
-import { RIVALS, IDS, rivOf, defOf, costs, fwCost, buyFirewall, ACTS } from './rivals.js?v=12';
-import { ICON } from './icons.js?v=12';
-import { createDiorama } from './diorama.js?v=12';
-import { leafSVG } from './leaf.js?v=12';
+import { POL, FAC, GROUPS, EVENTS, LEDGER, resolve, setPolicy, dirProgress, capacity, forecast } from './sim.js?v=14';
+import { bureau, bureauKey, bureauClose } from './bureau.js?v=14';
+import { inbox, contracted, spendable, reserve, govOf } from './gov.js?v=14';
+import { RIVALS, IDS, rivOf, defOf, costs, fwCost, buyFirewall, ACTS } from './rivals.js?v=14';
+import { ICON } from './icons.js?v=14';
+import { createDiorama } from './diorama.js?v=14';
+import { leafSVG } from './leaf.js?v=14';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const yen = v => (v < 0 ? '−¥' : '¥') + Math.abs(Math.round(v)).toLocaleString();
@@ -251,7 +251,8 @@ function riv() {
       <div class="lb" style="margin-top:8px">情報 INTEL ${Math.round(r.intel)} · EVERY 34 LOWERS THEIR DEFENSE</div>${bar(r.intel)}
       <div class="lb" style="margin-top:8px">LAST RUN</div><div style="min-height:34px">${L ? `${L.core ? '<b style="color:var(--y)">中枢侵害 core breached</b>' : L.traced ? '<b style="color:var(--red)">逆探知 traced</b>' : '離脱 jacked out'} · ${L.nodes} nodes · ${yen(L.yen)} · ${L.data} data` : '<span class="lb">NEVER ATTACKED</span>'}</div>
       <button type="button" class="seg" data-hack="${k}" style="margin-top:10px;width:100%;background:var(--y);color:#000;border:0;padding:12px;font:700 12px var(--mono);letter-spacing:.1em;cursor:pointer">侵入 · LAUNCH AN INTRUSION · ENTRY ${yen(c.entry)}</button></div></div>`; }).join('');
-  const fc = fwCost(save, X), act = [S.breach && S.breach.open ? `侵入警報 ${S.breach.open.rival} is in your memory: 保安部 Security` : '', S.sab && S.sab.until > S.t ? `送電妨害 −${S.sab.mw} MW, ${Math.ceil((S.sab.until - S.t) / 3600e3)} h left` : '', S.pw && S.pw.until > S.t ? `価格戦争 −15% price, ${Math.ceil((S.pw.until - S.t) / 3600e3)} h left` : ''].filter(Boolean);
+  const PC = govOf(save).cases.proxy, act0 = PC && PC.st === 'contest' ? [`委任状争奪 ${PC.sup}% of proxies for the board vs ${RIVALS[PC.bidder].corp} (count at visit ${PC.countV})`] : [];
+  const fc = fwCost(save, X), act = [...act0, S.conc ? `運営権 ${RIVALS[S.conc.by].corp} holds the port: 25% of every sale` : '',S.breach && S.breach.open ? `侵入警報 ${S.breach.open.rival} is in your memory: 保安部 Security` : '', S.sab && S.sab.until > S.t ? `送電妨害 −${S.sab.mw} MW, ${Math.ceil((S.sab.until - S.t) / 3600e3)} h left` : '', S.pw && S.pw.until > S.t ? `価格戦争 −15% price, ${Math.ceil((S.pw.until - S.t) / 3600e3)} h left` : ''].filter(Boolean);
   return cards + `<div class="mgp" style="left:832px;top:0;width:408px;height:440px"><div class="ph"><span><b>DEF</b> 防壁 · YOUR FIREWALL</span><span>LEVEL ${R.fw}/5</span></div><div class="in">
       <div class="big" style="font:700 40px var(--num)">${'■'.repeat(R.fw)}${'□'.repeat(5 - R.fw)}</div>
       <p style="color:#B8BCC6">Each level cuts the rivals' chance to answer by 15%. They act only on your attended visits: at most one act a visit and two a week. A breach never deletes a word; it marks words compromised until you reverify them.</p>
@@ -261,7 +262,7 @@ function riv() {
     <div class="mgp" style="left:0;top:452px;width:1240px;height:182px;overflow:auto"><div class="ph"><span><b>LOG</b> 敵対記録 · RAIDS AND ANSWERS</span></div><div class="in">${R.log.slice().reverse().map(l => `<div class="lg"><span>${new Date(l.t).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span><span>${esc(l.txt)}</span></div>`).join('') || '<p class="lb">NO CONTACT YET. THE FIRST MOVE IS YOURS.</p>'}</div></div>`;
 }
 function wireRiv(B) {
-  B.querySelectorAll('[data-hack]').forEach(b => b.onclick = () => { const q = new URLSearchParams(location.search); M.c.persist(); location.href = `hack/?target=${b.dataset.hack}${q.has('embed') ? '&embed=1' : ''}${q.has('demo') ? '&demo' : ''}&v=12`; });
+  B.querySelectorAll('[data-hack]').forEach(b => b.onclick = () => { const q = new URLSearchParams(location.search); M.c.persist(); location.href = `hack/?target=${b.dataset.hack}${q.has('embed') ? '&embed=1' : ''}${q.has('demo') ? '&demo' : ''}&v=14`; });
   const f = B.querySelector('[data-fw]'); if (f) f.onclick = () => { if (buyFirewall(M.c.save, M.c.ctx(), spendable(M.c.save))) { M.c.persist(); render(); } };
 }
 function log() {

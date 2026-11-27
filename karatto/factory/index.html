@@ -78,6 +78,7 @@ button { font:inherit; color:inherit; }
 .side { position:absolute; top:64px; background:rgba(5,5,6,.86); border:1px solid var(--line); z-index:3; font-size:11px; line-height:1.7; padding:9px 11px; }
 #left { left:10px; width:188px; }
 #log { right:10px; width:180px; max-height:190px; overflow:hidden; }
+#race { right:10px; top:266px; width:180px; } #race ruby rt { font-size:7.5px; }
 .side .hd { white-space:nowrap; gap:8px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line); padding-bottom:5px; margin-bottom:5px; }
 #log div.e { display:flex; justify-content:space-between; gap:6px; animation:fade .3s ease-out both; white-space:nowrap; }
 #log div.e span:first-child { overflow:hidden; text-overflow:ellipsis; }
@@ -149,12 +150,13 @@ button { font:inherit; color:inherit; }
   </div>
   <div class="side" id="left"></div>
   <div class="side" id="log" aria-live="polite"></div>
+  <div class="side" id="race" aria-live="polite"></div>
   <div id="cards"></div>
   <div id="bins"></div>
   <div id="toast"></div>
   <div class="ov" id="ov-brief"><div class="sheet" id="brief"></div></div>
   <div class="ov" id="ov-report"><div class="sheet" id="report"></div></div>
 </div></div>
-<script type="module" src="../../js/karatto/factory.js?v=12"></script>
+<script type="module" src="../../js/karatto/factory.js?v=14"></script>
 </body>
 </html>

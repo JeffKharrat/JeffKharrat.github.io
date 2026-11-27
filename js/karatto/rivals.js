@@ -3,8 +3,8 @@
    its tools, kanji are the exploits. They answer, bounded: on an attended visit only, at most one act per visit and
    two a week, never deleting a certified word (a breach only marks words compromised, as before).
    Pure logic, no DOM. Saved in save.riv. */
-import { book, log, weekStart } from './sim.js?v=12';
-import { govOf, price, refRate, visitHooks } from './gov.js?v=12';
+import { book, log, weekStart } from './sim.js?v=14';
+import { govOf, price, refRate, visitHooks } from './gov.js?v=14';
 
 const H = 3600e3, clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const RIVALS = {
@@ -53,7 +53,7 @@ export function lootOf(save, k, ctx, res) {
 export function settleRaid(save, k, ctx, res, bookYen = true) {
   const R = rivOf(save), r = R.r[k], S = save.sim; if (!r.cash) r.cash = refOf(save, ctx) * 60;
   const { yen, data } = lootOf(save, k, ctx, res);
-  r.cash = Math.max(0, r.cash - yen); r.raids++; r.last = { t: S.t, ...res, yen, data };
+  r.cash = Math.max(0, r.cash - yen); r.raids++; r.vaults = (r.vaults || 0) + (res.vaults || 0); r.last = { t: S.t, ...res, yen, data };
   r.intel = clamp(r.intel + res.nodes * 2 + (res.core ? 25 : 0), 0, 100);
   r.grudge = clamp(r.grudge + 8 + res.nodes + (res.core ? 25 : 0) + (res.traced ? 12 : 0), 0, 100);
   if (res.core) { r.cores++; r.won++; r.def = clamp(r.def + 1, 1, 9); }                  // they harden after a core breach
@@ -96,3 +96,24 @@ export function buyFirewall(save, ctx, spendable) {
 }
 
 visitHooks.push(rivalsVisit);
+
+/* ---------------- the rivals inside the other buildings (Logistics, the Great Factory) ---------------- */
+const L = (jp, en) => ({ jp, en });
+export const LINES = {
+  kurogane: { snatch: L('[遅|おそ]い。この[荷|に]は[黒鉄|くろがね]がもらう。', 'Too slow. Kurogane takes this load.'), lead: L('[鉄|てつ]の[速度|そくど]についてこられるか。', 'Can you keep up with iron?'),
+    behind: L('…[今|いま]だけだ。', '…Only for now.'), undercut: L('[値段|ねだん]を[下|さ]げた。[客|きゃく]はこちらに[来|く]る。', 'I cut the price. The customers come to us.'),
+    win: L('[契約|けいやく]は[黒鉄|くろがね]のものだ。', 'The contract belongs to Kurogane.'), lose: L('[今回|こんかい]は[譲|ゆず]ろう。', 'This time, I yield.'), hello: L('[同|おな]じ[客|きゃく]を[狙|ねら]っている。[覚悟|かくご]しろ。', 'We want the same customers. Be ready.') },
+  shirasagi: { snatch: L('お[先|さき]に[失礼|しつれい]します。', 'Pardon me for going first.'), lead: L('[追|お]いつけますか。', 'Can you catch up?'),
+    behind: L('[計算|けいさん]どおりです。まだ。', 'As calculated. For now.'), undercut: L('[白鷺|しらさぎ]は[一割|いちわり][安|やす]くしました。', 'Shirasagi went ten percent cheaper.'),
+    win: L('[契約|けいやく]は[白鷺|しらさぎ]が[頂|いただ]きました。', 'Shirasagi has taken the contract.'), lose: L('[今回|こんかい]は[負|ま]けを[認|みと]めます。', 'This time I concede.'), hello: L('[同|おな]じ[配送先|はいそうさき]ですね。どうぞお[先|さき]に…[行|い]ければ。', 'The same destinations, I see. After you… if you can.') } };
+export const rubyHTML = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]).replace(/\[([^|\]]+)\|([^\]]+)\]/g, '<ruby>$1<rt>$2</rt></ruby>');
+/* which rival shows up in a building: they take turns */
+export const pickRival = n => IDS[(n || 0) % IDS.length];
+/* the result of a contest in a building: you learn about them (intel), they resent losing (grudge) */
+export function matchResult(save, k, won, what) {
+  const R = rivOf(save), r = R.r[k], S = save.sim; if (!S || S.v !== 2) return;
+  r.intel = clamp(r.intel + 3, 0, 100); if (won) r.grudge = clamp(r.grudge + 3, 0, 100); else r.cash = (r.cash || 0) + 200;
+  r.match = (r.match || 0) + 1; r.mwon = (r.mwon || 0) + (won ? 1 : 0);
+  note(R, { t: S.t, k, txt: `${what}: ${won ? 'won against' : 'lost to'} ${RIVALS[k].corp}.` });
+}
+export const rivalDef = (save, k, ctx) => (save.sim && save.sim.v === 2 && ctx ? defOf(save, k, ctx) : 3);

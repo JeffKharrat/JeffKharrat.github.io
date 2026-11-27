@@ -1,15 +1,18 @@
 /* カラット: 物流センター, Logistics. The district on the dispatch table, seen from above: nine shops on a 3×3 grid
    (laid out like the numpad), their signs words from the deck. Order slips give a destination as a reading (skill
    reading) or a meaning (skill recall); pick the shop (click it or its numpad key) and a free truck drives the route.
-   A wrong shop is a misdelivery: the truck goes there and back for nothing, and that skill's evidence is wiped. */
-import { game, panel, esc, clamp, ease, Y, RED, OK, sfx, $, overlap } from './game.js?v=12';
-import { available } from './sim.js?v=12';
-import { activeLot, sendLot } from './gov.js?v=12';
+   A wrong shop is a misdelivery: the truck goes there and back for nothing, and that skill's evidence is wiped.
+   A rival AI works the same district from its own depot at the top of the map: if its truck reaches a shop first, the
+   order is theirs (横取り). The faster you read, the fewer they take. */
+import { game, panel, esc, clamp, ease, Y, RED, OK, sfx, $, overlap } from './game.js?v=14';
+import { available } from './sim.js?v=14';
+import { activeLot, sendLot } from './gov.js?v=14';
+import { RIVALS, LINES, rubyHTML, pickRival, matchResult, rivalDef } from './rivals.js?v=14';
 
 const COLS = [400, 640, 880], ROWS = [150, 310, 470], VX = [520, 520, 760], DEP = { x: 640, y: 616 };
 const shopPos = n => ({ c: n % 3, r: 2 - Math.floor(n / 3) });                       // numpad: 1 2 3 bottom row, 7 8 9 top
 const center = n => { const { c, r } = shopPos(n); return { x: COLS[c], y: ROWS[r] }; };
-let SH = [], ORD = [], TR = [], FX = [], PEDS = [], sel = 0, spawnT = 0, st = { del: 0, mis: 0, late: 0, lot: 0, fr: 0, tr: 0 }, FR = { lot: 0, stock: 0, id: null, name: '' };
+let RV = { k: 'kurogane', mine: 0, theirs: 0, trucks: [], said: {}, a: 1 }, SH = [], ORD = [], TR = [], FX = [], PEDS = [], sel = 0, spawnT = 0, st = { del: 0, mis: 0, late: 0, lot: 0, fr: 0, tr: 0 }, FR = { lot: 0, stock: 0, id: null, name: '' };
 
 function route(n) {
   const { c, r } = shopPos(n), x = COLS[c], y = ROWS[r] + 80, vx = VX[c];
@@ -32,7 +35,7 @@ function newOrder(api) {
   if (!cand.length) return;
   const { s, n } = cand[Math.random() * cand.length | 0], tr = api.G.tried;
   const skill = tr.has('reading' + s.w.id) ? 'recall' : tr.has('recall' + s.w.id) ? 'reading' : Math.random() < .5 ? 'reading' : 'recall';
-  ORD.push({ n, w: s.w, skill, born: api.t, T: 34 * (api.tech.fleet ? 1.25 : 1), fee: 120 + (5 - (s.w.lvl || 3)) * 30 + Math.round(Math.random() * 6) * 10, id: Math.random() });
+  ORD.push({ n, w: s.w, skill, born: api.t, T: 34 * (api.tech.fleet ? 1.25 : 1), fee: 120 + (5 - (s.w.lvl || 3)) * 30 + Math.round(Math.random() * 6) * 10, id: Math.random(), rvAt: api.t + 34 * (.42 + Math.random() * .4) / RV.a });
   sfx('card'); slips(api);
 }
 function slips(api) {
@@ -83,8 +86,10 @@ game({
       .tr { display:flex; gap:10px; padding:4px 0; border-bottom:1px solid #15171B; font-size:11.5px; } .tr b { font:700 13px var(--num); width:16px; } .tr .kj { font-size:13px; }`;
     document.head.appendChild(css);
     panel('pl', { x: 12, y: 62, w: 236, h: 520 }, '伝票 · ORDERS', 'ORD').id = 'p-ord';
-    panel('pf', { x: 1032, y: 62, w: 236, h: 160 }, '車両 · FLEET', 'FLT').id = 'p-fleet';
-    const lg = panel('pg', { x: 1032, y: 232, w: 236, h: 350 }, '記録 · LOG', 'LOG'); lg.id = 'g-log'; lg.classList.add('log');
+    panel('pf', { x: 1032, y: 62, w: 236, h: 128 }, '車両 · FLEET', 'FLT').id = 'p-fleet';
+    panel('pr', { x: 1032, y: 198, w: 236, h: 170 }, '競合 · THE RIVAL', 'RIV').id = 'p-riv';
+    const lg = panel('pg', { x: 1032, y: 376, w: 236, h: 206 }, '記録 · LOG', 'LOG');
+    document.head.insertAdjacentHTML('beforeend', '<style>#p-riv ruby rt { font-size:8px; } #p-riv .ln { font:500 14px/1.9 var(--kj); } #p-riv .m { font-size:10.5px; color:#9AA0AB; }</style>'); lg.id = 'g-log'; lg.classList.add('log');
     panel('ph', { x: 12, y: 592, w: 236, h: 116 }, '操作 · CONTROLS', 'KEY').innerHTML = '<span class="key">NUM 1–9</span> send to that shop<br><span class="key">Tab</span> next slip<br>click a slip, then a shop';
     for (let i = 0; i < 40; i++) PEDS.push({ s: Math.random() * 4000, v: 18 + Math.random() * 20, lane: i % 6 });
     signAll(api);
@@ -96,6 +101,8 @@ game({
     /* the cargo for this shift: a contract lot that's held in the warehouse, then the free stock above the household floor */
     const S = api.SAVE.sim, L = S && S.v === 2 && !api.preview ? activeLot(S) : null;
     FR = { id: L ? L.id : null, name: L ? `${L.j || L.id} (${L.en || ''})` : '', lot: L ? Math.min(Math.floor((L.held || 0) / L.units), Math.ceil((L.qty - L.sent) / L.units)) : 0, stock: S && S.v === 2 && !api.preview ? Math.floor(available(S) / 4) : 0 };
+    RV = { k: pickRival(api.U.shifts), mine: 0, theirs: 0, trucks: [], said: {}, line: null };
+    RV.a = .75 + rivalDef(api.SAVE, RV.k, api.summary && api.summary.ctx) * .07; rtalk(api, 'hello');
     TR = Array.from({ length: api.U.truck4 ? 4 : 3 }, (_, i) => ({ st: 'idle', i })); newOrder(api); fleet(api); $('#g-log').innerHTML = '';
   },
   tick(dt, api) {
@@ -104,6 +111,20 @@ game({
     for (const o of ORD.slice()) if (api.t - o.born > o.T) { ORD.splice(ORD.indexOf(o), 1); st.late++; api.log(o.w.w, '期限切れ', 'expired', 'm'); slips(api); }
     timers(api);
     const sp = api.U.fast ? 400 : 300;
+    /* the rival: it dispatches on its own clock, always to the right shop, from its depot at the top */
+    for (const o of ORD.concat(TR.filter(t => t.o && t.st === 'out').map(t => t.o))) if (!o.rvGo && !o.done && o.ok !== false && api.t >= o.rvAt) {
+      o.rvGo = true; const P = rroute(o.n); RV.trucks.push({ o, P, d: 0, L: plen(P), st: 'out' }); }
+    for (const r of RV.trucks) {
+      r.d += sp * .92 * RV.a * dt;
+      if (r.st === 'out' && r.d >= r.L) { r.st = 'back'; r.d = 0; r.P = r.P.slice().reverse();
+        const o = r.o; if (!o.done) { o.taken = true; RV.theirs++; FX.push({ k: 'taken', n: o.n, t: 0 }); sfx('buzz');
+          const i = ORD.indexOf(o); if (i >= 0) { ORD.splice(i, 1); slips(api); }
+          api.log(o.w.w, '横取り', 'taken by ' + RIVALS[RV.k].corp, 'r'); if (Math.random() < .5) rtalk(api, 'snatch'); } }
+      else if (r.st === 'back' && r.d >= r.L) r.st = 'gone';
+    }
+    RV.trucks = RV.trucks.filter(r => r.st !== 'gone');
+    if (RV.theirs >= RV.mine + 2) rtalk(api, 'lead', true); if (RV.mine >= RV.theirs + 3) rtalk(api, 'behind', true);
+    riv(api);
     for (const t of TR) {
       if (t.st === 'out') { t.d += sp * dt; if (t.d >= t.L) { t.d = t.L; t.st = 'drop'; t.wait = .6; arrive(api, t); } }
       else if (t.st === 'drop') { t.wait -= dt; if (t.wait <= 0) { t.st = 'back'; t.d = 0; t.P = t.P.slice().reverse(); fleet(api); } }
@@ -117,16 +138,17 @@ game({
     if (e.key === 'Tab') { sel = ORD.length ? (sel + 1) % ORD.length : 0; slips(api); return true; }
   },
   end(api) {
-    return { title: st.del >= 10 ? '配送完了' : '業務終了', rows: [['delivered', st.del, 'y'], ['misdelivered', st.mis, st.mis ? 'r' : ''], [st.lot ? 'contract lot' : 'training runs', st.lot ? st.lot : st.tr]], effect: { delivered: st.del, freight: st.fr, lot: st.lot, training: st.tr, lotId: FR.id },
-      extra: `<div class="note">${st.lot ? `<b class="y">契約 ${st.lot} contract deliveries</b> against ${esc(FR.name)}. ` : ''}${st.fr} freight deliveries from the warehouse${st.tr ? `; ${st.tr} training runs (no stock to carry: a 40% service fee)` : ''}.</div>` };
+    return { title: st.del >= 10 ? '配送完了' : '業務終了', rows: [['delivered', st.del, 'y'], ['misdelivered', st.mis, st.mis ? 'r' : ''], [st.lot ? 'contract lot' : 'training runs', st.lot ? st.lot : st.tr]], effect: { delivered: st.del, freight: st.fr, lot: st.lot, training: st.tr, lotId: FR.id, rival: RV.k, mine: RV.mine, theirs: RV.theirs },
+      extra: `<div class="note">競合 <b class="kj" style="color:${RIVALS[RV.k].col}">${RIVALS[RV.k].corp}</b> · you ${RV.mine} · them ${RV.theirs} · ${RV.mine > RV.theirs ? '<b class="y">the district is yours</b>' : '<b class="r">they took the district</b>'}<br><span class="kj">${rubyHTML(LINES[RV.k][RV.mine > RV.theirs ? 'lose' : 'win'].jp)}</span> <span class="m">${LINES[RV.k][RV.mine > RV.theirs ? 'lose' : 'win'].en}</span></div><div class="note">${st.lot ? `<b class="y">契約 ${st.lot} contract deliveries</b> against ${esc(FR.name)}. ` : ''}${st.fr} freight deliveries from the warehouse${st.tr ? `; ${st.tr} training runs (no stock to carry: a 40% service fee)` : ''}.</div>` };
   },
-  settle(api, res, rid) { if (res.effect.lot && FR.id) sendLot(api.SAVE, FR.id, res.effect.lot, rid);
+  settle(api, res, rid) { if (res.effect.lot && FR.id) sendLot(api.SAVE, FR.id, res.effect.lot, rid); matchResult(api.SAVE, RV.k, RV.mine > RV.theirs, '物流 Logistics');
   },
   draw(cx, t, dt, api) { scene(cx, t, api); }
 });
 function arrive(api, t) {
   const o = t.o, c = center(o.dest);
-  if (o.ok) {
+  if (o.ok && o.taken) { o.done = true; api.log(o.w.w, '先着 ' + RIVALS[RV.k].corp, 'beaten to it', 'r'); FX.push({ k: 'miss', n: o.dest, t: 0 }); fleet(api); return; }
+  if (o.ok) { o.done = true; RV.mine++;
     /* what the truck carried: a contract lot first, then freight from the warehouse, else a training run at a service fee */
     const kind = FR.lot > 0 ? 'lot' : FR.stock > 0 ? 'freight' : 'training'; if (kind === 'lot') { FR.lot--; st.lot++; } else if (kind === 'freight') { FR.stock--; st.fr++; } else st.tr++;
     const late = api.t - o.born > o.T, base = late ? Math.round(o.fee / 2) : o.fee, fee = Math.round(base * (o.rate || 1) * (kind === 'training' ? .4 : 1));
@@ -134,6 +156,16 @@ function arrive(api, t) {
     if (Math.random() < .55) setTimeout(() => resign(api, o.dest), 700); }
   else { st.mis++; FX.push({ k: 'miss', n: o.dest, t: 0 }); }
   fleet(api);
+}
+
+/* ---------------- the rival ---------------- */
+function rroute(n) { const { c, r } = shopPos(n), x = COLS[c], y = ROWS[r] + 80, vx = VX[c] + 20; return [{ x: vx, y: 40 }, { x: vx, y }, { x, y }]; }
+function rtalk(api, k, once) { if (once && RV.said[k]) return; RV.said[k] = 1; RV.line = LINES[RV.k][k]; riv(api, true); }
+function riv(api, force) {
+  const el = $('#p-riv'); if (!el) return; const key = RV.mine + ':' + RV.theirs + ':' + (RV.line && RV.line.en); if (!force && el.dataset.k === key) return; el.dataset.k = key; const P = RIVALS[RV.k];
+  el.innerHTML = `<div class="kj" style="font-size:17px;color:${P.col}">${P.corp} <span class="lb">AI ${P.ai}</span></div>
+    <div style="display:flex;justify-content:space-between;font:700 22px var(--num);margin:4px 0"><span style="color:var(--y)">${RV.mine}</span><span class="lb" style="align-self:center">YOU · THEM</span><span style="color:${P.col}">${RV.theirs}</span></div>
+    ${RV.line ? `<div class="ln">${rubyHTML(RV.line.jp)}</div><div class="m">${RV.line.en}</div>` : ''}`;
 }
 
 /* ---------------- the table display ---------------- */
@@ -180,8 +212,14 @@ function scene(cx, t, api) {
     cx.beginPath(); let acc = 0; cx.moveTo(P[0].x, P[0].y); for (let i = 1; i < P.length; i++) { const L = Math.hypot(P[i].x - P[i - 1].x, P[i].y - P[i - 1].y); if (acc + L >= d) { const u = (d - acc) / L; cx.lineTo(P[i - 1].x + (P[i].x - P[i - 1].x) * u, P[i - 1].y + (P[i].y - P[i - 1].y) * u); break; } cx.lineTo(P[i].x, P[i].y); acc += L; } cx.stroke(); cx.setLineDash([]);
     const p = along(P, d); truck(cx, p.x, p.y, p.a, true);
   }
+  /* the rival's depot (top) and trucks */
+  const RC = RIVALS[RV.k].col; cx.fillStyle = '#121418'; cx.fillRect(560, 0, 160, 34); cx.strokeStyle = RC; cx.strokeRect(560.5, .5, 160, 34);
+  cx.fillStyle = RC; cx.font = '500 11px "M PLUS 1"'; cx.fillText(RIVALS[RV.k].corp + ' 配送所', 568, 22);
+  for (const r of RV.trucks) { const p = along(r.P, r.d); cx.save(); cx.translate(p.x, p.y); cx.rotate(p.a); cx.fillStyle = RC; cx.fillRect(-14, -7, 20, 14); cx.fillStyle = '#111'; cx.fillRect(6, -7, 8, 14); cx.restore();
+    if (r.st === 'out') { cx.strokeStyle = RC; cx.globalAlpha = .5; cx.setLineDash([4, 6]); cx.beginPath(); cx.moveTo(p.x, p.y); const e = r.P[r.P.length - 1]; cx.lineTo(e.x, e.y); cx.stroke(); cx.setLineDash([]); cx.globalAlpha = 1; } }
   /* effects */
   for (const f of FX) {
+    if (f.k === 'taken') { const c = center(f.n), u = f.t / 1.6; cx.globalAlpha = 1 - u; cx.fillStyle = RC; cx.font = '700 16px "M PLUS 1"'; cx.textAlign = 'center'; cx.fillText('横取り', c.x, c.y - 60 - u * 20); cx.textAlign = 'left'; cx.globalAlpha = 1; continue; }
     const c = center(f.n < 0 ? 0 : f.n), u = f.t / 1.6;
     if (f.k === 'pay') { cx.globalAlpha = 1 - u; cx.fillStyle = Y; cx.font = '700 22px Tektur'; cx.textAlign = 'center'; cx.fillText(f.txt, c.x, c.y - 60 - u * 30); cx.textAlign = 'left'; cx.globalAlpha = 1; }
     if (f.k === 'miss') { cx.globalAlpha = 1 - u; cx.strokeStyle = RED; cx.lineWidth = 4; cx.beginPath(); cx.moveTo(c.x - 26, c.y - 26); cx.lineTo(c.x + 26, c.y + 26); cx.moveTo(c.x + 26, c.y - 26); cx.lineTo(c.x - 26, c.y + 26); cx.stroke(); cx.globalAlpha = 1; cx.lineWidth = 1; }

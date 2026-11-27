@@ -7,14 +7,15 @@
    evidence for the word; a late one scraps it with no change to the evidence. Words already in memory are handled by
    the AI's own robots (blue, 自動). First attempt per word and skill in a shift only. At the end of the shift: the daily
    report, the yen, and the files the evidence now supports, sent to the audit in the core. */
-import { loadKanji } from './model.js?v=12';
-import * as store from './store.js?v=12';
-import { deckWord, buildPool, traps, shuffle } from './words.js?v=12';
-import { record, updateFlags, SKILL_J, day, payRate } from './evidence.js?v=12';
-import { addShift, book } from './sim.js?v=12';
-import './rivals.js?v=12';
-import { once, visit, progress } from './gov.js?v=12';
-import { leafSVG, leafFavicon } from './leaf.js?v=12';
+import { loadKanji } from './model.js?v=14';
+import * as store from './store.js?v=14';
+import { deckWord, buildPool, traps, shuffle } from './words.js?v=14';
+import { record, updateFlags, SKILL_J, day, payRate } from './evidence.js?v=14';
+import { addShift, book } from './sim.js?v=14';
+import './rivals.js?v=14';
+import { once, visit, progress, price } from './gov.js?v=14';
+import { RIVALS, LINES, rubyHTML, pickRival, matchResult, rivalDef, refOf } from './rivals.js?v=14';
+import { leafSVG, leafFavicon } from './leaf.js?v=14';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;
@@ -36,6 +37,8 @@ const ST = [
 ST.forEach((s, i) => Object.assign(s, { i, prod: null, card: null, act: null, beacon: 0, ng: 0 }));
 
 /* ---------------- shift state ---------------- */
+/* the rival line: another megacorp bids for the same contract and ships on its own clock */
+let RF = { k: 'kurogane', ship: 0, acc: 0, rate: .05, cut: 0, rush: 0, said: {}, line: null };
 const G = { run: false, T: 180, T0: 180, ship: 0, def: 0, yen: 0, target: 10, spawnT: 0, pace: [], D: 14, focus: null, lock: 0,
   tried: new Set(), touched: new Map(), log: [], forgive: 0, streak: 0, best: 0, auto: 0, shake: 0 };
 let PRODS = [], PARTS = [], FX = [], pid = 0;
@@ -83,7 +86,7 @@ function hall() {
   };
   banner(532, '安全第一', '#5CFFA0', 'SAFE-01'); banner(792, '品質第一', Y, 'QC-01');
   g.font = '400 17px "M PLUS 1"'; g.fillStyle = 'rgba(233,235,240,.18)'; g.fillText('第一ライン', 228, 300);
-  g.font = '500 8px "M PLUS 1 Code"'; g.fillStyle = 'rgba(233,235,240,.24)'; g.fillText('KARATTO HEAVY IND.', 228, 314); g.fillText('LINE 01', 228, 325);
+  g.font = '500 8px "M PLUS 1 Code"'; g.fillStyle = 'rgba(233,235,240,.24)'; g.fillText('MOMIJI HEAVY IND.', 228, 314); g.fillText('LINE 01', 228, 325);
   /* pipes along the wall */
   for (const [y, w, c] of [[350, 8, '#1D232D'], [364, 5, '#262D39']]) { g.fillStyle = c; g.fillRect(0, y, W, w); g.fillStyle = 'rgba(255,255,255,.05)'; g.fillRect(0, y, W, 1); }
   for (let x = 60; x < W; x += 140) { g.fillStyle = '#0B0E12'; g.fillRect(x, 346, 6, 26); }
@@ -447,7 +450,7 @@ function tick(now) {
     if (st && st.prod && st.prod !== p) nx = Math.min(nx, st.x - 104);
     if (nx > p.x + .01) moving = true; p.x = Math.max(p.x, nx); ahead = p.x - 104;
     if (st && Math.abs(p.x - st.x) < .5 && !st.prod && G.run) { st.prod = p; p.state = 'work'; spawnCard(st); }
-    if (!st && p.x > W + 60) { p.gone = true; G.ship++; G.yen += 30; sfx('ship'); logL('製品 #' + p.id, '出荷', '+¥30', 'y'); }
+    if (!st && p.x > W + 60) { p.gone = true; G.ship++; const y = RF.cut > 0 ? 20 : 30; G.yen += y; sfx('ship'); logL('製品 #' + p.id, '出荷', '+¥' + y + (RF.cut > 0 ? ' (undercut)' : ''), 'y'); }
   }
   PRODS = PRODS.filter(p => !p.gone && !(p.state === 'scrap' && p.y > BELT + 160));
   if (moving) BOFF += speed * dt;
@@ -469,6 +472,13 @@ function tick(now) {
       if (a.t >= a.dur) finishWork(s);
     }
   }
+  if (G.run) {
+    RF.acc += dt * RF.rate * (RF.rush > 0 ? 1.3 : 1); while (RF.acc >= 1) { RF.acc--; RF.ship++; }
+    RF.cut = Math.max(0, RF.cut - dt); RF.rush = Math.max(0, RF.rush - dt);
+    if (RF.ship >= G.ship + 2 && !RF.said.undercut) { RF.cut = 15; rtalk('undercut'); logL(RIVALS[RF.k].corp, '値下げ', '¥20 a product for 15 s', 'r'); }
+    else if (RF.ship >= G.ship + 1 && !RF.said.lead && G.T < G.T0 - 30) rtalk('lead');
+    if (G.ship >= RF.ship + 3 && !RF.said.behind) { RF.rush = 20; rtalk('behind'); logL(RIVALS[RF.k].corp, '増産', 'their line speeds up', 'r'); }
+  }
   if (G.lock > 0) { G.lock -= dt; if (G.lock <= 0) { G.lock = 0; fillBins(); } }
   G.shake = Math.max(0, G.shake - dt * 1.6);
   for (const pt of PARTS) { pt.t += dt; if (pt.t >= pt.dur && !pt.done) { pt.done = 1; landed(pt); } } PARTS = PARTS.filter(p => !p.done);
@@ -478,10 +488,21 @@ function tick(now) {
   hud();
   draw(CLOCK, dt);
 }
+function rtalk(k) { RF.said[k] = 1; RF.line = LINES[RF.k][k]; race(true); }
+function race(force) {
+  const el = $('#race'); if (!el) return; const P = RIVALS[RF.k], key = G.ship + ':' + RF.ship + ':' + (RF.line && RF.line.en) + ':' + (RF.cut > 0) + ':' + (RF.rush > 0); if (!force && el.dataset.k === key) return; el.dataset.k = key;
+  const cap = Math.max(G.target, G.ship, RF.ship, 1) * 1.15, bar = (v, c) => `<div style="height:7px;background:#1A1D22;margin:3px 0"><div style="height:7px;width:${Math.min(100, v / cap * 100)}%;background:${c}"></div></div>`;
+  el.innerHTML = `<div class="hd"><span class="lb">受注競争 · CONTRACT RACE</span></div>
+    <div class="kj" style="font-size:15px;color:${P.col}">${P.corp} <span class="lb">AI ${P.ai}</span></div>
+    <div style="display:flex;justify-content:space-between;font:700 12px var(--num)"><span>YOU ${G.ship}</span><span style="color:${P.col}">THEM ${RF.ship}</span></div>${bar(G.ship, '#FFE600')}${bar(RF.ship, P.col)}
+    ${RF.cut > 0 ? '<div style="color:#FF3B30;font-size:10px">値下げ UNDERCUT · ¥20 A PRODUCT</div>' : ''}${RF.rush > 0 ? '<div style="color:#FF3B30;font-size:10px">増産 THEIR LINE SPEEDS UP</div>' : ''}
+    ${RF.line ? `<div class="kj" style="font-size:13px;line-height:1.9;margin-top:4px">${rubyHTML(RF.line.jp)}</div><div style="font-size:10px;color:#9AA0AB">${RF.line.en}</div>` : ''}`;
+}
 function hud() {
   const T = Math.ceil(G.T); $('#clock').textContent = `${String(T / 60 | 0).padStart(2, '0')}:${String(T % 60).padStart(2, '0')}`;
   $('#clock').style.color = G.run && G.T <= 10 ? RED : '';
   const cap = G.target * 1.5; $('#prog i').style.width = (100 * Math.min(1, G.ship / cap)) + '%'; $('#prog b').style.left = (100 * G.target / cap) + '%';
+  race();
   $('#s-ship').textContent = G.ship + ' / ' + G.target; $('#s-def').textContent = G.def; $('#s-yen').textContent = G.yen.toLocaleString();
 }
 
@@ -517,6 +538,8 @@ function start() {
   $('#ov-brief').classList.remove('on'); $('#ov-report').classList.remove('on');
   Object.assign(G, { run: true, rid: 'factory:' + Date.now().toString(36) + ':' + Math.random().toString(36).slice(2, 6), prac: 0, T0: FC.ext ? 240 : 180, ship: 0, def: 0, yen: 0, spawnT: 0, focus: null, lock: 0, tried: new Set(), touched: new Map(), forgive: 0, streak: 0, auto: 0 });
   G.T = G.T0; G.target = Math.round((FC.ext ? 240 : 180) / (FC.conv ? 15 : 18));
+  RF = { k: pickRival(FC.shifts), ship: 0, acc: 0, cut: 0, rush: 0, said: {}, line: null };
+  RF.rate = G.target / G.T0 * (.72 + rivalDef(SAVE, RF.k, summaryCtx()) * .045); rtalk('hello');
   PRODS = []; PARTS = []; ST.forEach(s => { s.prod = null; s.card = null; s.act = null; }); CARDS.innerHTML = ''; $('#log').innerHTML = '<div class="hd"><span class="lb">LOG · 作業ログ</span><span class="bc"></span></div>';
   makeBins(); left();
 }
@@ -527,7 +550,10 @@ function endShift() {
   const flagged = updateFlags(SAVE);
   const answers = [...G.touched.values()].reduce((n, x) => n + Object.values(x.res).filter(v => v !== 'miss').length, 0);
   /* the shift's result applies once (reloads, a second click): goods, shipments, fees, then the governance clock */
-  if (!DEMO) once(SAVE, 'game:' + G.rid, () => { addShift(SAVE, G.ship, answers, G.yen); const ctx = summaryCtx(); if (ctx) { visit(SAVE, ctx); progress(SAVE, ctx); } });
+  /* the contract: whoever shipped more this shift wins it */
+  const won = G.ship > RF.ship, ctx0 = summaryCtx(), bonus = won ? (SAVE.sim && SAVE.sim.v === 2 && ctx0 ? price(refOf(SAVE, ctx0))(2) : 150) : 0;
+  G.yen += bonus; G.race = { won, bonus, mine: G.ship, theirs: RF.ship, k: RF.k }; rtalk(won ? 'lose' : 'win');
+  if (!DEMO) once(SAVE, 'game:' + G.rid, () => { matchResult(SAVE, RF.k, won, '大工場 Great Factory'); addShift(SAVE, G.ship, answers, G.yen); const ctx = summaryCtx(); if (ctx) { visit(SAVE, ctx); progress(SAVE, ctx); } });
   else addShift(SAVE, G.ship, answers, G.yen);
   FC.shifts++; FC.best = Math.max(FC.best || 0, G.ship);
   (SAVE.log = SAVE.log || []).push({ t: Date.now(), k: 'factory', ship: G.ship, def: G.def, yen: G.yen, flagged: flagged.length }); if (SAVE.log.length > 200) SAVE.log.splice(0, SAVE.log.length - 200);
@@ -543,6 +569,7 @@ function report(flagged) {
     <div class="row"><div class="stat"><span class="lb">shipped</span><b>${G.ship}<span class="m" style="font-size:16px"> / ${G.target}</span></b></div><div class="stat"><span class="lb">defects</span><b style="color:${G.def ? RED : 'inherit'}">${G.def}</b></div><div class="stat"><span class="lb">earned</span><b style="color:${Y}">¥${G.yen.toLocaleString()}</b></div><div class="stat"><span class="lb">best streak</span><b>${G.best}</b></div></div>
     <div class="lb">evidence · ${ok} clean, ${ng} wiped${G.auto ? ` · ${G.auto} handled by the AI` : ''}${G.prac ? ` · ${G.prac} repeat${G.prac > 1 ? 's' : ''} at the practice rate` : ''}${G.ship >= 5 ? ' · <span style="color:#FFE600">shipment run counted</span>' : ' · 5 shipped makes a shipment run'}</div>
     <div class="ev">${rows.slice(0, 16).map(x => `<div><span><span class="kj">${esc(x.w.w)}</span> <span class="m">${esc(x.w.r)}</span></span><span>${Object.entries(x.res).map(([k, v]) => SKILL_J[k] + ' ' + cell(v)).join(' · ')}</span></div>`).join('') || '<div class="m">No card answered.</div>'}</div>
+    ${G.race ? `<div class="files" style="border-color:${G.race.won ? '#FFE600' : RIVALS[G.race.k].col}">受注競争 · you ${G.race.mine}, ${RIVALS[G.race.k].corp} ${G.race.theirs} · ${G.race.won ? `<b style="color:#FFE600">the contract is yours: +¥${G.race.bonus.toLocaleString()}</b>` : '<b>they took the contract</b>'}<br><span class="kj">${rubyHTML(LINES[G.race.k][G.race.won ? 'lose' : 'win'].jp)}</span> <span class="m">${LINES[G.race.k][G.race.won ? 'lose' : 'win'].en}</span></div>` : ''}
     ${flagged.length ? `<div class="files"><b class="a">${flagged.length} file${flagged.length > 1 ? 's' : ''} sent to the audit</b> · the AI thinks you know <span class="kj">${flagged.slice(0, 6).map(id => esc((byId.get(id) && deckWord(byId.get(id), KD).w) || '')).join('、')}${flagged.length > 6 ? '…' : ''}</span>. Commit or reject them in the core (審査).</div>` : ''}
     <div class="lb" style="margin-top:16px">設備投資 · upgrades · funds ¥${(SAVE.corp.funds || 0).toLocaleString()}</div>
     <div class="shop">${UPG.map(u => `<button type="button" data-u="${u.id}" ${FC[u.id] || (SAVE.corp.funds || 0) < u.cost ? 'disabled' : ''}><b>${u.name}</b>${u.en} · ${FC[u.id] ? 'installed' : '¥' + u.cost}<br><span class="m">${u.d}</span></button>`).join('')}</div>
