@@ -7,15 +7,15 @@
    evidence for the word; a late one scraps it with no change to the evidence. Words already in memory are handled by
    the AI's own robots (blue, 自動). First attempt per word and skill in a shift only. At the end of the shift: the daily
    report, the yen, and the files the evidence now supports, sent to the audit in the core. */
-import { loadKanji } from './model.js?v=15';
-import * as store from './store.js?v=15';
-import { deckWord, buildPool, traps, shuffle } from './words.js?v=15';
-import { record, updateFlags, SKILL_J, day, payRate } from './evidence.js?v=15';
-import { addShift, book } from './sim.js?v=15';
-import './rivals.js?v=15';
-import { once, visit, progress, price } from './gov.js?v=15';
-import { RIVALS, LINES, rubyHTML, pickRival, matchResult, rivalDef, refOf } from './rivals.js?v=15';
-import { leafSVG, leafFavicon } from './leaf.js?v=15';
+import { loadKanji } from './model.js?v=16';
+import * as store from './store.js?v=16';
+import { deckWord, buildPool, traps, shuffle } from './words.js?v=16';
+import { record, updateFlags, SKILL_J, day, payRate } from './evidence.js?v=16';
+import { addShift, book } from './sim.js?v=16';
+import './rivals.js?v=16';
+import { once, visit, progress, price } from './gov.js?v=16';
+import { RIVALS, LINES, rubyHTML, pickRival, matchResult, rivalDef, refOf } from './rivals.js?v=16';
+import { leafSVG, leafFavicon } from './leaf.js?v=16';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;

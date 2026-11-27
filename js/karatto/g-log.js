@@ -4,10 +4,10 @@
    A wrong shop is a misdelivery: the truck goes there and back for nothing, and that skill's evidence is wiped.
    A rival AI works the same district from its own depot at the top of the map: if its truck reaches a shop first, the
    order is theirs (横取り). The faster you read, the fewer they take. */
-import { game, panel, esc, clamp, ease, Y, RED, OK, sfx, $, overlap } from './game.js?v=15';
-import { available } from './sim.js?v=15';
-import { activeLot, sendLot } from './gov.js?v=15';
-import { RIVALS, LINES, rubyHTML, pickRival, matchResult, rivalDef } from './rivals.js?v=15';
+import { game, panel, esc, clamp, ease, Y, RED, OK, sfx, $, overlap } from './game.js?v=16';
+import { available } from './sim.js?v=16';
+import { activeLot, sendLot } from './gov.js?v=16';
+import { RIVALS, LINES, rubyHTML, pickRival, matchResult, rivalDef } from './rivals.js?v=16';
 
 const COLS = [400, 640, 880], ROWS = [150, 310, 470], VX = [520, 520, 760], DEP = { x: 640, y: 616 };
 const shopPos = n => ({ c: n % 3, r: 2 - Math.floor(n / 3) });                       // numpad: 1 2 3 bottom row, 7 8 9 top
@@ -35,7 +35,7 @@ function newOrder(api) {
   if (!cand.length) return;
   const { s, n } = cand[Math.random() * cand.length | 0], tr = api.G.tried;
   const skill = tr.has('reading' + s.w.id) ? 'recall' : tr.has('recall' + s.w.id) ? 'reading' : Math.random() < .5 ? 'reading' : 'recall';
-  ORD.push({ n, w: s.w, skill, born: api.t, T: 34 * (api.tech.fleet ? 1.25 : 1), fee: 120 + (5 - (s.w.lvl || 3)) * 30 + Math.round(Math.random() * 6) * 10, id: Math.random(), rvAt: api.t + 34 * (.42 + Math.random() * .4) / RV.a });
+  ORD.push({ n, w: s.w, skill, born: api.t, T: 34 * (api.tech.fleet ? 1.25 : 1), fee: 120 + (5 - (s.w.lvl || 3)) * 30 + Math.round(Math.random() * 6) * 10, id: Math.random(), rvAt: api.t + (2 + Math.random() * 7) / RV.a });
   sfx('card'); slips(api);
 }
 function slips(api) {
@@ -115,7 +115,7 @@ game({
     for (const o of ORD.concat(TR.filter(t => t.o && t.st === 'out').map(t => t.o))) if (!o.rvGo && !o.done && o.ok !== false && api.t >= o.rvAt) {
       o.rvGo = true; const P = rroute(o.n); RV.trucks.push({ o, P, d: 0, L: plen(P), st: 'out' }); }
     for (const r of RV.trucks) {
-      r.d += sp * .92 * RV.a * dt;
+      r.d += sp * .5 * RV.a * dt;
       if (r.st === 'out' && r.d >= r.L) { r.st = 'back'; r.d = 0; r.P = r.P.slice().reverse();
         const o = r.o; if (!o.done) { o.taken = true; RV.theirs++; FX.push({ k: 'taken', n: o.n, t: 0 }); sfx('buzz');
           const i = ORD.indexOf(o); if (i >= 0) { ORD.splice(i, 1); slips(api); }
