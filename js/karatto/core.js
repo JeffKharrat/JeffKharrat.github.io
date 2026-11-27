@@ -2,14 +2,16 @@
    cavity wall is its memory, a keyboard of every JLPT kanji. Two views: the base view (the AI and the corporation's
    panels) and the wall view (on the gantry, looking around the wall). Clicking a key presses it and opens its file. */
 import * as THREE from '../vendor/three.module.min.js';
-import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=2';
-import * as store from './store.js?v=2';
-import { files, updateFlags } from './evidence.js';
-import { openAudit } from './audit.js?v=2';
+import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=5';
+import * as store from './store.js?v=5';
+import { files, updateFlags } from './evidence.js?v=5';
+import { openAudit } from './audit.js?v=5';
+import { advance, hourOf } from './sim.js?v=5';
+import { openMgmt, briefing, decide, mgmtOpen, refreshMgmt } from './mgmt.js?v=5';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;   // embed: opened over the site from Tau Jeffy VI
-const ACC = new THREE.Color('#4A5BFF'), WARM = new THREE.Color('#FFB347');
+const ACC = new THREE.Color('#FFE600'), WARM = new THREE.Color('#FFF0A0');   // the AI's light: yellow
 const sm5 = t => { t = Math.min(1, Math.max(0, t)); return t * t * t * (t * (t * 6 - 15) + 10); };
 
 /* ---------------- renderer, scene ---------------- */
@@ -72,7 +74,7 @@ void main(){
   float band = 1. - smoothstep(.13, .16, abs(ph)), edge = smoothstep(.12, .16, abs(ph)) * (1. - smoothstep(.16, .19, abs(ph)));
   float run = fract(th / 6.2832 * 3. - uTime * .12), wave = smoothstep(.0, .25, run) * (1. - smoothstep(.25, .9, run));
   float fire = step(.55, h * .7 + wave * .5) * (.5 + .5 * sin(uTime * (3. + h2 * 9.) + h * 40.));
-  vec3 cool = mix(uAcc * 1.6, vec3(.8, .86, 1.), step(.86, h2));
+  vec3 cool = mix(uAcc * 1.6, vec3(1., .97, .85), step(.86, h2));
   c = mix(c, vec3(.02, .022, .03) + cool * fire * (.6 + uPulse), band);
   c += uAcc * edge * 1.2;
   /* elsewhere a few service lights blink on the plates */
@@ -435,7 +437,7 @@ function summary() {
 function ui() {
   const cert = certifiedSet(), lv = PROG.lev, tier = PROG.tier;
   const counts = [0, 0, 0, 0, 0]; S.forEach(s => counts[s.lvl]++);
-  const fame = cert.size * 10 + counts[2] * 5 + counts[3] * 15 + counts[4] * 40, level = Math.floor(Math.sqrt(fame / 50)) + 1, next = Math.pow(level, 2) * 50, prev = Math.pow(level - 1, 2) * 50;
+  const fame = fameOf(), level = Math.floor(Math.sqrt(fame / 50)) + 1, next = Math.pow(level, 2) * 50, prev = Math.pow(level - 1, 2) * 50;
   $('#tier').textContent = tier < 0 ? '創業準備中 · Founding' : TIERS[tier].name + ' · ' + TIERS[tier].en;
   $('#famebar').style.width = Math.round((fame - prev) / (next - prev) * 100) + '%'; $('#famelv').textContent = 'Level ' + level;
   /* the division being worked on: the first one under 80% */
@@ -443,12 +445,14 @@ function ui() {
   const fb = cur ? WALL.L.sections[LEVELS.indexOf(cur.l)].blocks[cur.d] : null;
   if (fb) VIEW.front = WALL.L.angle((fb.c0 + fb.c1) / 2, 0).t;
   $('#divn').textContent = cur ? 'N' + cur.l + ' division ' + (cur.d + 1) + ' · ' + Math.round(cur.a / cur.n * 100) + '%' : 'All divisions held';
-  const c = SAVE.corp; $('#r-funds').textContent = '¥' + c.funds.toLocaleString(); $('#r-fame').textContent = fame.toLocaleString(); $('#r-data').textContent = c.data; $('#r-stab').textContent = c.stability;
+  const c = SAVE.corp, Sm = SAVE.sim; $('#r-funds').textContent = (c.funds < 0 ? '−¥' : '¥') + Math.abs(Math.round(c.funds)).toLocaleString(); $('#r-fame').textContent = fame.toLocaleString(); $('#r-data').textContent = Math.floor(c.data).toLocaleString(); $('#r-stab').textContent = Math.round(c.stability);
+  if (Sm) { $('#r-share').textContent = '¥' + Sm.share.toLocaleString(); $('#r-pop').textContent = Math.round(Sm.pop.w + Sm.pop.c + Sm.pop.e).toLocaleString(); }
+  const ne = Sm ? Sm.ev.length : 0; $('#b-mgmt').innerHTML = `経営${ne ? `<i>${ne}</i>` : ''}<small>Management${ne ? ' · ' + ne + ' decision' + (ne > 1 ? 's' : '') : ''}</small>`;
   const deckN = (DECK || []).length;
   $('#dirs').innerHTML = (tier < 0 ? [
     `創業: found the corporation. Commit your first 100 words to memory (${cert.size}/100).`,
     `Hold the N5 board: 80% of its keys acquired (${lv[5] ? Math.round(lv[5].a / lv[5].n * 100) : 0}%).`,
-  ] : [`Advance the next division.`]).map(t => `<li>${t}</li>`).join('');
+  ] : [`Advance the next division.`]).concat(Sm && Sm.dir ? [`取締役会: ${simDir()}`] : []).map(t => `<li>${t}</li>`).join('');
   $('#mem').innerHTML = [`Deck: ${deckN} words${DEMO ? ' (demo)' : ''}`, `In memory: ${cert.size}`, `Keys: ${counts[2]} acquired · ${counts[3]} integrated · ${counts[4]} mastered`, `Uncharted keys: ${counts[0]}`].map(t => `<li>${t}</li>`).join('');
   $('#jump').innerHTML = WALL.L.sections.map((s, i) => { const L2 = lv[s.lv] || { a: 0, n: 1 }; return `<button class="btn" data-s="${i}">N${s.lv}<span class="tn"> ${TIERS[i].name}</span><i><s style="width:${Math.round(L2.a / L2.n * 100)}%"></s></i></button>`; }).join('');
   $('#jump').querySelectorAll('button').forEach(b => b.onclick = () => { const s = WALL.L.sections[+b.dataset.s]; VIEW.yaw = WALL.L.angle((s.c0 + Math.min(s.c1, s.c0 + 20)) / 2, 0).t; VIEW.pitch = 0; });
@@ -497,6 +501,26 @@ function audit(tab) {
     onClose: ids => { document.body.classList.remove('audit'); if (ids.length) { applyState(); const i = KD.list.findIndex(k => DECK.find(w => w.id === ids[ids.length - 1] && (w._facets || []).some(f => f.k === k.k))); if (i >= 0) { ripT = 0; WALL.U.uRipC.value.copy(WALL.pos[i]); } toast(ids.length + ' word' + (ids.length > 1 ? 's' : '') + ' committed to memory.'); } else ui(); } });
 }
 $('#b-audit').onclick = () => audit();
+
+/* ---------------- the living planet: the simulation, the console, briefings and decisions ---------------- */
+function fameOf() {
+  const cert = certifiedSet(), counts = [0, 0, 0, 0, 0]; S.forEach(s => counts[s.lvl]++);
+  return cert.size * 10 + counts[2] * 5 + counts[3] * 15 + counts[4] * 40 + Math.round((SAVE.sim && SAVE.sim.fameB) || 0);
+}
+function simCtx() {
+  const counts = [0, 0, 0, 0, 0], fc = SAVE.corp.factory || {}; S.forEach(s => counts[s.lvl]++);
+  return { mem: certifiedSet().size, acq: counts[2] + counts[3] + counts[4], tier: PROG.tier, div: Object.values(PROG.div).filter(d => d.a / d.n >= .8).length, up: (fc.conv ? 1 : 0) + (fc.qc ? 1 : 0) + (fc.ext ? 1 : 0), fame: fameOf() };
+}
+function simDir() { const d = SAVE.sim.dir; return { funds: `funds ¥${d.goal.toLocaleString()}`, stab: `stability ${d.goal}+`, ship: `ship ${d.goal} products`, mem: `${d.goal} words in memory`, poll: `pollution ≤ ${d.goal}` }[d.k] + ' this quarter'; }
+const busy = () => document.body.classList.contains('audit') || mgmtOpen() || (document.getElementById('mgm') || { classList: { contains: () => false } }).classList.contains('on');
+function nextDecision() { const e = SAVE.sim && SAVE.sim.ev[0]; if (!e || busy()) return; decide(SAVE, e, persist, () => { ui(); refreshMgmt(); setTimeout(nextDecision, 300); }); }
+function mgmt(tab) {
+  closeFile(); document.body.classList.add('audit');
+  openMgmt({ save: SAVE, ctx: simCtx, persist, tab, onClose: () => { document.body.classList.remove('audit'); ui(); nextDecision(); } });
+}
+$('#b-mgmt').onclick = () => mgmt();
+/* every half minute: run the hours that have passed */
+setInterval(() => { if (!SAVE || !SAVE.sim || !PROG) return; if (hourOf(Date.now()) > SAVE.sim.t) { advance(SAVE, simCtx(), Date.now(), true); persist(); ui(); refreshMgmt(); nextDecision(); } }, 30000);
 $('#b-wall').onclick = () => go('wall'); $('#b-base').onclick = () => go('base');
 
 /* ---------------- demo deck: for previews before Anki is connected ---------------- */
@@ -549,12 +573,16 @@ function frame(now) {
   if (document.fonts) await Promise.race([Promise.all([document.fonts.load('500 37px "M PLUS 1 Code"', chars), document.fonts.load('500 64px "M PLUS 1"', '町工場中小企業堅大財閥')]), new Promise(r => setTimeout(r, 6000))]);
   buildWall();
   const L0 = await store.load(); SAVE = L0.save; DECK = L0.deck; SRC = L0.source;
-  if (DEMO) { const d = demoDeck(); DECK = d.deck; SAVE = { ...SAVE, words: d.words }; }
+  if (DEMO) { const d = demoDeck(); DECK = d.deck; SAVE = { ...SAVE, words: d.words, corp: { ...SAVE.corp }, sim: undefined }; }
   updateFlags(SAVE); if (!DEMO && DECK) persist();
   ANKI_OK = await store.ankiAvailable();
   applyState();
+  /* the hours since the last visit */
+  if (DEMO) advance(SAVE, simCtx(), Date.now() - 30 * 3600e3);
+  const sum = advance(SAVE, simCtx(), Date.now(), false); persist(); ui();
+  if (sum.hours >= 2 && !QS.has('audit')) briefing(sum, nextDecision); else nextDecision();
   if (!DECK && !DEMO) toast(ANKI_OK ? 'Anki found: open Settings to read your deck.' : 'No deck yet: open Anki, then Settings → Read the deck.', 6000);
   if (EMBED) parent.postMessage('karatto:ready', location.origin);
   if (QS.has('audit')) audit();
-  window.__k = { go, pressKey, audit, view: VIEW, state: () => ({ tier: PROG.tier, deck: (DECK || []).length }), yaw: (y, p, f) => { VIEW.yaw = y; VIEW.pitch = p || 0; if (f) VIEW.fov = f; }, sec: i => { const s = WALL.L.sections[i]; return WALL.L.angle(s.c0 + 8, 0).t; } };
+  window.__k = { go, pressKey, audit, mgmt, save: () => SAVE, advance: h => { advance(SAVE, simCtx(), Date.now() + h * 3600e3, true); ui(); refreshMgmt(); }, view: VIEW, state: () => ({ tier: PROG.tier, deck: (DECK || []).length }), yaw: (y, p, f) => { VIEW.yaw = y; VIEW.pitch = p || 0; if (f) VIEW.fov = f; }, sec: i => { const s = WALL.L.sections[i]; return WALL.L.angle(s.c0 + 8, 0).t; } };
 })();

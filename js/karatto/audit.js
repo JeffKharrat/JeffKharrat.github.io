@@ -5,9 +5,9 @@
      申告 Claim         a word you know that the games haven't proven: always spot-checked. 40 a day after the founding.
      創業監査 Founding  before the corporation exists: your deck's easiest words, 20 at a time, each one spot-checked.
    The AI argues; Jeff decides. Nothing here touches Anki. */
-import { deckWord, buildPool, traps, shuffle } from './words.js';
-import { toKana, sameReading } from './kana.js';
-import { SKILLS, SKILL_J, files, commit, snooze, record, claimsLeft, useClaim, skillsClean, day } from './evidence.js';
+import { deckWord, buildPool, traps, shuffle } from './words.js?v=5';
+import { toKana, sameReading } from './kana.js?v=5';
+import { SKILLS, SKILL_J, files, commit, snooze, record, claimsLeft, useClaim, skillsClean, day } from './evidence.js?v=5';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const SK_EN = { meaning: 'Meaning', reading: 'Reading', recall: 'Recall', context: 'Context', listen: 'Listening' };
@@ -16,7 +16,7 @@ const CSS = `
 #au.on { display:flex; animation:auF .3s ease-out both; }
 @keyframes auF { from { opacity:0; } to { opacity:1; } }
 #au * { box-sizing:border-box; }
-#au { --y:#FFE600; --red:#FF3B30; --ai:#4A5BFF; --ink:#ECEEF2; --mute:#8A909C; --line:#24282F; --line2:#383D46; --kj:"M PLUS 1", sans-serif; --mono:"M PLUS 1 Code", monospace; --num:Tektur, sans-serif; }
+#au { --y:#FFE600; --red:#FF3B30; --ai:#FFE600; --ink:#ECEEF2; --mute:#8A909C; --line:#24282F; --line2:#383D46; --kj:"M PLUS 1", sans-serif; --mono:"M PLUS 1 Code", monospace; --num:Tektur, sans-serif; }
 #au .stg { position:relative; width:1280px; height:720px; flex:none; overflow:hidden; transform-origin:center; font:400 12.5px/1.45 var(--mono); color:var(--ink); background:#050506; }
 /* the room: a grid, a scan line, registration marks, the big glyph */
 #au .grid { position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px); background-size:40px 40px; }
@@ -105,19 +105,19 @@ const CSS = `
 #au .res { font:700 13px var(--mono); }
 /* the right: the core link, the AI, the actions */
 #au .side { position:absolute; left:924px; top:68px; width:336px; bottom:20px; display:flex; flex-direction:column; gap:10px; z-index:2; }
-#au .link { position:relative; height:206px; border:1px solid var(--line2); background:radial-gradient(circle at 50% 54%, rgba(74,91,255,.16), transparent 62%); overflow:hidden; }
-#au .link .ring { position:absolute; left:50%; top:54%; border-radius:50%; border:1px dashed rgba(140,152,255,.45); transform:translate(-50%,-50%); animation:auRot 18s linear infinite; }
+#au .link { position:relative; height:206px; border:1px solid var(--line2); background:radial-gradient(circle at 50% 54%, rgba(255,230,0,.16), transparent 62%); overflow:hidden; }
+#au .link .ring { position:absolute; left:50%; top:54%; border-radius:50%; border:1px dashed rgba(255,236,120,.45); transform:translate(-50%,-50%); animation:auRot 18s linear infinite; }
 #au .link .ring.b { border-style:solid; border-color:rgba(255,255,255,.12); animation-duration:30s; animation-direction:reverse; }
 #au .link .ring.c { border:3px dotted rgba(255,230,0,.5); animation-duration:9s; }
 @keyframes auRot { to { transform:translate(-50%,-50%) rotate(360deg); } }
-#au .link .core { position:absolute; left:50%; top:54%; width:58px; height:58px; transform:translate(-50%,-50%); border-radius:50%; background:radial-gradient(circle, #fff 0 10%, #9AA4FF 22%, #4A5BFF 46%, rgba(74,91,255,0) 70%); box-shadow:0 0 30px rgba(74,91,255,.7); animation:auPl 3s ease-in-out infinite; }
+#au .link .core { position:absolute; left:50%; top:54%; width:58px; height:58px; transform:translate(-50%,-50%); border-radius:50%; background:radial-gradient(circle, #fff 0 10%, #FFF3A0 22%, #FFE600 46%, rgba(255,230,0,0) 70%); box-shadow:0 0 30px rgba(255,230,0,.7); animation:auPl 3s ease-in-out infinite; }
 @keyframes auPl { 50% { transform:translate(-50%,-50%) scale(.9); } }
 #au .link.pulse .core { animation:auHit .7s ease-out; }
-@keyframes auHit { 0% { transform:translate(-50%,-50%) scale(1); } 30% { transform:translate(-50%,-50%) scale(1.7); box-shadow:0 0 80px rgba(74,91,255,1), 0 0 0 30px rgba(255,230,0,.2); } 100% { transform:translate(-50%,-50%) scale(1); } }
-#au .link .lb { position:absolute; left:10px; top:8px; } #au .link .cnt { position:absolute; right:10px; top:6px; font:700 22px var(--num); color:#8C98FF; }
+@keyframes auHit { 0% { transform:translate(-50%,-50%) scale(1); } 30% { transform:translate(-50%,-50%) scale(1.7); box-shadow:0 0 80px rgba(255,230,0,1), 0 0 0 30px rgba(255,230,0,.2); } 100% { transform:translate(-50%,-50%) scale(1); } }
+#au .link .lb { position:absolute; left:10px; top:8px; } #au .link .cnt { position:absolute; right:10px; top:6px; font:700 22px var(--num); color:#FFF08A; }
 #au .link .brk { position:absolute; width:16px; height:16px; border:2px solid var(--y); }
-#au .ai { border:1px solid #2B3594; border-left:3px solid var(--ai); background:#070917; padding:10px 12px; font-size:11.5px; color:#C8CEFF; min-height:104px; }
-#au .ai p { margin:6px 0 0; } #au .ai .kj { font-size:13px; color:#fff; } #au .cur::after { content:'▌'; animation:auB 1s steps(1) infinite; color:#8C98FF; } @keyframes auB { 50% { opacity:0; } }
+#au .ai { border:1px solid #5A5320; border-left:3px solid var(--y); background:#0E0D05; padding:10px 12px; font-size:11.5px; color:#EFE6B8; min-height:104px; }
+#au .ai p { margin:6px 0 0; } #au .ai .kj { font-size:13px; color:#fff; } #au .cur::after { content:'▌'; animation:auB 1s steps(1) infinite; color:#FFF08A; } @keyframes auB { 50% { opacity:0; } }
 #au .acts { display:flex; flex-direction:column; gap:6px; }
 #au .bt { display:grid; grid-template-columns:96px 1fr auto; align-items:center; gap:10px; text-align:left; padding:10px 12px; border:1px solid var(--line2); background:#0B0C0E; color:var(--ink); cursor:pointer; font:500 10.5px var(--mono); letter-spacing:.06em; }
 #au .bt b { font:600 18px var(--kj); letter-spacing:0; } #au .bt span.m { color:var(--mute); }
@@ -156,7 +156,7 @@ export function openAudit(ctx) {
       <div class="link"><span class="lb">CORE LINK // 記憶</span><span class="cnt" id="au-m">0</span>
         <div class="ring" style="width:168px;height:168px"></div><div class="ring b" style="width:124px;height:124px"></div><div class="ring c" style="width:88px;height:88px"></div><div class="core"></div>
         <div class="brk" style="left:96px;top:58px;border-width:2px 0 0 2px"></div><div class="brk" style="right:96px;top:58px;border-width:2px 2px 0 0"></div><div class="brk" style="left:96px;bottom:22px;border-width:0 0 2px 2px"></div><div class="brk" style="right:96px;bottom:22px;border-width:0 2px 2px 0"></div></div>
-      <div class="ai"><div class="lb" style="color:#8C98FF">ANALYSIS // カラットの所見</div><p id="au-say" class="cur"></p></div>
+      <div class="ai"><div class="lb" style="color:#FFF08A">ANALYSIS // カラットの所見</div><p id="au-say" class="cur"></p></div>
       <div class="acts"></div>
       <div class="stat"><div><span class="lb">committed now</span><b id="au-n">0</b></div><div><span class="lb">claims today</span><b id="au-c">—</b></div></div>
     </div>
@@ -226,12 +226,12 @@ function paperHTML(w, opts = {}) {
   const days = []; for (let i = 7; i >= 0; i--) days.push(day(Date.now() - i * 864e5));
   const rows = SKILLS.map(k => { const e = ev[k] || { d: [] }; return `<tr><td style="width:150px"><span class="code">${CODE[k]}</span><span class="kj">${SKILL_J[k]}</span> <span class="lb">${SK_EN[k]}</span></td><td><span class="pp">${days.map(d => `<s class="${e.d.includes(d) ? 'on' : ''}${d === today ? ' today' : ''}"></s>`).join('')}</span></td>
     <td class="${e.miss && !e.d.length ? 'ms' : ''}" style="width:140px;text-align:right">${e.d.length ? e.d.length + (e.d.length > 1 ? ' DAYS' : ' DAY') + (e.at ? ' · ' + esc(e.at).toUpperCase() : '') : e.miss ? 'MISS ' + new Date(e.miss).toLocaleDateString('ja-JP') : '—'}</td></tr>`; }).join('');
-  const no = String(w.id).padStart(5, '0'), hide = !!opts.hide;
+  const no = String(w.id).slice(-6), hide = !!opts.hide;
   return `<div class="ph"><span><b>REC #${no}</b> ${opts.kind || ''}</span><span>${w.lvl ? 'JLPT N' + w.lvl + ' · ' : ''}${new Date().toLocaleDateString('ja-JP')} <span class="bc"></span></span></div>
     <div class="rec"><div class="lb">SUBJECT // 対象</div>
     <div class="subj${hide ? ' hide' : ''}"><span class="big">${esc(w.w)}</span><span class="rd">${esc(w.r)}</span></div>
     <div class="${hide ? 'hide' : ''}"><div class="mean">${esc(w.m.length > 120 ? w.m.slice(0, 118) + '…' : w.m)}</div></div>
-    <div class="src">SRC ジェフの日本語 · NOTE ${w.id}${r.flag ? ' · FLAGGED ' + new Date(r.flag).toLocaleDateString('ja-JP') : ''}${r.snooze ? ' · DEFERRED ×' + r.snooze.n : ''}</div>
+    <div class="src">SRC ジェフの日本語 · NOTE …${String(w.id).slice(-6)}${r.flag ? ' · FLAGGED ' + new Date(r.flag).toLocaleDateString('ja-JP') : ''}${r.snooze ? ' · DEFERRED ×' + r.snooze.n : ''}</div>
     <table><tr><th>EVIDENCE // 証拠</th><th>LAST 8 DAYS</th><th style="text-align:right">STATUS</th></tr>${rows}</table></div>`;
 }
 function desk() {
@@ -351,7 +351,7 @@ function no() {
 function move(d) { if (A.busy || A.check || A.tab !== 'files') return; const n = fileList().length; if (n < 2) return; A.sel = (A.sel + d + n) % n; render(); }
 function stampIt(w, how) {
   A.busy = true; const P = $a('.paper'), D = $a('.desk');
-  P.insertAdjacentHTML('beforeend', `<div class="band"><b>記憶</b><span>${how === 'claim' ? 'CLAIMED' : how === 'founding' ? 'FOUNDED' : 'COMMITTED'}<br>TO MEMORY // REC #${String(w.id).padStart(5, '0')}</span></div>`);
+  P.insertAdjacentHTML('beforeend', `<div class="band"><b>記憶</b><span>${how === 'claim' ? 'CLAIMED' : how === 'founding' ? 'FOUNDED' : 'COMMITTED'}<br>TO MEMORY // REC #${String(w.id).slice(-6)}</span></div>`);
   D.classList.add('thud'); setTimeout(() => D.classList.remove('thud'), 300);
   setTimeout(() => { const L = $a('.link'); if (L) { L.classList.remove('pulse'); void L.offsetWidth; L.classList.add('pulse'); } }, 950);
   commit(save(), w.id, how); A.committed.push(w.id); A.ctx.persist();

@@ -132,7 +132,7 @@ void main(){
     if (stage < .5) discard;
     if (!ff) col = PANEL;
     else if (stage < 1.5) col = ghostC(L * .8, max(gl, glm)) * cool + GHOST * SPKC * Ls * .8 + SPKC * sheen * .22;
-    else if (glowK) col = (vec3(.29, .36, 1.) * (.95 + .3 * sin(uTime * 1.3 + vSeed * 6.2832)) + vec3(.05) * step(.5, hash(cid))) * (1. - .55 * gl);   // the core's light, at the bottom of Tau Jeffy VI's shaft
+    else if (glowK) col = (vec3(1., .88, .05) * (.95 + .3 * sin(uTime * 1.3 + vSeed * 6.2832)) + vec3(.05) * step(.5, hash(cid))) * (1. - .55 * gl);   // the core's light, at the bottom of Tau Jeffy VI's shaft
     else if (lampK) {
       float ph = uTime * .45 + vSeed * 9.;
       float on = step(.3, hash(vec3(vSeed * 91., floor(ph), 2.)));
@@ -975,7 +975,7 @@ function tauState() {
   return { tier: s.tier ?? -1, held, total: total || 27 };
 }
 const siteOpen = (st, s) => s.t <= st.tier + 1;
-const CORE_URL = 'karatto/?embed=1', GAMES = { factory: 'karatto/factory/?embed=1' };   // the buildings with a game inside
+const CORE_URL = 'karatto/?embed=1&v=5', GAMES = { factory: 'karatto/factory/?embed=1&v=5' };   // v: a new address each release, so the frame never shows a cached page   // the buildings with a game inside
 const siteNeed = s => 'Opens when N' + [5, 4, 3, 2, 1][s.t - 1] + ' is held';
 const poseQ = p => ({ E: p.E, q: lookQ(p.E, p.T, p.up) });
 /* each landmark's shot: az (degrees round the site, 0 = toward +i, 90 = toward +j on its face), el (degrees above the ground),

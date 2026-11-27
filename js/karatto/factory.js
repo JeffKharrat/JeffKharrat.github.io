@@ -7,10 +7,11 @@
    evidence for the word; a late one scraps it with no change to the evidence. Words already in memory are handled by
    the AI's own robots (blue, 自動). First attempt per word and skill in a shift only. At the end of the shift: the daily
    report, the yen, and the files the evidence now supports, sent to the audit in the core. */
-import { loadKanji } from './model.js?v=2';
-import * as store from './store.js?v=2';
-import { deckWord, buildPool, traps, shuffle } from './words.js';
-import { record, updateFlags, SKILL_J, day } from './evidence.js';
+import { loadKanji } from './model.js?v=5';
+import * as store from './store.js?v=5';
+import { deckWord, buildPool, traps, shuffle } from './words.js?v=5';
+import { record, updateFlags, SKILL_J, day } from './evidence.js?v=5';
+import { addShift } from './sim.js?v=5';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;
@@ -495,14 +496,15 @@ function left() {
 function brief() {
   const nW = LEARN.length, today = day();
   const evT = Object.values(SAVE.words).reduce((n, w) => n + (w.ev ? Object.values(w.ev).filter(e => e.d && e.d.includes(today)).length : 0), 0);
-  const none = !DECK.length;
+  const none = !DECK.length, strike = SAVE.sim && SAVE.sim.strike > Date.now();
   $('#brief').innerHTML = `<div class="bar"><span>FAC-01 // 大工場 GREAT FACTORY // LINE 01</span><span>BRIEFING 始業前</span></div><h2>始業前ミーティング</h2>
     <div style="color:#C9CDD6;font-size:13px;max-width:640px">Plates come in from the left and stop at three stations. Each posts a kanban card; pick the right part from the bins below, laid out like the numpad (<span class="key">4 5 6</span> over <span class="key">1 2 3</span>) before its ring closes. The card you are on runs at full speed, the others at 0.4×. A wrong part scraps the product and wipes that skill's evidence for the word. Words already in memory are handled by the AI's robots.</div>
     <div class="how">${ST.map(s => `<div><em>ST-0${s.i + 1} // ${s.en.toUpperCase()}</em><b>${s.name} <span class="m" style="font:500 11px var(--mono)">${s.en}</span></b>${s.rule} · ${SKILL_J[s.skill]}<br><span class="m">${s.show === 'kana' ? 'a reading: pick the written word' : s.show === 'en' ? 'a meaning: pick the written word' : 'a written word: pick its meaning'}</span></div>`).join('')}</div>
     <div class="row"><div class="stat"><span class="lb">training</span><b>${nW}</b></div><div class="stat"><span class="lb">in memory</span><b style="color:#8C98FF">${MEM.length}</b></div><div class="stat"><span class="lb">evidence today</span><b>${evT}</b></div><div class="stat"><span class="lb">funds</span><b>¥${(SAVE.corp.funds || 0).toLocaleString()}</b></div></div>
     ${none ? `<div class="files" style="border-color:var(--red)">No deck yet. Open the core, Settings → Read the deck (Anki must be running). Or <a href="?demo${EMBED ? '&embed=1' : ''}" style="color:var(--y)">run a demo shift</a>.</div>` : ''}
     ${DEMO ? '<div class="files">Demo shift: a made-up deck, nothing is saved.</div>' : ''}
-    <div class="acts">${none ? '' : '<button class="go" id="b-go" type="button">始業 · Start the shift <span class="key" style="border-color:#111;color:#111">Enter</span></button>'}<button class="go2" id="b-out" type="button">Back to the surface</button></div>`;
+    ${strike ? `<div class="files" style="border-color:var(--red)">ストライキ中 STRIKE · the union has stopped the line for ${Math.ceil((SAVE.sim.strike - Date.now()) / 3600e3)} more hours. Settle it in the core (経営).</div>` : ''}
+    <div class="acts">${none || strike ? '' : '<button class="go" id="b-go" type="button">始業 · Start the shift <span class="key" style="border-color:#111;color:#111">Enter</span></button>'}<button class="go2" id="b-out" type="button">Back to the surface</button></div>`;
   $('#ov-brief').classList.add('on'); left();
   if ($('#b-go')) $('#b-go').onclick = start; $('#b-out').onclick = exit;
 }
@@ -519,6 +521,8 @@ function endShift() {
   ST.forEach(s => { if (s.card && !s.card.done) { s.card.done = true; s.card.el.classList.add('leave'); } s.card = null; });
   setTimeout(() => { CARDS.innerHTML = ''; }, 500); BIN.forEach(b => b.classList.add('off'));
   const flagged = updateFlags(SAVE);
+  const answers = [...G.touched.values()].reduce((n, x) => n + Object.values(x.res).filter(v => v !== 'miss').length, 0);
+  addShift(SAVE, G.ship, answers);
   SAVE.corp.funds = (SAVE.corp.funds || 0) + G.yen; FC.shifts++; FC.best = Math.max(FC.best || 0, G.ship);
   (SAVE.log = SAVE.log || []).push({ t: Date.now(), k: 'factory', ship: G.ship, def: G.def, yen: G.yen, flagged: flagged.length }); if (SAVE.log.length > 200) SAVE.log.splice(0, SAVE.log.length - 200);
   persist();
