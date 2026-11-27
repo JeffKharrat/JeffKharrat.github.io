@@ -466,7 +466,8 @@ function lattice(fr, H, w0, w1, banded) {                           // a broadca
 }
 function tether(fr, H) {                                            // a space elevator's lattice, rising from its anchor to a counterweight station
   const w = 1.6;
-  for (let y = 12; y < H; y += 8) {
+  lbox(fr, [0, .6, 0], [7, 3.2, 7], COL.steel); lbox(fr, [0, 2.6, 0], [5, 1, 5], COL.bone);                        // the collar: the lattice sits on its anchor
+  for (let y = -1; y < H; y += 8) {
     [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([a, b], n, A) => { beam(fr, [a * w, y, b * w], [a * w, y + 8, b * w], .45, COL.light); const [c, d] = A[(n + 1) % 4]; beam(fr, [a * w, y, b * w], [c * w, y + 8, d * w], .22, COL.steel); });
     if ((y / 8 | 0) % 4 === 0) lbox(fr, [0, y, 0], [w * 2 + 1.6, .8, w * 2 + 1.6], COL.bone);
   }

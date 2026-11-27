@@ -51,6 +51,8 @@ canvas#k3 { position:fixed; inset:0; width:100%; height:100%; display:block; cur
 #jump .btn i s { position:absolute; inset:0 auto 0 0; background:var(--acc); }
 body.wall #corp, body.wall #side, body.wall #res { display:none; }
 body.wall #jump { display:flex; }
+#b-audit i { font-style:normal; display:inline-block; min-width:18px; padding:1px 5px; margin-left:6px; background:#FFC400; color:#111; font:700 11px var(--mono); text-align:center; vertical-align:1px; }
+body.wall #b-audit { display:none; }
 #b-batch { display:none; } body.wall #b-batch { display:inline-block; }
 body.batch canvas#k3 { outline:2px solid var(--warm); outline-offset:-2px; }
 #file .man { margin-top:16px; }
@@ -109,6 +111,7 @@ body.wall #hint { display:block; }
 </div>
 <div class="ui" id="jump"></div>
 <div class="ui" id="bar">
+  <button class="btn" id="b-audit">審査<small>Audit room</small></button>
   <button class="btn" id="b-wall">記憶の壁<small>Memory wall</small></button>
   <button class="btn" id="b-base" style="display:none">中枢<small>Back to the core</small></button>
   <button class="btn" id="b-batch">一括取得<small>Batch mark kanji</small></button>
@@ -118,6 +121,6 @@ body.wall #hint { display:block; }
 <div class="ui pnl" id="file"><button class="x" id="file-x">×</button><div id="file-c"></div></div>
 <div class="ui pnl" id="set"><button class="x" id="set-x">×</button><div id="set-c"></div></div>
 <div class="ui pnl" id="toast"></div>
-<script type="module" src="../js/karatto/core.js?v=2"></script>
+<script type="module" src="../js/karatto/core.js?v=3"></script>
 </body>
 </html>

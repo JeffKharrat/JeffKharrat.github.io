@@ -270,7 +270,7 @@ const slotsFor = k => { if (PLANETS[k].secret) return {}; const o = {}; ['n01', 
 /* ================= the planets ================= */
 const PLS = PLANETS.map((Pl, k) => ({ k, Pl, C: CEN[k], Q: new THREE.Quaternion(), Qi: new THREE.Quaternion(), group: new THREE.Group(), U: planetUniforms(),
   heroTop: 45, ready: false, fr: { on: false, prog: -9, speed: SPEED, maxV: 2.2, mode: 1, drive: false } }));
-PLS.forEach(P => { P.group.position.copy(P.C); scene.add(P.group); });
+PLS.forEach(P => { P.group.position.copy(P.C); scene.add(P.group); if (P.Pl.secret) P.U.uAcc.value.set(FRONTS[3][1]); });   // Tau Jeffy VI starts yellow
 const CARU = { uFoc: { value: 1000 }, uPx: { value: 1 } };
 const logoTex = LOGOS.map(() => null);
 const ldr = new THREE.TextureLoader();
@@ -412,7 +412,7 @@ void main(){
 /* ================= fronts ================= */
 let acc = 0;
 function startFront(P, mode, origin, speed, maxV) {
-  acc++; const c = P.k === TAU ? FRONTS[0] : FRONTS[acc % 4];                 // Tau Jeffy VI keeps the corporation's blue
+  acc++; const c = P.k === TAU ? FRONTS[acc % 4 ? 3 : 0] : FRONTS[acc % 4];   // Tau Jeffy VI: yellow, now and then the AI's blue
   Object.assign(P.fr, { on: true, prog: mode ? P0 - T0 * speed : -.02, speed, maxV, mode, drive: false });
   P.U.uMode.value = mode; P.U.uOrigin.value.set(...origin); P.U.uAcc.value.set(c[1]);
   if (mode) vis(P, 0);
@@ -975,6 +975,7 @@ function tauState() {
   return { tier: s.tier ?? -1, held, total: total || 27 };
 }
 const siteOpen = (st, s) => s.t <= st.tier + 1;
+const CORE_URL = 'karatto/?embed=1', GAMES = { factory: 'karatto/factory/?embed=1' };   // the buildings with a game inside
 const siteNeed = s => 'Opens when N' + [5, 4, 3, 2, 1][s.t - 1] + ' is held';
 const poseQ = p => ({ E: p.E, q: lookQ(p.E, p.T, p.up) });
 /* each landmark's shot: az (degrees round the site, 0 = toward +i, 90 = toward +j on its face), el (degrees above the ground),
@@ -1100,6 +1101,8 @@ function tauPanel() {
     return `<li><button type="button" data-n="${n}" class="${TV.view === 'site' && TV.site === n ? 'on' : ''}${open ? '' : ' off'}"><b>${s.jp}</b><span>${s.en}</span><i>${s.id === 'core' ? '↓' : open ? '●' : 'N' + [5, 4, 3, 2, 1][s.t - 1]}</i></button></li>`; }).join('');
   el.querySelectorAll('[data-t="sites"] button').forEach(b => b.onclick = () => setView('site', +b.dataset.n));
   el.querySelector('[data-t="globe"]').classList.toggle('on', TV.view === 'globe');
+  const site = SITES[TV.site], game = TV.view === 'site' && site && GAMES[site.id] && siteOpen(st, site), en = el.querySelector('[data-t="enter"]');
+  en.hidden = !game; if (game) { en.textContent = site.jp + 'に入る · Enter'; en.onclick = () => openCore(GAMES[site.id]); }
 }
 (() => {
   const el = panelsEl[TAU]; if (!el) return;
@@ -1109,17 +1112,18 @@ function tauPanel() {
 })();
 /* the core, over the page */
 let coreEl = null;
-function loadCore() {
-  if (coreEl) return;
-  coreEl = document.createElement('div'); coreEl.className = 'tau-core';
-  coreEl.innerHTML = '<p class="tau-core-l">中枢へ接続中 · Connecting to the core</p><iframe title="カラット · the core" src="karatto/?embed=1"></iframe>';
+function loadCore(src = CORE_URL) {
+  if (coreEl && coreEl.dataset.src === src) return;
+  if (coreEl) coreEl.remove();
+  coreEl = document.createElement('div'); coreEl.className = 'tau-core'; coreEl.dataset.src = src;
+  coreEl.innerHTML = `<p class="tau-core-l">${src === CORE_URL ? '中枢へ接続中 · Connecting to the core' : '入場中 · Entering'}</p><iframe title="カラット" src="${src}"></iframe>`;
   document.body.appendChild(coreEl);
 }
-function openCore() { loadCore(); coreEl.classList.add('on'); document.documentElement.classList.add('tau-in'); setTimeout(() => { if (coreEl && coreEl.classList.contains('on')) inCore = true; }, 900); }
+function openCore(src = CORE_URL) { loadCore(src); coreEl.classList.add('on'); document.documentElement.classList.add('tau-in'); setTimeout(() => { if (coreEl && coreEl.classList.contains('on')) inCore = true; }, 900); }
 function closeCore() {
-  if (!coreEl) return; const el = coreEl; coreEl = null; inCore = false;
+  if (!coreEl) return; const el = coreEl, wasCore = el.dataset.src === CORE_URL; coreEl = null; inCore = false;
   el.classList.remove('on', 'ready'); document.documentElement.classList.remove('tau-in'); setTimeout(() => el.remove(), 800);
-  TV.diveT = 1; TV.from = tauPose('dive'); TV.view = 'site'; TV.site = 0; TV.t = 0; TV.dur = 2.8; TV.bump = 0;            // back up the shaft
+  if (wasCore) { TV.diveT = 1; TV.from = tauPose('dive'); TV.view = 'site'; TV.site = 0; TV.t = 0; TV.dur = 2.8; TV.bump = 0; }   // back up the shaft
   if (JSON.stringify(tauState()) !== TV.built) { dropFull(PLS[TAU]); wakeBuild(); }                                 // the city follows the memory
   tauPanel(); kick();
 }
@@ -1134,7 +1138,7 @@ window.__about = {
   ready: () => PLS.filter(p => p.ready).length,
   full: () => PLS.filter(p => p.full).length,
   ship: () => FLEET.map(L => L.map(o => o.g.visible ? o.g.position.clone().project(camera).toArray().map(v => +v.toFixed(2)) : null)),
-  pose: s => { mv = null; ROCKS.clear(); cur = want = s; restT = 4; PLS.forEach(P => { if (P.ready) setBuilt(P); }); panels(isPl(s) ? pk(s) : -1); if (s === SEC) { wakeBuild(); tauPanel(); } cap.classList.toggle('on', s === 6); hud(s); kick(); },
+  pose: s => { mv = null; ROCKS.clear(); cur = want = s; restT = 4; PLS.forEach(P => { if (P.ready) setBuilt(P); }); panels(isPl(s) ? pk(s) : -1); if (s === SEC) { secY = scrollY; wakeBuild(); tauPanel(); } cap.classList.toggle('on', s === 6); hud(s); kick(); },
   move: (a, b, t) => { mv = null; cur = a; want = b; restT = 4; base = (() => { const p = restPose(a); return { E: p.E.clone(), q: lookQ(p.E, p.T, p.up) }; })(); PLS.forEach(P => { if (P.ready) setBuilt(P); }); startMove(b); if (mv) mv.t = t; kick(); },
   hover: (x, y) => { mouse.px = x; mouse.py = y; kick(); },
   uni: (k, name, a) => { PLS[k].U[name].value.fromArray(a); kick(); },

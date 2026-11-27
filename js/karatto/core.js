@@ -4,6 +4,8 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=2';
 import * as store from './store.js?v=2';
+import { files, updateFlags } from './evidence.js';
+import { openAudit } from './audit.js?v=1';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;   // embed: opened over the site from Tau Jeffy VI
@@ -311,10 +313,11 @@ let SAVE = null, DECK = null, S = null, PROG = null;
 function certifiedSet() { const c = new Set(); if (SAVE) for (const [id, w] of Object.entries(SAVE.words)) if (w.cert) c.add(+id); return c; }
 const manualSet = () => new Set(Object.keys((SAVE && SAVE.kanji) || {}));
 /* mark or unmark a kanji as acquired by hand */
+const persist = () => { if (!DEMO) store.store(SAVE, null); };
 function setManual(ks, on) {
   SAVE.kanji = SAVE.kanji || {}; let n = 0;
   for (const k of ks) { if (!KD.byK.has(k)) continue; if (on && !SAVE.kanji[k]) { SAVE.kanji[k] = Date.now(); n++; } if (!on && SAVE.kanji[k]) { delete SAVE.kanji[k]; n++; } }
-  if (n) { store.store(SAVE, null); applyState(); }
+  if (n) { persist(); applyState(); }
   return n;
 }
 function applyState() {
@@ -449,6 +452,7 @@ function ui() {
   $('#mem').innerHTML = [`Deck: ${deckN} words${DEMO ? ' (demo)' : ''}`, `In memory: ${cert.size}`, `Keys: ${counts[2]} acquired · ${counts[3]} integrated · ${counts[4]} mastered`, `Uncharted keys: ${counts[0]}`].map(t => `<li>${t}</li>`).join('');
   $('#jump').innerHTML = WALL.L.sections.map((s, i) => { const L2 = lv[s.lv] || { a: 0, n: 1 }; return `<button class="btn" data-s="${i}">N${s.lv}<span class="tn"> ${TIERS[i].name}</span><i><s style="width:${Math.round(L2.a / L2.n * 100)}%"></s></i></button>`; }).join('');
   $('#jump').querySelectorAll('button').forEach(b => b.onclick = () => { const s = WALL.L.sections[+b.dataset.s]; VIEW.yaw = WALL.L.angle((s.c0 + Math.min(s.c1, s.c0 + 20)) / 2, 0).t; VIEW.pitch = 0; });
+  const nf = files(SAVE).length; $('#b-audit').innerHTML = `審査${nf ? `<i>${nf}</i>` : ''}<small>Audit room · ${nf} file${nf === 1 ? '' : 's'}</small>`;
   links();
 }
 let ANKI_OK = false, SRC = '';
@@ -486,6 +490,13 @@ function settings() {
   $('#s-kan-clear').onclick = () => { if (!confirm('Remove every hand mark? Words in memory are kept.')) return; const n = setManual(Object.keys(SAVE.kanji || {}), false); toast(n + ' hand marks removed.'); settings(); };
 }
 $('#b-set').onclick = settings; $('#set-x').onclick = () => $('#set').classList.remove('on');
+function audit(tab) {
+  if (!DECK || !DECK.length) { toast('No deck yet: Settings → Read the deck.'); return; }
+  closeFile(); document.body.classList.add('audit');
+  openAudit({ save: SAVE, deck: DECK, KD, founding: PROG.tier < 0, demo: DEMO, tab, persist,
+    onClose: ids => { document.body.classList.remove('audit'); if (ids.length) { applyState(); const i = KD.list.findIndex(k => DECK.find(w => w.id === ids[ids.length - 1] && (w._facets || []).some(f => f.k === k.k))); if (i >= 0) { ripT = 0; WALL.U.uRipC.value.copy(WALL.pos[i]); } toast(ids.length + ' word' + (ids.length > 1 ? 's' : '') + ' committed to memory.'); } else ui(); } });
+}
+$('#b-audit').onclick = () => audit();
 $('#b-wall').onclick = () => go('wall'); $('#b-base').onclick = () => go('base');
 
 /* ---------------- demo deck: for previews before Anki is connected ---------------- */
@@ -495,7 +506,8 @@ function demoDeck() {
     if (k.l < 3 && Math.random() > .25) continue;
     for (const f of k.fa) for (const e of f.ex.slice(0, k.l >= 4 ? 3 : 1)) if (!seen.has(e[0])) { seen.add(e[0]); deck.push({ id: id++, written: e[0], reading: e[1], meaning: e[2], expr: e[0] }); }
   }
-  const words = {}; deck.forEach(w => { if (Math.random() < .62) words[w.id] = { cert: Date.now() }; });
+  const words = {}, y = new Date(Date.now() - 864e5 - 4 * 3600e3).toISOString().slice(0, 10), t = new Date(Date.now() - 4 * 3600e3).toISOString().slice(0, 10);
+  deck.forEach(w => { const r = Math.random(); if (r < .62) words[w.id] = { cert: Date.now() }; else if (r < .645) words[w.id] = { ev: { meaning: { d: [y], at: 'factory' }, recall: { d: [y, t], at: 'factory' }, reading: { d: [t], at: 'factory' } } }; });
   return { deck, words };
 }
 
@@ -505,6 +517,7 @@ addEventListener('resize', resize);
 let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
+  if (document.body.classList.contains('audit')) { last = now; return; }      // the audit room covers the core: don't render under it
   const dt = Math.min(.05, (now - last) / 1000); last = now; UT.value += dt;
   /* camera */
   const P = poseNow();
@@ -537,9 +550,11 @@ function frame(now) {
   buildWall();
   const L0 = await store.load(); SAVE = L0.save; DECK = L0.deck; SRC = L0.source;
   if (DEMO) { const d = demoDeck(); DECK = d.deck; SAVE = { ...SAVE, words: d.words }; }
+  updateFlags(SAVE); if (!DEMO && DECK) persist();
   ANKI_OK = await store.ankiAvailable();
   applyState();
   if (!DECK && !DEMO) toast(ANKI_OK ? 'Anki found: open Settings to read your deck.' : 'No deck yet: open Anki, then Settings → Read the deck.', 6000);
   if (EMBED) parent.postMessage('karatto:ready', location.origin);
-  window.__k = { go, pressKey, view: VIEW, state: () => ({ tier: PROG.tier, deck: (DECK || []).length }), yaw: (y, p, f) => { VIEW.yaw = y; VIEW.pitch = p || 0; if (f) VIEW.fov = f; }, sec: i => { const s = WALL.L.sections[i]; return WALL.L.angle(s.c0 + 8, 0).t; } };
+  if (QS.has('audit')) audit();
+  window.__k = { go, pressKey, audit, view: VIEW, state: () => ({ tier: PROG.tier, deck: (DECK || []).length }), yaw: (y, p, f) => { VIEW.yaw = y; VIEW.pitch = p || 0; if (f) VIEW.fov = f; }, sec: i => { const s = WALL.L.sections[i]; return WALL.L.angle(s.c0 + 8, 0).t; } };
 })();
