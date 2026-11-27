@@ -2,8 +2,8 @@
    deck, in its own audio when Anki is open, the browser's Japanese voice otherwise. Pick the word you heard among four
    that sound close. Right: the clip airs. Wrong: a correction goes out. One replay per clip, at half the reward.
    Skill: listening. */
-import { game, panel, keycaps, esc, clamp, Y, RED, OK, sfx, audio, $, furi } from './game.js?v=10';
-import { ankiAvailable, ankiAudio } from './store.js?v=10';
+import { game, panel, keycaps, esc, clamp, Y, RED, OK, sfx, audio, $, furi } from './game.js?v=11';
+import { ankiAvailable, ankiAudio } from './store.js?v=11';
 
 let cur = null, phase = 'idle', K, aired = 0, pulled = 0, aud = 8, n = 0, gap = 0, env = 0, ANKI = false, noise = null, replayed = false, speaking = 0;
 const PROG = ['天気 WEATHER', 'スポーツ SPORTS', '社内広報 COMPANY PR', 'ニュース NEWS', '交通 TRAFFIC', '経済 MARKETS', '地域 LOCAL', '文化 CULTURE'];

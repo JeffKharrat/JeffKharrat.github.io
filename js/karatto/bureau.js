@@ -1,13 +1,13 @@
 /* カラット: 派閥 · the live Factions bureau, inside 経営 (Management). A staffed negotiation counter: seven people
    along the rear lip of the counter (the bureau pack), the AI on this side of it. Talk to one, discuss terms, carry a
    draft from desk to desk, ask the chair for a hearing. The room is a picture with three layers (wall, people, the
-   counter in front of them) and a gentle pointer parallax; everything said is Japanese first, with furigana and the
+   counter in front of them) everything said is Japanese first, with furigana and the
    English underneath. The logic is gov.js; this file only draws it and sends the player's actions there. */
-import { EVENTS, resolve, POL, FAC, capacity, LEDGER } from './sim.js?v=10';
-import * as gov from './gov.js?v=10';
-import { AUTH, STANCE, REPLY, SAY, need, mood } from './gov-arc.js?v=10';
-import { ICON } from './icons.js?v=10';
-import { leafSVG } from './leaf.js?v=10';
+import { EVENTS, resolve, POL, FAC, capacity, LEDGER } from './sim.js?v=11';
+import * as gov from './gov.js?v=11';
+import { AUTH, STANCE, REPLY, SAY, need, mood } from './gov-arc.js?v=11';
+import { ICON } from './icons.js?v=11';
+import { leafSVG } from './leaf.js?v=11';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const yen = v => (v < 0 ? '−¥' : '¥') + Math.abs(Math.round(v)).toLocaleString();
@@ -18,10 +18,10 @@ const RM = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const CSS = `
 #mg .bur { position:absolute; inset:0; overflow:hidden; background:#16181D; border:1px solid var(--line2); }
-#mg .bur .lay { position:absolute; left:0; top:-30px; width:1240px; height:698px; pointer-events:none; transition:transform .25s ease-out; }
+#mg .bur .lay { position:absolute; left:0; top:-30px; width:1240px; height:698px; pointer-events:none; }
 #mg .bur .lay img { width:100%; height:100%; display:block; image-rendering:pixelated; }
 #mg .bur .desk { clip-path:polygon(0 66%,10% 66%,12% 58.6%,88% 58.6%,89% 66%,100% 66%,100% 100%,0 100%); }
-#mg .bur .cast { position:absolute; left:161px; top:-30px; width:918px; height:698px; pointer-events:none; transition:transform .25s ease-out; }
+#mg .bur .cast { position:absolute; left:161px; top:-30px; width:918px; height:698px; pointer-events:none; }
 #mg .bur .rep { position:absolute; bottom:${698 - 401}px; width:131px; height:164px; pointer-events:auto; cursor:pointer; background:none; border:0; padding:0; }
 #mg .bur .rep img { width:131px; height:164px; object-fit:contain; object-position:bottom; image-rendering:pixelated; display:block; animation:bBr 5.2s ease-in-out infinite; filter:drop-shadow(0 3px 0 rgba(0,0,0,.35)); }
 #mg .bur .rep:nth-child(2n) img { animation-delay:-1.7s; } #mg .bur .rep:nth-child(3n) img { animation-delay:-3.1s; }
@@ -101,7 +101,7 @@ const CSS = `
 #mg .bur .go:disabled { opacity:.35; cursor:not-allowed; } #mg .bur .go.r { background:var(--red); color:#fff; } #mg .bur .go.g { background:transparent; color:var(--ink); border:1px solid var(--line2); }
 #mg .bur .res { margin:8px 0; padding:8px 10px; border:1px solid var(--line2); }
 #mg .bur .res.pass { border-color:var(--y); } #mg .bur .res.fail { border-color:var(--red); }
-@media (prefers-reduced-motion: reduce) { #mg .bur .rep img, #mg .bur .dot, #mg .bur .lamp { animation:none; } #mg .bur .lay, #mg .bur .cast { transition:none; } }
+@media (prefers-reduced-motion: reduce) { #mg .bur .rep img, #mg .bur .dot, #mg .bur .lamp { animation:none; } }
 `;
 function css() { if (!document.getElementById('bur-css')) { const st = document.createElement('style'); st.id = 'bur-css'; st.textContent = CSS; document.head.appendChild(st); } }
 
@@ -314,14 +314,6 @@ function wire() {
   q('[data-defer]').forEach(x => x.onclick = () => { gov.deferCase(save(), theCase().C.id); persist(); B.view = 'room'; draw(); });
   q('[data-opt]').forEach(x => x.onclick = () => choose(x.dataset.opt));
   q('[data-room]').forEach(x => x.onclick = () => { B.view = 'room'; draw(); });
-  /* the parallax: three layers, a few pixels each */
-  const R = b.querySelector('.bur');
-  if (R && B.view === 'room' && !RM()) {
-    R.onpointermove = e => { if (e.pointerType === 'touch') return; const r = R.getBoundingClientRect(), x = Math.max(-1, Math.min(1, 2 * (e.clientX - r.left) / r.width - 1));
-      R.querySelector('.far').style.transform = `scale(1.025) translateX(${x * -2}px)`; R.querySelector('.cast').style.transform = `translateX(${x * -5}px)`; R.querySelector('.near').style.transform = `scale(1.025) translateX(${x * -9}px)`; };
-    R.onpointerleave = () => { ['.far', '.near'].forEach(s => R.querySelector(s).style.transform = 'scale(1.025)'); R.querySelector('.cast').style.transform = ''; };
-    ['.far', '.near'].forEach(s => R.querySelector(s).style.transform = 'scale(1.025)');
-  }
   const tr = b.querySelector('#bur-tr'); if (tr) tr.scrollTop = tr.scrollHeight;
 }
 function openTalk(i) {
