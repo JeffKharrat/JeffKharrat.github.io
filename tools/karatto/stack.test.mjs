@@ -1,5 +1,5 @@
 const R = new URL('../../js/karatto/', import.meta.url).href;
-const sim = await import(R + 'sim.js?v=15'), gov = await import(R + 'gov.js?v=15');
+const sim = await import(R + 'sim.js?v=21'), gov = await import(R + 'gov.js?v=21');
 const H = 3600e3, MON = Date.UTC(2026, 10, 23) - 5 * H, day = d => MON + d * 24 * H + 2 * H;
 let fails = 0; const ok = (c, m) => { console.log((c ? '  ok  ' : '  FAIL') + ' ' + m); if (!c) fails++; };
 const N4 = { mem: 450, acq: 0, tier: 1, div: 6, up: 0, fu: {}, fame: 6000, tech: {} };

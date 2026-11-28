@@ -1,5 +1,5 @@
 const R = new URL('../..', import.meta.url).href.replace(/\/$/, '');
-const sim = await import(R + '/js/karatto/sim.js?v=8');
+const sim = await import(R + '/js/karatto/sim.js?v=21');
 const H = 3600e3, MON = Date.UTC(2026, 10, 23) - 5 * H; // Mon 23 Nov 04:00 JST
 const cases = { founding: { mem: 0, acq: 0, tier: -1, div: 0, up: 0, fame: 0, tech: {} }, N5: { mem: 150, acq: 0, tier: 0, div: 2, up: 0, fame: 1900, tech: {} }, N3: { mem: 900, acq: 0, tier: 2, div: 10, up: 0, fame: 11600, tech: {} } };
 for (const [name, ctx] of Object.entries(cases)) for (const eco of [0, 2]) {

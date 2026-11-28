@@ -8,9 +8,9 @@
    - Clocks: governance deadlines count ATTENDED visits (one per Japan-time day, when Management opens or a shift ends).
      Absence never burns a deadline, never breaks a promise that needed the player.
    - Everything that changes money or state goes through once(): a stable id, applied at most once (reloads, retries). */
-import { migrate, book, log, available, reserved, FLOOR, capacity, forecast, essentials, newDir, projX, RUN } from './sim.js?v=20';
-import { day } from './evidence.js?v=20';
-import { ARCS, MOTIONS, CLAUSES } from './gov-arc.js?v=20';
+import { migrate, book, log, available, reserved, FLOOR, capacity, forecast, essentials, newDir, projX, RUN, refRate, PET } from './sim.js?v=21';
+import { day } from './evidence.js?v=21';
+import { ARCS, MOTIONS, CLAUSES, ISSUES, ISSUE_NAME } from './gov-arc.js?v=21';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export { MOTIONS, CLAUSES, ARCS };
@@ -45,11 +45,7 @@ function remember(G, e) { G.hist.push(e); if (G.hist.length > 120) G.hist.splice
 function news(G, item) { G.news.push(item); if (G.news.length > 30) G.news.splice(0, G.news.length - 30); }
 export const trustAdd = (G, k, d) => { G.trust[k] = clamp((G.trust[k] || 0) + d, -50, 50); };
 /* prices in reference hours: the rate is snapshotted when a case opens, inside the tier's band; never the wallet */
-const REF = { '-1': [20, 40], 0: [60, 150], 1: [120, 300], 2: [250, 600], 3: [400, 1000], 4: [600, 1500] };
-export function refRate(S, ctx) {
-  const [lo, hi] = REF[Math.max(-1, Math.min(4, ctx.tier))], v = (S.hist || []).slice(-24).map(h => h.n).filter(n => n > 0).sort((a, b) => a - b);
-  return Math.round(clamp(Math.max(lo, v.length >= 12 ? v[v.length >> 1] : lo), lo, hi));
-}
+export { refRate };
 export function price(ref = 90) { const p = h => Math.round(h * ref / 10) * 10; p.y = h => '¥' + p(h).toLocaleString(); return p; }
 const priceOf = (save, draft) => price((caseOf(save, MOTIONS[draft.motion].arc) || {}).ref);
 export const describe = (save, id) => MOTIONS[id].d(price((caseOf(save, MOTIONS[id].arc) || {}).ref));
@@ -121,7 +117,26 @@ export function commitments(save, draft) {
   for (const [id, c] of Object.entries(draft.cl || {})) if (c.st === 'agreed' || c.st === 'grudging') cash += CLAUSES[id].cost(c.terms, p);
   return cash;
 }
+/* the mandate: at most one point per voter, from the group's approval as frozen when the meeting opened.
+   High (≥65) and the motion or an AGREED clause protects the group's tagged interest: +1. Low (<35) and the motion
+   exposes it unprotected: −1. Otherwise 0. The board's mandate is Finance's alone (the chair votes on oversight, trust
+   and promises); the engineers' is Operations', and only once engineers are employed (N3). */
+export const SEAT_FAC = { union: 'union', civic: 'res', ops: 'eng', fin: 'board' };
+export const engActive = (save, ctx) => ctx.tier >= 2 && ((save.sim && save.sim.pop.e) || 0) >= 1;
+export function approvalSnap(save, draft) {
+  const C = draft && caseOf(save, MOTIONS[draft.motion].arc);
+  return (C && C.st === 'm1' && C.snap) || { ...save.sim.fac };
+}
+export function mandateOf(save, ctx, draft, seat) {
+  const f = SEAT_FAC[seat]; if (!f) return { v: 0 };
+  if (f === 'eng' && !engActive(save, ctx)) return { v: 0, fac: f, off: true };
+  const has = id => !!(draft.cl && draft.cl[id] && draft.cl[id].st === 'agreed'), tags = (ISSUES[draft.motion] || (() => ({})))(has), tag = tags[f];
+  const a = approvalSnap(save, draft)[f], name = (ISSUE_NAME[MOTIONS[draft.motion].arc] || {})[f] || ['—', '—'];
+  const v = tag === 'p' && a >= 65 ? 1 : tag === 'x' && a < 35 ? -1 : 0;
+  return { v, fac: f, appr: a, now: save.sim.fac[f], tag, name, why: v > 0 ? ['支持基盤', `mandate: ${name[1]} protected, approval ${(Math.floor(a * 10) / 10)}`] : ['反発', `mandate: ${name[1]} exposed, approval ${(Math.floor(a * 10) / 10)}`] };
+}
 export function seatScore(save, ctx, draft, seat) {
+  if (!SEATS.includes(seat)) return null;                                    // legal and audit advise; they hold no ballot
   const G = govOf(save), M = MOTIONS[draft.motion], st = { save, ctx, S: save.sim, G, spend: spendable(save), need: commitments(save, draft) };
   const b = M.base[seat](st), parts = [{ v: b.v, why: b.why }];
   const t = G.trust[seat] || 0; if (t >= 25) parts.push({ v: 1, why: ['信頼', 'trust'] }); if (t <= -25) parts.push({ v: -1, why: ['不信', 'distrust'] });
@@ -130,6 +145,7 @@ export function seatScore(save, ctx, draft, seat) {
     if (c.st === 'agreed') parts.push({ v: 2, why: C.why }); else if (c.st === 'grudging') parts.push({ v: 1, why: C.why });
   }
   const broken = G.pledges.filter(p => p.to === seat && p.st === 'broken' && !p.cured).length; if (broken) parts.push({ v: -2, why: ['約束違反', 'a broken promise'] });
+  const md = mandateOf(save, ctx, draft, seat); if (md.v) parts.push({ v: md.v, why: md.why, mandate: true });
   const v = parts.reduce((n, p) => n + p.v, 0);
   return { v, vote: v >= 1 ? 'yes' : v <= -1 ? 'no' : 'abs', parts, main: parts.slice().sort((a, c) => Math.abs(c.v) - Math.abs(a.v))[0] };
 }
@@ -139,7 +155,7 @@ export function tally(save, ctx, draft) {
 }
 /* what blocks a submission: cash, power, a freeze, a vote already failed this visit */
 export function blockers(save, ctx, draft) {
-  const G = govOf(save), M = MOTIONS[draft.motion], out = [], need = commitments(save, draft), sp = spendable(save);
+  const G = govOf(save), M = MOTIONS[draft.motion], out = [], need = commitments(save, draft) + crewFee(save, ctx, draft), sp = spendable(save);
   if (need > 0 && sp < need) out.push(['資金不足', `Needs ¥${need.toLocaleString()} above the reserve; ¥${Math.max(0, sp).toLocaleString()} is spendable.`]);
   if (M.auto && G.freeze && G.freeze.untilV >= G.visit.n) out.push(['凍結', 'The chair froze new automation proposals until the next review.']);
   if (M.power) { const f = previewOf(save, ctx, draft); if (f.power < 0) out.push(['電力不足', `The line would run the grid ${Math.round(-f.power)} MW short. A Power plant shift adds supply for a day.`]); }
@@ -149,12 +165,24 @@ export function blockers(save, ctx, draft) {
 /* the 24-hour operating projection with the proposal installed, from a copy that includes what is already signed */
 export function previewOf(save, ctx, draft) {
   const c = JSON.parse(JSON.stringify({ sim: save.sim, corp: save.corp })), M = MOTIONS[draft.motion], S = migrate(c.sim);
-  if (M.proj) S.proj = S.proj.filter(p => p.id !== M.proj.id).concat([projFor(draft)]);
-  c.corp.funds -= commitments(save, draft);
+  if (M.proj) S.proj = S.proj.filter(p => p.id !== M.proj.id).concat([projFor(draft, handoverOf(save, ctx, draft))]);
+  c.corp.funds -= commitments(save, draft) + crewFee(save, ctx, draft);
   return forecast(c, ctx, null, 24);
 }
-function projFor(draft) {
+/* the handover of a full night line: who implements it. Union yes: its stewards staff it (full bonus). Otherwise the
+   player picks, before submitting: a supervised start (75% of the signed robot bonus until two paid Factory shifts) or a
+   hired commissioning crew (two reference hours on signing, full bonus at once). Only the full line has one. */
+export function handoverOf(save, ctx, draft) {
+  if (draft.motion !== 'full') return null;
+  if (seatScore(save, ctx, draft, 'union').vote === 'yes') return 'staff';
+  return draft.handover === 'crew' ? 'crew' : 'sup';
+}
+export function crewFee(save, ctx, draft) { if (handoverOf(save, ctx, draft) !== 'crew') return 0; return price((caseOf(save, MOTIONS[draft.motion].arc) || {}).ref)(2); }
+export function setHandover(save, caseId, hv) { const C = caseOf(save, caseId); if (!C || C.st !== 'm1' || !['sup', 'crew'].includes(hv)) return false; C.draft.handover = hv; return true; }
+export const SUP_X = .75, SUP_SHIFTS = 2;
+function projFor(draft, hv) {
   const M = MOTIONS[draft.motion], p = { ...M.proj }, r = draft.cl && draft.cl.retrain;
+  if (hv === 'sup') { p.sup = SUP_SHIFTS; p.supX = SUP_X; }
   if (draft.cl && draft.cl.stage && (draft.cl.stage.st === 'agreed' || draft.cl.stage.st === 'grudging')) { p.robot = p.robot / 2; p.staged = true; }
   if (r && (r.st === 'agreed' || r.st === 'grudging') && r.terms.safety === 'shift') { p.jobs = (p.jobs || 0) + 2; p.upkeep += 2; p.shift = true; }
   return p;
@@ -167,10 +195,12 @@ export function progress(save, ctx) {
   const G = govOf(save); if (!save.sim || save.sim.v !== 2) return;
   for (const A of Object.values(ARCS)) {
     let C = G.cases[A.id];
-    if (!C) { if (A.entry(save, ctx).ok) { C = G.cases[A.id] = { id: A.id, st: 'm1', v0: G.visit.n, ref: refRate(save.sim, ctx), draft: { motion: A.first, cl: {} }, asked: {}, said: {} }; A.open && A.open(save, C); news(G, { v: G.visit.n, k: 'case', id: A.id }); } continue; }
+    if (!C) { if (A.entry(save, ctx).ok) { C = G.cases[A.id] = { id: A.id, st: 'm1', v0: G.visit.n, ref: refRate(save.sim, ctx), draft: { motion: A.first, cl: {} }, asked: {}, said: {} }; A.open && A.open(save, C); news(G, { v: G.visit.n, k: 'case', id: A.id }); C.snap = { ...save.sim.fac }; } continue; }
     if (C.st === 'later' && G.visit.n >= C.reV) { C.st = 'm1'; C.v0 = G.visit.n; }
     if (C.ref == null) C.ref = refRate(save.sim, ctx);
     A.step && A.step(save, ctx, C, api);
+    if (C.st === 'm1' && !C.snap) C.snap = { ...save.sim.fac };             // the delegation's approval, frozen as the meeting opens (and once, for a case open before the upgrade)
+    if (C.st !== 'm1' && C.snap) delete C.snap;
   }
 }
 export function deferCase(save, id) { const G = govOf(save), C = G.cases[id]; if (!C || C.st !== 'm1') return false; C.st = 'later'; C.reV = G.visit.n + 2; remember(G, { v: G.visit.n, k: 'defer', id }); return true; }
@@ -233,7 +263,7 @@ export function overrideOK(save, ctx, draft) {
   const G = govOf(save), M = MOTIONS[draft.motion], cost = Math.max(200, Math.round(4 * essentials(save.sim)));
   if (!M.override) return { ok: false, why: 'This motion cannot be forced.' };
   if (G.over.q === save.sim.q.n) return { ok: false, why: 'The override was already used this quarter.' };
-  if (spendable(save) < commitments(save, draft) + cost) return { ok: false, why: 'Not even an override can spend the reserve.' };
+  if (spendable(save) < commitments(save, draft) + crewFee(save, ctx, draft) + cost) return { ok: false, why: 'Not even an override can spend the reserve.' };
   return { ok: true, cost };
 }
 function sign(save, ctx, C, T, override) {
@@ -251,9 +281,13 @@ function sign(save, ctx, C, T, override) {
     if (K.lock) S.locks = Object.assign(S.locks || {}, K.lock(c.terms));
   }
   if (M.lock) { S.locks = Object.assign(S.locks || {}, M.lock); Object.assign(S.pol, M.lock); }
-  if (M.proj) { S.proj = S.proj.filter(x => x.id !== M.proj.id).concat([projFor(draft)]); if (M.costH) escrowOut(save, C.id + ':' + draft.motion, 'pay'); }
+  const hv = draft.motion === 'full' ? (T.seats.union.vote === 'yes' ? 'staff' : draft.handover === 'crew' ? 'crew' : 'sup') : null;   // the union's actual vote, before any trust moves
+  if (hv === 'crew') book(S, save.corp, 'cap', -p(2), `試運転班 Commissioning crew hired for the night line: ${p.y(2)}.`);
+  if (M.proj) { S.proj = S.proj.filter(x => x.id !== M.proj.id).concat([projFor(draft, hv)]); if (M.costH) escrowOut(save, C.id + ':' + draft.motion, 'pay'); }
+  if (hv === 'staff') log(S, 'gov', '引継ぎ The union\'s stewards staff the handover: the line starts at full output.');
+  if (hv === 'sup') log(S, 'gov', `監督運転 Supervised start: ${Math.round(SUP_X * 100)}% of the robot bonus until two paid Factory shifts are done.`);
   const cap1 = capacity(S, ctx);
-  C.acc = { motion: draft.motion, v: G.visit.n, t: S.t, override, base: { runs: S.runs, retr: S.retr, aired: S.aired, dlv: S.dlv, ships: S.ships }, disp: Math.max(0, Math.round(cap0.jobsW - cap1.jobsW)), clauses: Object.keys(draft.cl).filter(id => ['agreed', 'grudging'].includes(draft.cl[id].st)), yes: T.yes };
+  C.acc = { motion: draft.motion, v: G.visit.n, t: S.t, override, base: { runs: S.runs, retr: S.retr, aired: S.aired, dlv: S.dlv, ships: S.ships }, disp: Math.max(0, Math.round(cap0.jobsW - cap1.jobsW)), clauses: Object.keys(draft.cl).filter(id => ['agreed', 'grudging'].includes(draft.cl[id].st)), yes: T.yes, hv, unionVote: T.seats.union.vote };
   C.st = M.next || 'live';
   remember(G, { v: G.visit.n, k: 'vote', id: C.id, motion: draft.motion, yes: T.yes, no: T.no, abs: T.abs, pass: true, override });
   log(S, 'gov', `採決 ${M.j} (${M.en}) ${override ? 'FORCED by the AI\'s emergency mandate' : `passed ${T.yes}–${T.no}–${T.abs}`}.`);
@@ -297,6 +331,8 @@ export function inbox(save, ctx) {
   out.routine = (S.ev || []).slice(0, 2);
   if (S.ev.length > 2) out.status.push(`${S.ev.length - 2} more routine decisions wait behind these`);
   if (G.review && G.review.v <= G.visit.n) out.status.push('Oversight review open: the commissioner wants to see the override\'s record');
+  if (S.pet && S.pet.st === 'open') out.status.push('技術者の請願 · the engineers ask Operations for retention');
+  if (S.maint && S.maint.left > 0) out.status.push(`整備時間 · maintenance window: ${S.maint.left} paid Factory shift${S.maint.left === 1 ? '' : 's'} left`);
   return out;
 }
 /* contracted cash flows, shown apart from the operating forecast */
@@ -310,4 +346,61 @@ export function closeReview(save, ok) {
   const G = govOf(save); if (!G.review) return false;
   once(save, 'review:' + G.review.v + ':' + G.review.id, () => { trustAdd(G, 'audit', ok ? 3 : -5); remember(G, { v: G.visit.n, k: 'review', id: G.review.id, ok }); G.review = null; });
   return true;
+}
+
+/* ---------------- the entrance line: one actionable sentence from live state ----------------
+   Priority: a due review, an actionable hearing, a pending petition, an attainable case prerequisite, the earliest
+   future review. Returns { jp, en, go } where go names a seat to select ('chair', 'ops', …), 'hear', or a room id. */
+const wordsFor = robots => { let m = 0; while (Math.floor(m * .6) < robots) m++; return m; };
+export function nextAction(save, ctx) {
+  const G = govOf(save), S = save.sim, I = inbox(save, ctx), maj = I.major;
+  if (G.review && G.review.v <= G.visit.n) return { jp: '監督審査', en: 'Oversight review due: show the commissioner the override\'s record.', go: 'audit' };
+  if (maj && maj.m.kind !== 'vote') return { jp: '審査', en: `${maj.m.title[1]} is due today: open it with the chair.`, go: 'hear' };
+  if (maj) {
+    const d = maj.C.draft, M = MOTIONS[d.motion], T = tally(save, ctx, d), bl = blockers(save, ctx, d);
+    if (T.pass) {
+      const hv = handoverOf(save, ctx, d), st = d.cl.stage && ['agreed', 'grudging'].includes(d.cl.stage.st), b = M.proj ? (M.proj.robot || 0) * (st ? .5 : 1) : 0, pc = v => Math.round(v * 1000) / 10 + '%';
+      const u = T.seats.union.vote, hand = hv === 'sup' ? ` · +${pc(b * SUP_X)} robot output until two paid Factory shifts, then +${pc(b)}` : hv === 'crew' ? ` · crew hired: +${pc(b)} at once` : hv === 'staff' ? ` · the union staffs it: +${pc(b)}` : '';
+      return { jp: '採決可能', en: `${T.yes}/5 yes${u !== 'yes' && M.proj ? ` · Union ${u === 'no' ? 'opposes' : 'abstains'}` : ''}${hand}.${bl.length ? ' Blocked: ' + bl[0][1] : ' Ready for the hearing.'}`, go: 'hear' };
+    }
+    const wants = SEATS.filter(k => T.seats[k].vote !== 'yes').map(k => { const id = M.clauses.find(c => CLAUSES[c].by === k && !(d.cl[c] && d.cl[c].st === 'agreed')); return id ? { k, id } : null; }).filter(Boolean);
+    const SH = { chair: 'Chair wants', fin: 'Finance wants', union: 'Union wants', civic: 'Residents want', ops: 'Operations wants' };
+    return { jp: '交渉中', en: `${T.yes}/3 yes.${wants.map(w => ` ${SH[w.k]} ${CLAUSES[w.id].why[1]}.`).join('')}${wants.length ? '' : ' No clause left to offer: try the other motion.'}`, go: wants.length ? wants[0].k : 'chair', all: wants.map(w => w.k) };
+  }
+  if (S.pet && S.pet.st === 'open') return { jp: '技術者の請願', en: 'The engineers have petitioned for retention: answer them with Operations.', go: 'ops' };
+  const line = G.cases.line;
+  if (!line && ctx.tier >= 0) {
+    if (!((save.corp.factory || {}).shifts)) return { jp: '夜間ライン', en: 'Play a paid Factory shift now: the night-line proposal opens after the first one.', go: 'factory' };
+    const r = Math.floor(ctx.mem * .6); if (r < 30) { const w = wordsFor(30) - ctx.mem; return { jp: '夜間ライン', en: `Night-line proposal · ${r}/30 robots. ${30 - r} more robot${30 - r === 1 ? '' : 's'} require ${w} more word${w === 1 ? '' : 's'} in memory.`, go: 'study' }; }
+  }
+  if (I.status.length) return { jp: '次の審査', en: I.status[0].replace(/ · review in (\d+) visits?/, (m, n) => ` · review in ${n} attended day${n === '1' ? '' : 's'}`) + '.', go: null };
+  return { jp: '案件なし', en: 'Nothing pending. The Policies tab forecasts any change before you make it.', go: 'policy' };
+}
+
+/* ---------------- the engineers' retention petition (answered with Operations) ---------------- */
+export function petitionOpts(save) {
+  const S = save.sim, p = S.pet; if (!p || p.st !== 'open') return [];
+  const P = price(p.ref), sp = spendable(save), lost = Math.min(1, S.pop.e) * .02;
+  return [
+    { id: 'fund', j: '定着手当', en: `Fund a retention allowance · ${P.y(3)}`, d: `Paid now, above the reserve: engineers +10 at once. Worth it if the grid problem will soon clear.`, ok: sp >= P(3), why: `Needs ${P.y(3)} above the reserve (¥${Math.max(0, sp).toLocaleString()} spendable).` },
+    { id: 'window', j: '整備時間', en: 'Give the crew a maintenance window', d: 'The next two paid Factory shifts pay 15% less in fees; then engineers +12, once. Partial progress persists. No cash needed now.', ok: true },
+    { id: 'release', j: '異動承認', en: 'Release the engineers who asked to transfer', d: `One engineer leaves now and the post stays closed for 24 simulated hours. About ${lost.toFixed(2)} research an hour lost while the post is empty. Research already earned stays.`, ok: S.pop.e >= 1, why: 'No engineer is employed.' }];
+}
+export function answerPetition(save, ctx, opt, hid) {
+  const S = save.sim, p = S.pet; if (!p || p.st !== 'open') return { ok: false, stale: true, why: 'There is no open petition.' };
+  const r = once(save, 'pet:' + p.id + ':' + hid, () => {
+    const o = petitionOpts(save).find(x => x.id === opt); if (!o) return { ok: false, why: 'Unknown answer.' }; if (!o.ok) return { ok: false, why: o.why };
+    const P = price(p.ref);
+    if (opt === 'fund') { book(S, save.corp, 'ev', -P(3), `定着手当 Retention allowance paid: ${P.y(3)}. Engineers +10.`); S.fac.eng = clamp(S.fac.eng + 10, 0, 100); }
+    if (opt === 'window') { S.maint = { left: 2, cut: .15, id: p.id }; log(S, 'eng', '整備時間 Maintenance window agreed: the next two paid Factory shifts pay 15% less in fees.'); }
+    if (opt === 'release') { const n = Math.min(1, Math.floor(S.pop.e)); S.pop.e -= n; S.engCut = { n: 1, until: S.t + 24 * 3600e3 }; log(S, 'eng', `異動 ${n} engineer released; the post stays closed for 24 hours.`); }
+    p.st = 'done'; p.at = S.t; p.pick = opt; S.engLow = 0; trustAdd(govOf(save), 'ops', opt === 'release' ? -3 : 2);
+    return { ok: true };
+  });
+  return r.dup ? { ok: true, dup: true } : r;
+}
+export function engDossier(save, ctx) {
+  const S = save.sim, D = S.engD || {}, el = ctx.tier >= 2 && S.pop.e >= 1, NAMES = { employed: 'engineers employed', wage: 'wages', train: 'paid training', safety: 'high safety', hours: 'crunch hours', grid: 'repeated power deficits' };
+  const top = Object.entries(D).filter(([, v]) => v).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 2).map(([k, v]) => `${NAMES[k]} ${v > 0 ? '+' : ''}${v}`);
+  return { el, appr: S.fac.eng, target: (S.drivers || {}).eng, streak: S.engLow || 0, top, warn: el && S.fac.eng < PET.warn, pet: S.pet, maint: S.maint };
 }

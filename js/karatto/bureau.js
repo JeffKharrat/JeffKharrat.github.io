@@ -3,11 +3,11 @@
    draft from desk to desk, ask the chair for a hearing. The room is a picture with three layers (wall, people, the
    counter in front of them) everything said is Japanese first, with furigana and the
    English underneath. The logic is gov.js; this file only draws it and sends the player's actions there. */
-import { EVENTS, resolve, POL, FAC, capacity, LEDGER } from './sim.js?v=20';
-import * as gov from './gov.js?v=20';
-import { AUTH, STANCE, REPLY, SAY, need, mood } from './gov-arc.js?v=20';
-import { ICON } from './icons.js?v=20';
-import { leafSVG } from './leaf.js?v=20';
+import { EVENTS, resolve, POL, FAC, capacity, LEDGER, projBonus } from './sim.js?v=21';
+import * as gov from './gov.js?v=21';
+import { AUTH, STANCE, REPLY, SAY, need, mood } from './gov-arc.js?v=21';
+import { ICON } from './icons.js?v=21';
+import { leafSVG } from './leaf.js?v=21';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const yen = v => (v < 0 ? '−¥' : '¥') + Math.abs(Math.round(v)).toLocaleString();
@@ -51,6 +51,8 @@ const CSS = `
 #mg .bur .roster button { flex:1; background:rgba(5,6,8,.88); border:1px solid var(--line2); color:var(--ink); padding:4px 2px; cursor:pointer; font:500 11px var(--kj); }
 #mg .bur .roster button small { display:block; font:700 8px var(--mono); color:var(--mute); letter-spacing:.08em; }
 #mg .bur .roster button.sel, #mg .bur .roster button:hover { border-color:var(--y); }
+#mg .bur .next { position:absolute; left:318px; right:318px; top:8px; display:flex; gap:10px; align-items:center; padding:7px 10px; background:rgba(5,6,8,.92); border:1px solid var(--y); font:12px var(--mono); color:#E6E8EC; cursor:pointer; text-align:left; }
+#mg .bur .next b { color:#000; background:var(--y); padding:1px 6px; font:700 11px var(--jp, sans-serif); white-space:nowrap; } #mg .bur .next small { margin-left:auto; color:var(--mute); font:700 9px var(--mono); letter-spacing:.14em; white-space:nowrap; }
 #mg .bur .hint { position:absolute; left:250px; right:250px; bottom:52px; text-align:center; font:700 9px var(--mono); letter-spacing:.14em; color:#B8BCC6; text-shadow:0 1px 0 #000; }
 #mg .bur .lamp { position:absolute; width:10px; height:10px; border-radius:50%; background:var(--red); box-shadow:0 0 10px 3px rgba(255,59,48,.6); animation:bDot .8s steps(2) infinite; }
 #mg .bur .stamp { position:absolute; transform:rotate(-12deg); border:2px solid var(--red); color:var(--red); font:700 13px var(--kj); padding:1px 6px; background:rgba(0,0,0,.15); }
@@ -144,7 +146,7 @@ function room() {
   const ob = `<div class="pn" style="right:8px;top:8px;width:300px;height:176px"><div class="ph"><span><b>約束</b> OBLIGATIONS</span><span>ESCROW ${yen(esc0)}</span></div><div class="in" style="height:146px;overflow:auto">
     ${obl.map(p => `<div class="ob"><span><span class="kj">${esc(gov.CLAUSES[p.clause].j)}</span> <span class="lb">→ ${esc(gov.CAST[p.to].j)}</span></span><span class="${p.st === 'kept' ? 'k' : p.st === 'broken' ? 'x' : 'lb'}">${p.st === 'open' ? `DUE V${p.dueV}` : p.st === 'kept' ? '履行 KEPT' : p.cured ? '是正 CURED' : '違反 BROKEN'}</span></div>`).join('')}
     ${lots.map(l => `<div class="ob"><span><span class="kj">${esc(l.j || l.id)}</span> <span class="lb">${l.sent}/${l.qty} goods · ${esc(l.kind)}</span></span><span class="lb">HELD ${l.held}</span></div>`).join('')}
-    ${(S.proj || []).map(p => `<div class="ob"><span class="kj">${esc(p.label)}</span><span class="lb">+${Math.round(p.robot * 100)}% · ¥${p.upkeep}/H</span></div>`).join('')}
+    ${(S.proj || []).map(p => `<div class="ob"><span class="kj">${esc(p.label)}</span><span class="lb">+${Math.round(projBonus(p) * 1000) / 10}%${p.sup > 0 ? ` (SUPERVISED · ${p.sup} SHIFT${p.sup > 1 ? 'S' : ''} TO +${Math.round(p.robot * 100)}%)` : ''} · ¥${p.upkeep}/H</span></div>`).join('')}
     ${!obl.length && !lots.length && !(S.proj || []).length ? '<div class="lb" style="padding:6px 0">NO PROMISES ON RECORD YET</div>' : ''}
     <div class="lb" style="margin-top:6px">TRUST ${gov.SEATS.map(k => `${gov.CAST[k].j.split(' ')[0]} ${fmtT(g.trust[k])}`).join(' · ')}</div></div></div>`;
   /* the room's game-state signals: a stamped folder after a signature, the switchboard lamp in a grid emergency, freight queued in a hold */
@@ -152,9 +154,21 @@ function room() {
   const lamp = S.power < 0 || (S.hold && S.hold.until > S.t) ? '<div class="lamp" style="left:157px;top:476px" title="switchboard"></div>' : '';
   const fr = S.hold && S.hold.until > S.t ? `<div class="fr" style="left:1128px;top:452px" title="freight queued by the hold">${'<s></s>'.repeat(5)}</div>` : '';
   return `<div class="lay far"><img alt="The negotiations bureau: a records wall, the counter, a glass meeting room" src="bureau/room.webp" draggable="false"></div>
-    ${B.flash ? `<div class="flash${B.flash.r ? ' r' : ''}"><b>${esc(B.flash.j)}</b>${esc(B.flash.en)}</div>` : ''}<div class="cast">${reps}</div><div class="lay desk near"><img alt="" src="bureau/room.webp" draggable="false"></div>${plates}${stamp}${lamp}${fr}${inb}${ob}
+    ${B.flash ? `<div class="flash${B.flash.r ? ' r' : ''}"><b>${esc(B.flash.j)}</b>${esc(B.flash.en)}</div>` : ''}<div class="cast">${reps}</div><div class="lay desk near"><img alt="" src="bureau/room.webp" draggable="false"></div>${plates}${stamp}${lamp}${fr}${inb}${ob}${nextHTML(s, X)}
     <div class="hint">← → CHOOSE · ENTER TALK · H HEARING · 1–7 TABS</div>
     <div class="roster" role="list">${gov.ORDER.map((k, i) => `<button type="button" role="listitem" class="${B.sel === i ? 'sel' : ''}" data-r="${i}">${esc(gov.CAST[k].j)}<small>${esc(gov.roleOf(k, X.tier)[1].split(' ')[0])}</small></button>`).join('')}</div>`;
+}
+/* the entrance line: the next actionable step, with a shortcut */
+function nextHTML(s, X) {
+  const n = gov.nextAction(s, X); B.next = n;
+  const lab = { hear: 'H · HEARING', factory: 'FACTORY', study: 'STUDY', policy: 'POLICIES' }[n.go] || (gov.CAST[n.go] ? 'TALK · ' + gov.CAST[n.go].j.split(' ')[0] : '');
+  return `<button type="button" class="next" data-next="1"><b>${esc(n.jp)}</b><span>${esc(n.en)}</span>${lab ? `<small>${esc(lab)} →</small>` : ''}</button>`;
+}
+function goNext() {
+  const n = B.next; if (!n || !n.go) return;
+  if (n.go === 'hear') { B.sel = gov.ORDER.indexOf('chair'); openHear(); return; }
+  if (gov.CAST[n.go]) { openTalk(gov.ORDER.indexOf(n.go)); return; }
+  B.M.go && B.M.go(n.go);
 }
 const fmtT = t => (t > 0 ? '+' : '') + Math.round(t || 0);
 function repNews(k, I) { return I.routine.some(e => EVENTS[e.k].who === k) || (I.major && I.major.C.st === 'm1' && gov.CAST[k].seat && !I.major.C.said[k] && !(B.logs[k] || []).length); }
@@ -181,7 +195,7 @@ function acts(k) {
   out.push({ j: '権限', en: 'What can you do?', fn: () => { say(k, { jp: 'あなたの権限は何ですか。', en: 'What is your authority?' }, 'me'); say(k, AUTH[k]); } });
   if (draft) {
     const st = STANCE[draft.motion] && STANCE[draft.motion][k];
-    out.push({ j: '立場', en: `Your view on ${M.en.toLowerCase()}?`, fn: () => { say(k, { jp: `「${M.j}」についてどう思いますか。`, en: `What do you think of "${M.en}"?` }, 'me'); if (st) say(k, st[0]); const v = gov.seatScore(s, X, draft, k); if (gov.CAST[k].seat) say(k, SAY.vote[v.vote]); } });
+    out.push({ j: '立場', en: `Your view on ${M.en.toLowerCase()}?`, fn: () => { say(k, { jp: `「${M.j}」についてどう思いますか。`, en: `What do you think of "${M.en}"?` }, 'me'); if (st) say(k, st[0]); if (gov.CAST[k].seat) say(k, SAY.vote[gov.seatScore(s, X, draft, k).vote]); } });   // legal and audit: advice, no ballot
     if (st) out.push({ j: '異議', en: 'What would change your mind?', fn: () => { gov.ask(s, C.id, k); say(k, { jp: '何があれば賛成できますか。', en: 'What would it take for you to vote yes?' }, 'me'); say(k, st[1]); persist(); } });
     for (const id of M.clauses) { const K = gov.CLAUSES[id]; if (K.by !== k) continue;
       const c = draft.cl[id]; out.push({ j: '条件', en: `Discuss terms: ${K.en}${c ? ' · ' + ({ agreed: 'agreed', grudging: 'signed grudgingly', refused: 'refused', countered: 'a counter on the table' }[c.st]) : ''}`, full: true, fn: () => { B.talk.sub = { clause: id, terms: c ? { ...c.terms } : { ...(K.terms0 || {}) } }; } }); }
@@ -194,6 +208,9 @@ function acts(k) {
     const E = EVENTS[e.k];
     out.push({ j: '決裁', en: `${E.j} · ${E.en}`, y: true, full: true, fn: () => { say(k, SAY.routine); say(k, { jp: E.d.split('。')[0] + '。', en: E.d.split('。').slice(1).join('。').trim() }); B.talk.sub = { ev: e.id }; } });
   }
+  if (k === 'ops') for (const o of gov.petitionOpts(s)) out.push({ j: o.j, en: `請願 · ${o.en}: ${o.d}${o.ok ? '' : ' · ' + o.why}`, y: o.ok, full: true, dis: !o.ok, fn: () => {
+    say(k, { jp: o.j + 'でお[願|ねが]いします。', en: o.en + '.' }, 'me'); const r = gov.answerPetition(s, X, o.id, o.id + ':' + g.visit.n);
+    say(k, r.ok ? { jp: '[分|わ]かった。[技術者|ぎじゅつしゃ]に[伝|つた]える。', en: 'Understood. I\'ll tell the engineers.' } : { jp: 'それは[今|いま]できない。', en: r.why || 'Not possible now.' }); persist(); B.M.refresh && B.M.refresh(); } });
   if (gov.CAST[k].fac) out.push({ j: '資料', en: 'The dossier (approval and its drivers)', fn: () => dossier(k) });
   return out;
 }
@@ -230,6 +247,9 @@ function offerNow(k) {
 /* the dossier and the advisors' readings */
 function dossier(k) {
   const S = save().sim, f = gov.CAST[k].fac, v = S.fac[f], t = (S.drivers || {})[f];
+  if (f === 'eng') { const D = gov.engDossier(save(), ctx());
+    if (!D.el) { say(k, { jp: '技術者 · まだいない', en: ctx().tier < 2 ? 'Engineering workforce opens at N3. Until then Operations votes as a director.' : 'No engineer is employed yet: the engineers\' mandate and petition start with the first hire.' }, 'sys'); return; }
+    say(k, { jp: `${FAC.eng[0]} · ${Math.round(D.appr)} → ${Math.round(D.target)}`, en: `Engineer approval ${Math.round(D.appr)}, drifting toward ${Math.round(D.target)}. Largest drivers: ${D.top.join(', ') || 'none'}. ${D.streak ? `${D.streak}/12 hours under 35.` : ''}${D.warn ? ' Warning: under 40, a retention petition comes after twelve hours under 35.' : ''}${D.pet && D.pet.st === 'open' ? ' A petition is open: answer it here.' : ''}${D.maint && D.maint.left > 0 ? ` Maintenance window: ${D.maint.left} paid shift${D.maint.left === 1 ? '' : 's'} left.` : ''}` }, 'sys'); return; }
   const WHY = { union: 'wages, hours, safety, idle workers, training', board: 'hourly profit, dividends, debt, the directive', res: 'pollution, PR, surveillance, stability', eng: 'wages and work for engineers (N3+)' };
   say(k, { jp: `${FAC[f][0]} · ${Math.round(v)} → ${Math.round(t == null ? v : Math.max(0, Math.min(100, t)))}`, en: `${FAC[f][1]} approval ${Math.round(v)}, drifting toward ${Math.round(t == null ? v : t)}. Driven by ${WHY[f]}. Below 30: ${{ union: 'a strike notice', board: 'a locked policy', res: 'a protest', eng: 'they leave (later)' }[f]}.` }, 'sys');
 }
@@ -267,10 +287,12 @@ function hearView() {
     const ov = gov.overrideOK(s, X, draft);
     right = `<div class="pn" style="position:relative;clip-path:none"><div class="ph"><span><b>採決</b> THE VOTE · THREE YES TO PASS</span><span>${H0.res && H0.res.pass ? 'PASSED' : ''}</span></div><div class="in">
       ${gov.SEATS.map(k => { const v = T.seats[k]; return `<div class="seat"><img alt="" src="${IMG(k)}"><div><div class="kj" style="font-size:13px">${esc(gov.CAST[k].j)} <span class="lb">${esc(gov.roleOf(k, X.tier)[1])}</span></div><div class="pt">${v.parts.map(p => `<i>${p.v > 0 ? '+' : ''}${p.v}</i> ${esc(p.why[1])}`).join(' · ')} = <i>${v.v > 0 ? '+' : ''}${v.v}</i></div></div><div class="v ${VOTE[v.vote][2]}"><b>${VOTE[v.vote][0]}</b>${VOTE[v.vote][1]}</div></div>`; }).join('')}
+      ${snapHTML(s, X, draft)}
       <div class="tally"><span>YES</span>${T.yes}<span>NO</span>${T.no}<span>ABSTAIN</span>${T.abs}<span style="margin-left:auto;color:${T.pass ? 'var(--y)' : 'var(--red)'}">${T.pass ? 'WOULD PASS' : 'WOULD FAIL'}</span></div>
       <div class="lb">24H OPERATING ESTIMATE IF SIGNED (EVENTS AND QUARTER CLOSE NOT INCLUDED)</div>
       <div class="fcr"><div><span class="lb">NET / H</span><b>${yen(F.net)}</b><span class="lb">${dlt(F.net - F0.net, yen)}</span></div><div><span class="lb">POWER</span><b>${Math.round(F.power)} MW</b><span class="lb">${dlt(F.power - F0.power, v => Math.round(v) + ' MW')}</span></div><div><span class="lb">UNION</span><b>${Math.round(F.fac.union)}</b><span class="lb">${dlt(F.fac.union - F0.fac.union, v => v.toFixed(0))}</span></div><div><span class="lb">STABILITY</span><b>${F.s.stab}</b><span class="lb">${dlt(F.s.stab - F0.s.stab, v => v.toFixed(0))}</span></div></div>
-      <div class="lb">COMMITTED ON SIGNING ${yen(need)} · SPENDABLE ${yen(sp)} (FUNDS ${yen(s.corp.funds)} − RESERVE ${yen(gov.reserve(s))})</div>
+      ${handHTML(s, X, C, draft)}
+      <div class="lb">COMMITTED ON SIGNING ${yen(need + gov.crewFee(s, X, draft))} · SPENDABLE ${yen(sp)} (FUNDS ${yen(s.corp.funds)} − RESERVE ${yen(gov.reserve(s))})</div>
       ${bl.map(b => `<div class="blk">■ ${esc(b[0])} · ${esc(b[1])}</div>`).join('')}
       ${H0.res ? resultHTML(H0.res, C) : C.failV === G().visit.n ? resultHTML({ ok: true, pass: false, T: { yes: '·', no: '·', abs: '·' }, again: true }, C) : ''}
       <div style="margin-top:6px"><button type="button" class="go" data-submit="1" ${bl.length || (H0.res && H0.res.pass) ? 'disabled' : ''}>採決 · SUBMIT <span class="key" style="border-color:#000;color:#000">Enter</span></button>${gov.MOTIONS[draft.motion].override ? `<button type="button" class="go r" data-over="1" ${ov.ok && !(H0.res && H0.res.pass) && !T.pass ? '' : 'disabled'} title="${esc(ov.ok ? `Costs ${yen(ov.cost)} now, +12 暴走度, chair trust −10 and −5 from each dissenting seat; an oversight review at your next visit.` : ov.why)}">緊急権限 · OVERRIDE${ov.ok ? ' ' + yen(ov.cost) : ''}</button>` : ''}<button type="button" class="go g" data-room="1">戻る · BACK <span class="key">Esc</span></button>
@@ -285,6 +307,23 @@ function hearView() {
   }
   left += '</div></div>';
   return `<div class="hr"><div class="hl">${left}</div><div class="hs">${right}</div></div>`;
+}
+/* the mandate snapshot: approval as frozen when the meeting opened, beside today's when they differ */
+function snapHTML(s, X, draft) {
+  const sn = gov.approvalSnap(s, draft), rows = gov.SEATS.map(k => [k, gov.mandateOf(s, X, draft, k)]).filter(([, m]) => m.fac && !m.off && m.tag);
+  if (!rows.length) return '';
+  return `<div class="lb" style="margin:4px 0;text-transform:none;letter-spacing:.03em;line-height:1.5">MANDATE · approval frozen at the opening (≥65 backs a protected interest, <35 punishes an exposed one): ${rows.map(([k, m]) => `${esc(gov.CAST[k].j.split(' ')[0])} ${esc(m.name[1])} ${m.tag === 'p' ? 'protected' : 'exposed'} · ${Math.floor(m.appr * 10) / 10}${Math.abs(m.now - m.appr) >= .1 ? ` (now ${Math.floor(m.now * 10) / 10})` : ''} → ${m.v > 0 ? '+1' : m.v < 0 ? '−1' : '0'}`).join(' · ')}</div>`;
+}
+/* the full line's handover: who implements it, what it costs, when the bonus is whole; both routes' 24h net side by side */
+function handHTML(s, X, C, draft) {
+  const hv = gov.handoverOf(s, X, draft); if (!hv) return '';
+  const P = gov.price(C.ref), M = gov.MOTIONS[draft.motion], staged = draft.cl.stage && ['agreed', 'grudging'].includes(draft.cl.stage.st), b = M.proj.robot * (staged ? .5 : 1), pc = v => Math.round(v * 1000) / 10 + '%';
+  if (hv === 'staff') return `<div class="lb" style="margin:6px 0;text-transform:none;letter-spacing:.03em">HANDOVER · the union votes yes: its stewards staff the line. +${pc(b)} robot output from signing.</div>`;
+  const f = h => { const d = { ...draft, handover: h }; return gov.previewOf(s, X, d).net * 24; }, fs = f('sup'), fc = f('crew'), F0 = baseF().net * 24;
+  const opt = (id, j, en, d, n) => `<button type="button" class="mot${hv === id ? ' on' : ''}" data-hv="${id}"><b>${j}</b>${esc(en)}<small>${esc(d)} · next 24h ${dlt(n - F0, yen)} vs today</small></button>`;
+  return `<div class="lb" style="margin:6px 0 4px">HANDOVER · THE UNION ${draft && gov.seatScore(s, X, draft, 'union').vote === 'no' ? 'OPPOSES' : 'ABSTAINS'}: WHO COMMISSIONS THE LINE?</div>
+    ${opt('sup', '監督運転', 'Supervised start (default)', `No fee. +${pc(b * gov.SUP_X)} until two paid Factory shifts are done, then +${pc(b)}`, fs)}
+    ${opt('crew', '試運転班', `Hire a commissioning crew · ${P.y(2)}`, `+${pc(b)} at once; the fee is paid on signing and counts against the reserve`, fc)}`;
 }
 const dlt = (v, f) => (Math.abs(v) < .5 ? '±0' : (v > 0 ? '▲ ' : '▼ ') + f(Math.abs(v)));
 function baseF() { const s = save(), t = s.sim.t; if (!B.f0 || B.f0.t !== t) B.f0 = { t, v: (B.M.fc && B.M.fc.t === t && B.M.fc.v) || null }; if (!B.f0.v) { const M = B.M; B.f0.v = M.base ? M.base().v : null; } return B.f0.v || { net: 0, power: 0, fac: { union: 0 }, s: { stab: 0 } }; }
@@ -309,6 +348,8 @@ function wire() {
   q('[data-ctr]').forEach(x => x.onclick = () => { const a = x.dataset.ctr === '1', k = B.talk.seat; gov.answerCounter(save(), theCase().C.id, B.talk.sub.clause, a); say(k, { jp: a ? 'わかりました。[受|う]け[入|い]れます。' : 'それは[約束|やくそく]できません。', en: a ? 'Understood. I accept.' : 'I can\'t promise that.' }, 'me'); say(k, REPLY[B.talk.sub.clause][a ? 'agreed' : 'grudging'] || REPLY[B.talk.sub.clause].agreed); B.talk.sub.terms = { ...theCase().C.draft.cl[B.talk.sub.clause].terms }; persist(); draw(); });
   q('[data-drop]').forEach(x => x.onclick = () => { gov.dropClause(save(), theCase().C.id, B.talk.sub.clause); B.talk.sub = null; persist(); draw(); });
   q('[data-chk]').forEach(x => x.onclick = () => check(+x.dataset.chk));
+  q('[data-next]').forEach(x => x.onclick = goNext);
+  q('[data-hv]').forEach(x => x.onclick = () => { gov.setHandover(save(), theCase().C.id, x.dataset.hv); B.hear.res = null; persist(); draw(); });
   q('[data-mot]').forEach(x => x.onclick = () => { gov.setMotion(save(), theCase().C.id, x.dataset.mot); B.hear.res = null; persist(); draw(); });
   q('[data-submit]').forEach(x => x.onclick = () => submit(false));
   q('[data-over]').forEach(x => x.onclick = () => { if (confirm('Force the motion through with the emergency mandate? +12 暴走度, the chair\'s trust −10, an oversight review at your next visit.')) submit(true); });
@@ -334,7 +375,7 @@ function pickEv(i) {
 function check(n) { const m = theCase(); if (!m || B.hear.chk != null) return; B.hear.chk = B.hear.order[n] === 0; draw(); }
 function submit(override) {
   const m = theCase(); if (!m) return;
-  const r = gov.submit(save(), ctx(), m.C.id, B.hear.hid + (override ? ':o' : '') + ':' + (m.C.fails || 0) + ':' + m.C.draft.motion + ':' + Object.keys(m.C.draft.cl).join(','), { override });
+  const r = gov.submit(save(), ctx(), m.C.id, B.hear.hid + (override ? ':o' : '') + ':' + (m.C.fails || 0) + ':' + m.C.draft.motion + ':' + Object.keys(m.C.draft.cl).join(',') + ':' + (m.C.draft.handover || ''), { override });
   B.hear.res = r.dup ? { ok: true, pass: m.C.st !== 'm1' } : r; persist(); B.M.fc = null;
   if (r.pass) { B.flash = { j: r.override ? '緊急権限' : '可決', en: `${gov.MOTIONS[gov.caseOf(save(), m.C.id).acc.motion].en.toUpperCase()} · ${r.override ? 'FORCED BY THE AI' : `PASSED ${r.T.yes}–${r.T.no}–${r.T.abs}`} · SIGNED, ON THE RECORD` }; B.view = 'room'; }
   draw(); B.M.refresh && B.M.refresh();
@@ -382,7 +423,7 @@ export function demoArc(save, ctx, branch) {
   save.corp.funds = Math.max(save.corp.funds, 6000); gov.visit(save, ctx, Date.now()); gov.progress(save, ctx);
   const C = gov.caseOf(save, 'line'); if (!C) return;
   const next = () => { g.visit.day = null; gov.visit(save, ctx, Date.now()); };
-  if (branch === 'proxy') { g.cases.line = { id: 'line', st: 'done', outcome: 'demo' }; save.riv = undefined; import('./rivals.js?v=20').then(R => { const r = R.rivOf(save); r.r.kurogane.cores = 1; r.r.kurogane.grudge = 65; gov.progress(save, ctx); }); return; }
+  if (branch === 'proxy') { g.cases.line = { id: 'line', st: 'done', outcome: 'demo' }; save.riv = undefined; import('./rivals.js?v=21').then(R => { const r = R.rivOf(save); r.r.kurogane.cores = 1; r.r.kurogane.grudge = 65; gov.progress(save, ctx); }); return; }
   if (branch === 'stack') { g.cases.line = { id: 'line', st: 'done', outcome: 'demo' }; S.poll = 70; S.pHi = 14; gov.progress(save, ctx); return; }
   if (branch === 'm1') return;
   if (branch === 'rescue') { gov.submit(save, ctx, 'line', 'demo:fail'); return; }

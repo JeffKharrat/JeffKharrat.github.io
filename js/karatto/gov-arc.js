@@ -85,6 +85,25 @@ Object.assign(MOTIONS, {
       union: () => ({ v: 0, why: ['仕事が残れば', 'if the jobs stay'] }), civic: () => ({ v: 1, why: ['公開条件', 'public conditions'] }),
       ops: () => ({ v: 0, why: ['設備に使える', 'money for equipment'] }) } } });
 
+/* ---------------- mandates: what each motion exposes or protects, per group (the faction brief, Nov 28) ----------------
+   x: the motion exposes the group's tagged interest; p: the motion (or an agreed clause) protects it; absent: no tag.
+   has(id) is true only for an AGREED clause: a grudging one keeps its +1 at the table but protects nothing. */
+export const ISSUES = {
+  full: has => ({ union: has('retrain') ? 'p' : 'x', res: has('report') ? 'p' : 'x', eng: 'x', board: has('stage') ? 'p' : 'x' }),
+  pilot: has => ({ union: 'p', eng: 'p', board: has('stage') ? 'p' : 'x', ...(has('report') ? { res: 'p' } : {}) }),
+  defer: () => ({}),
+  retrofit: has => ({ eng: has('grid') ? 'p' : 'x', res: 'p' }),
+  cap: has => ({ board: has('premium') ? 'p' : 'x', res: 'p' }),
+  delay: has => ({ res: has('report') ? 'p' : 'x' }),
+  refuse: () => ({ res: 'p' }),
+  sell: () => ({ res: 'x' }),
+  finance: has => ({ board: has('covenant') ? 'p' : 'x' }) };
+/* the issue each group's mandate speaks for, per arc (for the hearing preview) */
+export const ISSUE_NAME = {
+  line: { union: ['雇用', 'jobs'], res: ['住民の監視', 'resident oversight'], eng: ['試運転の負担', 'commissioning load'], board: ['設備投資', 'capital exposure'] },
+  stack: { union: ['—', '—'], res: ['空気', 'clean air'], eng: ['試運転の負担', 'commissioning capacity'], board: ['利益率', 'margin'] },
+  proxy: { res: ['地元の支配', 'local control'], board: ['財務の独立', 'financial independence'] } };
+
 /* ---------------- clauses: at most two per proposal, one per sponsor ---------------- */
 export const CLAUSES = {
   inspect: { by: 'chair', j: '独立検査', en: 'Independent inspection', why: ['独立検査', 'independent inspection'], due: 3,

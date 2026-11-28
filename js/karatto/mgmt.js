@@ -1,13 +1,13 @@
 /* カラット: 経営, the management console in the core. Overview (the planet's numbers and their last three days),
    policies, factions, quarterly reports, the log. Also the briefing after time away, and the decisions (決裁).
    Marathon-style: black, hairlines, micro labels, the AI's yellow. */
-import { POL, FAC, GROUPS, EVENTS, LEDGER, resolve, setPolicy, dirProgress, capacity, forecast } from './sim.js?v=20';
-import { bureau, bureauKey, bureauClose } from './bureau.js?v=20';
-import { inbox, contracted, spendable, reserve, govOf } from './gov.js?v=20';
-import { RIVALS, IDS, rivOf, defOf, costs, fwCost, buyFirewall, ACTS } from './rivals.js?v=20';
-import { ICON } from './icons.js?v=20';
-import { createDiorama } from './diorama.js?v=20';
-import { leafSVG } from './leaf.js?v=20';
+import { POL, FAC, GROUPS, EVENTS, LEDGER, resolve, setPolicy, dirProgress, capacity, forecast } from './sim.js?v=21';
+import { bureau, bureauKey, bureauClose } from './bureau.js?v=21';
+import { inbox, contracted, spendable, reserve, govOf } from './gov.js?v=21';
+import { RIVALS, IDS, rivOf, defOf, costs, fwCost, buyFirewall, ACTS } from './rivals.js?v=21';
+import { ICON } from './icons.js?v=21';
+import { createDiorama } from './diorama.js?v=21';
+import { leafSVG } from './leaf.js?v=21';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const yen = v => (v < 0 ? '−¥' : '¥') + Math.abs(Math.round(v)).toLocaleString();
@@ -119,7 +119,7 @@ const delta = (hist, k) => { const a = hist[Math.max(0, hist.length - 25)], b = 
 let M = null;
 export function openMgmt(c) {
   /* c: { save, ctx(), persist(), onClose(), tab } */
-  css(); const root = el('mg'); M = { c, root, tab: c.tab || 'over', base: () => base(), refresh: () => M && render() };
+  css(); const root = el('mg'); M = { c, root, tab: c.tab || 'over', base: () => base(), refresh: () => M && render(), go: t => { if (!M) return; if (t === 'policy') { M.tab = 'pol'; render(); } else if (t === 'factory') { location.href = 'factory/'; } else if (t === 'study') { closeMgmt(); const b = document.getElementById('b-audit'); b && b.click(); } } };
   root.innerHTML = `<div class="stg"><div class="top">${leafSVG(30)}<span class="tag">MGT-01</span><span class="ttl">経営</span><span class="lb">紅葉重工</span><div class="tabs"></div><span class="clock" id="mg-ck"></span><button class="x" type="button" id="mg-x">閉じる · CLOSE <span class="key">Esc</span></button></div><div class="body"></div></div>`;
   root.querySelector('#mg-x').onclick = closeMgmt; root.classList.add('on'); fit(root);
   addEventListener('keydown', mkeys, true); addEventListener('resize', mfit);
@@ -262,7 +262,7 @@ function riv() {
     <div class="mgp" style="left:0;top:452px;width:1240px;height:182px;overflow:auto"><div class="ph"><span><b>LOG</b> 敵対記録 · RAIDS AND ANSWERS</span></div><div class="in">${R.log.slice().reverse().map(l => `<div class="lg"><span>${new Date(l.t).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span><span>${esc(l.txt)}</span></div>`).join('') || '<p class="lb">NO CONTACT YET. THE FIRST MOVE IS YOURS.</p>'}</div></div>`;
 }
 function wireRiv(B) {
-  B.querySelectorAll('[data-hack]').forEach(b => b.onclick = () => { const q = new URLSearchParams(location.search); M.c.persist(); location.href = `hack/?target=${b.dataset.hack}${q.has('embed') ? '&embed=1' : ''}${q.has('demo') ? '&demo' : ''}&v=20`; });
+  B.querySelectorAll('[data-hack]').forEach(b => b.onclick = () => { const q = new URLSearchParams(location.search); M.c.persist(); location.href = `hack/?target=${b.dataset.hack}${q.has('embed') ? '&embed=1' : ''}${q.has('demo') ? '&demo' : ''}&v=21`; });
   const f = B.querySelector('[data-fw]'); if (f) f.onclick = () => { if (buyFirewall(M.c.save, M.c.ctx(), spendable(M.c.save))) { M.c.persist(); render(); } };
 }
 function log() {

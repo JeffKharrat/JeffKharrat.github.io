@@ -61,7 +61,9 @@ export const available = S => Math.max(0, S.goods - FLOOR - reserved(S));
 /* ---------------- what knowledge gives the company ---------------- */
 /* ctx from the core: { mem: words in memory, acq: kanji acquired, tier: -1..4, div: divisions held, up: factory upgrades (count),
    fu: { conv, qc, ext } each upgrade's own effect, fame, tech } */
-export const projX = S => (S.proj || []).reduce((m, p) => m * (1 + (p.robot || 0)), 1);
+/* a project's robot bonus as it runs: a supervised handover runs at supX of the signed bonus until its paid shifts are done */
+export const projBonus = p => (p.robot || 0) * (p.sup > 0 ? (p.supX || .75) : 1);
+export const projX = S => (S.proj || []).reduce((m, p) => m * (1 + projBonus(p)), 1);
 export function capacity(S, ctx) {
   const strike = S.strike > S.t, fu = ctx.fu || {};
   const robots = Math.floor(ctx.mem * .6 * (ctx.tech && ctx.tech.auto1 ? 1.15 : 1) * projX(S));
@@ -69,7 +71,7 @@ export function capacity(S, ctx) {
   /* a strike stops the work and the outbound dispatch; the jobs are still there when it ends */
   const pj = (S.proj || []).reduce((n, p) => n + (p.jobs || 0), 0);      // protected maintenance posts from signed agreements
   const jobsF = 140 + (fu.ext ? 50 : 0) + (ctx.fu ? 0 : 50 * (ctx.up || 0)), jobsW = Math.max(0, Math.max(20, jobsF - robots * .25) + pj);
-  const jobsC = 40 + 12 * ctx.div + Math.floor(ctx.mem * .05), jobsE = ctx.tier >= 2 ? 20 + 5 * ctx.div : 0;
+  const jobsC = 40 + 12 * ctx.div + Math.floor(ctx.mem * .05), jobsE = ctx.tier >= 2 ? Math.max(0, 20 + 5 * ctx.div - (S.engCut && S.engCut.until > S.t ? S.engCut.n : 0)) : 0;   // released engineers: one post fewer for a day
   return { robots, housing, jobsW, jobsC, jobsE, strike };
 }
 
@@ -126,9 +128,14 @@ function tick(S, corp, ctx, live) {
     union: 50 + [-15, 0, 12][P.wage] + [0, -10, -25][P.hours] + [-10, 0, 6][P.safety] - u * 50 + (P.train ? 6 : 0),
     board: 50 + clamp(profit * .6, -25, 25) + [-15, 0, 12][P.div] - (S.debt > 0 ? 10 : 0),
     res: 55 - S.poll * .5 + [0, 8][P.pr] - [0, 10, 25][P.watch] + (S.stab - 50) * .3,
-    eng: 50 + (pop.e > 0 ? 5 : 0) + [-8, 0, 6][P.wage] };
+    eng: 50 };
+  /* the engineers (the faction brief): wages and work as before, plus training, safety, crunch and a grid that keeps failing */
+  S.pdef = (S.pdef || []).concat([S.power < 0 ? 1 : 0]).slice(-12);            // the last 12 hourly power samples
+  const ED = { employed: pop.e > 0 ? 5 : 0, wage: [-8, 0, 6][P.wage], train: P.train ? 10 : 0, safety: P.safety === 2 ? 6 : 0, hours: P.hours === 2 ? -16 : 0, grid: S.pdef.reduce((a, b) => a + b, 0) >= 6 ? -18 : 0 };
+  T.eng = clamp(50 + Object.values(ED).reduce((a, b) => a + b, 0), 10, 90); S.engD = ED;
   for (const k in F) F[k] = clamp(toward(F[k], T[k], .02), 0, 100);
   S.drivers = T;
+  retention(S, ctx);
   /* the AI's own resources. Away, ambient 暴走 from surveillance and crunch is capped between visits: idle hours never choose an ending */
   corp.data += ctx.mem * .002 + [0, .5, 1.2][P.watch];
   if (ctx.tier >= 2) corp.research = (corp.research || 0) + pop.e * .02;
@@ -155,6 +162,23 @@ function tick(S, corp, ctx, live) {
   if (!S.breach.open && S.breach.n < 2 && ctx.mem >= 10 && rnd(S.t, 7) < (S.stab < 45 ? .012 : .004) * (live ? 1 : 0)) { S.breach.open = { t: S.t, rival: rnd(S.t, 8) < .5 ? '黒鉄重工' : '白鷺HD' }; S.breach.n++; log(S, 'breach', `侵入警報 Breach alert: ${S.breach.open.rival}'s AI is attacking the memory. Defend it in 保安部 Security.`); }
   S.hist.push({ t: S.t, f: Math.round(corp.funds), s: +S.stab.toFixed(1), p: Math.round(total), g: Math.round(S.goods), o: +S.poll.toFixed(1), h: +S.happy.toFixed(1), x: S.share, w: +S.power.toFixed(1), e: +S.last.ess.toFixed(1), n: +(R - K).toFixed(1) });
   if (S.hist.length > 168) S.hist.shift();
+}
+/* the retention petition: 12 consecutive eligible hours below 35 open one, with Operations. One outstanding petition or
+   maintenance agreement at a time; it rearms only 48 simulated hours after its resolution AND after six consecutive
+   eligible hours at 45 or more since then. Nothing here decides for the player: a petition waits, through any time away. */
+export const PET = { low: 35, warn: 40, streak: 12, ok: 45, okH: 6, rearmH: 48 };
+function retention(S, ctx) {
+  const el = ctx.tier >= 2 && S.pop.e >= 1, a = S.fac.eng;
+  S.engLow = el && a < PET.low ? (S.engLow || 0) + 1 : 0;
+  S.engOK = el && a >= PET.ok ? (S.engOK || 0) + 1 : 0;
+  const P0 = S.pet;
+  if (P0 && P0.st === 'done' && S.engOK >= PET.okH) P0.okSeen = true;
+  const busy = (P0 && P0.st === 'open') || (S.maint && S.maint.left > 0);
+  const armed = !P0 || (P0.st === 'done' && S.t - P0.at >= PET.rearmH * H && P0.okSeen);
+  if (!busy && armed && S.engLow >= PET.streak) {
+    S.pet = { st: 'open', t: S.t, ref: refRate(S, ctx), id: 'pet:' + S.t, appr: a };
+    log(S, 'eng', '請願 The engineers petition Operations for retention: approval under 35 for twelve hours. Answer them in the bureau.');
+  }
 }
 /* reserved lots fill from the stock above the household floor, up to what each still needs */
 function fillLots(S) {
@@ -277,6 +301,12 @@ export function setPolicy(save, k, v) {
   if (S.locks && S.locks[k] != null && S.locks[k] !== v) return false;      // a policy locked by a signed agreement
   S.pol[k] = v; log(S, 'policy', `社則 ${POL[k].j} → ${POL[k].o[v][0]} (${POL[k].o[v][1]})`); return true;
 }
+/* prices in reference hours: the rate is snapshotted when a case or a petition opens, inside the tier's band; never the wallet */
+const REF = { '-1': [20, 40], 0: [60, 150], 1: [120, 300], 2: [250, 600], 3: [400, 1000], 4: [600, 1500] };
+export function refRate(S, ctx) {
+  const [lo, hi] = REF[Math.max(-1, Math.min(4, ctx.tier))], v = (S.hist || []).slice(-24).map(h => h.n).filter(n => n > 0).sort((a, b) => a - b);
+  return Math.round(clamp(Math.max(lo, v.length >= 12 ? v[v.length >> 1] : lo), lo, hi));
+}
 /* the median of the essential hourly costs over the last day: the reserve and the reference for prices (gov.js) */
 export function essentials(S) { const v = (S.hist || []).slice(-24).map(x => x.e).filter(x => x != null).sort((a, b) => a - b); return v.length ? v[v.length >> 1] : S.last ? S.last.ess : 30; }
 
@@ -309,6 +339,11 @@ export function addShift(save, ship, answers, yen = 0) {
   if (S.shipCap && ship > S.shipCap) { S.capBr = (S.capBr || 0) + 1; log(S, 'gov', `公表上限違反 A Factory shift shipped ${ship}, over the published cap of ${S.shipCap}.`); }
   /* a shipment run; while funded training places are open (a signed agreement), each run trains one displaced worker into a funded role */
   if (ship >= RUN) { S.runs++; if ((S.trainSlots || 0) > 0 && S.pop.w >= 1) { S.trainSlots--; S.retr++; S.pop.w -= 1; S.pop.c += 1; log(S, 'gov', `研修 One displaced worker moved into a funded role (${S.trainSlots} training places left).`); } } save.corp.data += answers;
+  /* a maintenance window (the retention answer): the next two paid shifts pay 15% less in fees, then the engineers +12, once */
+  if (yen > 0 && S.maint && S.maint.left > 0) { const cut = Math.round(yen * S.maint.cut); yen -= cut; S.maint.left--; log(S, 'eng', `整備時間 Maintenance window: ¥${cut.toLocaleString()} of the shift fee goes to the crew's time (${S.maint.left} shift${S.maint.left === 1 ? '' : 's'} left).`);
+    if (!S.maint.left) { S.fac.eng = clamp(S.fac.eng + 12, 0, 100); log(S, 'eng', '整備完了 The maintenance window is done: engineers +12.'); } }
   if (yen) book(S, save.corp, 'shift', yen);
+  /* a paid Factory shift (each settles once: the caller's once()) brings a supervised handover one step closer to full output */
+  if (yen > 0) for (const p of S.proj || []) if (p.sup > 0) { p.sup--; if (!p.sup) log(S, 'gov', `引継ぎ完了 Handover complete: ${p.label} runs at its full +${Math.round(p.robot * 100)}%.`); }
   log(S, 'factory', `大工場 shift: ${ship} shipped, +${ship * 8} goods, +${answers} data${yen ? `, ¥${yen.toLocaleString()} in fees` : ''}.`);
 }

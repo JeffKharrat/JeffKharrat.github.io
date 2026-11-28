@@ -1,5 +1,5 @@
 const R = new URL('../../js/karatto/', import.meta.url).href;
-const sim = await import(R + 'sim.js?v=8'), gov = await import(R + 'gov.js?v=8');
+const sim = await import(R + 'sim.js?v=21'), gov = await import(R + 'gov.js?v=21');
 const H = 3600e3, D = 24 * H, MON = Date.UTC(2026, 10, 23) - 5 * H;
 const TIERS = { founding: { mem: 0, tier: -1, div: 0, fame: 0 }, N5: { mem: 150, tier: 0, div: 2, fame: 1900 }, N3: { mem: 900, tier: 2, div: 10, fame: 11600 }, N2: { mem: 1800, tier: 3, div: 16, fame: 30000 } };
 const med = a => { const b = a.slice().sort((x, y) => x - y); return b.length ? b[b.length >> 1] : 0; };
