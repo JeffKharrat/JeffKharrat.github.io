@@ -92,7 +92,8 @@ function tick(S, corp, ctx, live) {
   if (P.train && idle > 1 && pop.c < C.jobsC) { retrained = Math.min(idle * .01, C.jobsC - pop.c); pop.w -= retrained; pop.c += retrained; S.retr += retrained; }
   /* power, production, goods */
   const boost = S.boost && S.boost.until > S.t ? S.boost.mw : 0, pmw = (S.proj || []).reduce((n, p) => n + (p.mw || 0), 0);
-  const demand = work * .12 * hm + C.robots * .08 + total * .06 + pmw, supply = Math.max(10, 90 + (ctx.tier >= 1 ? 60 : 0) + boost - (S.sab && S.sab.until > S.t ? S.sab.mw : 0));
+  const demand = work * .12 * hm + C.robots * .08 + total * .06 + pmw, supply = Math.max(10, 90 + (ctx.tier >= 1 ? 60 : 0) + boost + (S.standby && S.standby.left > 0 ? S.standby.mw : 0) - (S.sab && S.sab.until > S.t ? S.sab.mw : 0));
+  if (S.standby && S.standby.left > 0) S.standby.left--;                      // grid standby: counted in simulated ticks, never in wall time
   S.power = supply - demand; const brown = S.power < 0 ? clamp(supply / demand, .5, 1) : 1;
   const PX = k => (S.proj || []).reduce((m, p) => m * (p[k] == null ? 1 : p[k]), 1);   // projects: production, pollution and price factors
   const prod = (work * .1 * hm + C.robots * .12 * (C.strike ? .85 : 1)) * brown * (fu.conv ? 1.08 : 1) * PX('prodX');

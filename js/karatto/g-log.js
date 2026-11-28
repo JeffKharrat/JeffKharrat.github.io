@@ -7,6 +7,7 @@
 import { game, panel, esc, clamp, ease, Y, RED, OK, sfx, $, overlap } from './game.js?v=21';
 import { available } from './sim.js?v=21';
 import { activeLot, sendLot } from './gov.js?v=21';
+import './treasury.js?v=21';                                                 // its delivery hook (community deliveries)
 import { RIVALS, LINES, rubyHTML, pickRival, matchResult, rivalDef } from './rivals.js?v=21';
 
 const COLS = [400, 640, 880], ROWS = [150, 310, 470], VX = [520, 520, 760], DEP = { x: 640, y: 616 };

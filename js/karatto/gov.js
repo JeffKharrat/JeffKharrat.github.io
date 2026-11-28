@@ -101,12 +101,13 @@ export function sendLot(save, lotId, n, rid) {
   return once(save, 'lot:' + lotId + ':' + rid, () => {
     const S = save.sim, l = S.lots.find(x => x.id === lotId); if (!l || l.done || l.off) return { sent: 0 };
     if (S.hold && S.hold.until > S.t && l.kind === 'commercial') return { sent: 0, held: true };
-    const k = Math.min(n, Math.floor(l.held / l.units), Math.ceil((l.qty - l.sent) / l.units)), g = Math.min(k * l.units, l.qty - l.sent);
+    const k = Math.min(n, Math.floor(l.held / l.units), Math.ceil((l.qty - l.sent) / l.units), l.perShift ? Math.floor(l.perShift / l.units) : Infinity), g = Math.min(k * l.units, l.qty - l.sent);
     l.held -= g; l.sent += g; S.goods -= g;
-    if (l.sent >= l.qty) { l.done = true; l.held = 0; if (l.pay) once(save, 'lotpay:' + l.id, () => book(S, save.corp, 'orders', l.pay, `契約完了 Lot ${l.id} delivered in full: +¥${l.pay.toLocaleString()}.`)); }
+    if (l.sent >= l.qty) { l.done = true; l.held = 0; if (l.pay) once(save, 'lotpay:' + l.id, () => book(S, save.corp, 'orders', l.pay, `契約完了 Lot ${l.id} delivered in full: +¥${l.pay.toLocaleString()}.`)); for (const f of lotHooks) f(save, l); }
     return { sent: k, goods: g };
   });
 }
+export const lotHooks = [];                                                   // the treasury listens for completed deliveries
 export function releaseLot(save, lotId) { const S = save.sim, l = S.lots.find(x => x.id === lotId); if (!l || l.done) return 0; const g = l.held; l.held = 0; l.off = true; return g; }
 export const activeLot = S => (S.lots || []).find(l => !l.done && !l.off && (!S.hold || S.hold.until <= S.t || l.kind !== 'commercial'));
 

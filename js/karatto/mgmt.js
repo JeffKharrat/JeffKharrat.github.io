@@ -4,6 +4,7 @@
 import { POL, FAC, GROUPS, EVENTS, LEDGER, resolve, setPolicy, dirProgress, capacity, forecast } from './sim.js?v=21';
 import { bureau, bureauKey, bureauClose } from './bureau.js?v=21';
 import { inbox, contracted, spendable, reserve, govOf } from './gov.js?v=21';
+import * as TR from './treasury.js?v=21';
 import { RIVALS, IDS, rivOf, defOf, costs, fwCost, buyFirewall, ACTS } from './rivals.js?v=21';
 import { ICON } from './icons.js?v=21';
 import { createDiorama } from './diorama.js?v=21';
@@ -29,7 +30,7 @@ const CSS = `
 #mg .tag { background:var(--y); color:#000; font:700 10px var(--mono); letter-spacing:.12em; padding:3px 6px; }
 #mg .ttl { font:600 19px var(--kj); }
 #mg .tabs { display:flex; margin-left:10px; border:1px solid var(--line2); }
-#mg .tab { background:transparent; border:0; border-right:1px solid var(--line2); color:var(--mute); padding:7px 9px; font:700 10px var(--mono); letter-spacing:.12em; cursor:pointer; }
+#mg .tab { background:transparent; border:0; border-right:1px solid var(--line2); color:var(--mute); padding:7px 7px; font:700 10px var(--mono); letter-spacing:.06em; cursor:pointer; }
 #mg .tab:last-child { border-right:0; } #mg .tab b { font:600 14px var(--kj); color:var(--ink); margin-right:7px; letter-spacing:0; }
 #mg .tab.on { background:var(--y); color:#000; } #mg .tab.on b { color:#000; }
 #mg .tab i { font-style:normal; margin-left:7px; background:var(--red); color:#fff; padding:0 5px; }
@@ -131,8 +132,8 @@ export const mgmtOpen = () => !!M;
 export function refreshMgmt() { if (M) render(); }
 function mkeys(e) { const mm = document.getElementById('mgm'); if (!M || (mm && mm.classList.contains('on'))) return; e.stopImmediatePropagation();
   if (M.tab === 'fac' && !(e.target && e.target.tagName === 'INPUT') && bureauKey(e)) { e.preventDefault(); return; }
-  if (e.key === 'Escape') { e.preventDefault(); closeMgmt(); } const n = ['1', '2', '3', '4', '5', '6', '7'].indexOf(e.key); if (n >= 0) { M.tab = TABS[n][0]; render(); } }
-const TABS = [['over', '概要', 'Overview'], ['live', '現場', 'Live'], ['pol', '社則', 'Policies'], ['fac', '派閥', 'Factions'], ['rep', '決算', 'Reports'], ['riv', '敵対', 'Rivals'], ['log', '記録', 'Log']];
+  if (e.key === 'Escape') { e.preventDefault(); closeMgmt(); } const n = ['1', '2', '3', '4', '5', '6', '7', '8'].indexOf(e.key); if (n >= 0) { M.tab = TABS[n][0]; render(); } }
+const TABS = [['over', '概要', 'Overview'], ['live', '現場', 'Live'], ['pol', '社則', 'Policies'], ['fac', '派閥', 'Factions'], ['rep', '決算', 'Reports'], ['riv', '敵対', 'Rivals'], ['log', '記録', 'Log'], ['tre', '財務', 'Treasury']];
 function render() {
   const { save } = M.c, S = save.sim;
   const I = inbox(save, M.c.ctx()), nI = (I.major ? 1 : 0) + I.routine.length;
@@ -141,8 +142,9 @@ function render() {
   M.root.querySelector('#mg-ck').textContent = `Q${S.q.n} · ${new Date(S.t).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
   const B = M.root.querySelector('.body');
   if (M.tab === 'fac') { dioStop(); B.innerHTML = '<div class="bur-host" style="position:absolute;inset:0"></div>'; bureau(B.querySelector('.bur-host'), M); return; }
-  B.innerHTML = { over, live, pol, rep, riv, log }[M.tab]();
+  B.innerHTML = { over, live, pol, rep, riv, log, tre }[M.tab]();
   if (M.tab === 'riv') wireRiv(B);
+  if (M.tab === 'tre') wireTre(B);
   if (M.tab === 'over') { const c = B.querySelector('canvas.dio'); dioStart(c, { x: 0, y: 236, w: 1240, h: 170 }); c.onclick = () => { M.tab = 'live'; render(); }; }
   else if (M.tab === 'live') dioStart(B.querySelector('canvas.live'), { x: 0, y: 0, w: 1240, h: 634 }); else dioStop();
   if (M.tab === 'pol') B.querySelectorAll('[data-p]').forEach(b => {
@@ -264,6 +266,38 @@ function riv() {
 function wireRiv(B) {
   B.querySelectorAll('[data-hack]').forEach(b => b.onclick = () => { const q = new URLSearchParams(location.search); M.c.persist(); location.href = `hack/?target=${b.dataset.hack}${q.has('embed') ? '&embed=1' : ''}${q.has('demo') ? '&demo' : ''}&v=21`; });
   const f = B.querySelector('[data-fw]'); if (f) f.onclick = () => { if (buyFirewall(M.c.save, M.c.ctx(), spendable(M.c.save))) { M.c.persist(); render(); } };
+}
+/* ================= 財務 · the treasury: today, this quarter, money already promised ================= */
+let TO = { calib: false, manifest: false };
+function tre() {
+  const { save, ctx } = M.c, S = save.sim, X = ctx(); TR.tickTreasury(save);
+  const T = TR.trOf(save), O = TR.options(save, X), P = TR.quote(save, X), pr = TR.promised(save), c = T.com, sp = pr.spend;
+  const card = (k, x) => { const C = TR.COM[k], o = O[k], v = TR.preview(save, X, k, TO), on = c && c.k === k;
+    const opt = k === 'standby' ? `<label class="lb" style="display:block;margin:6px 0;${o.calibOK ? '' : 'opacity:.4'}"><input type="checkbox" data-to="calib" ${TO.calib ? 'checked' : ''} ${o.calibOK ? '' : 'disabled'}> CALIBRATE · 20 RESEARCH → 12 MW (${Math.floor(save.corp.research || 0)} HELD)</label>`
+      : `<label class="lb" style="display:block;margin:6px 0;${o.manifestOK ? '' : 'opacity:.4'}"><input type="checkbox" data-to="manifest" ${TO.manifest ? 'checked' : ''} ${o.manifestOK ? '' : 'disabled'}> AUDITED MANIFEST · 30 DATA → ONE CLIP TOWARD THE OPEN PUBLIC-REPORT PLEDGE</label>${o.bonusUsed ? '<div class="lb" style="color:var(--red)">THE RESIDENTS\' BONUS WAS ALREADY GIVEN TODAY: NEXT ATTENDED DAY</div>' : ''}`;
+    const eff = k === 'standby' ? `Power ${Math.round(v.power0)} → ${Math.round(v.power)} MW · next 24h net ${v.net24 >= 0 ? '+' : '−'}${yen(Math.abs(v.net24))}${v.power0 >= 0 ? ' · the grid already has headroom: no extra output' : ''}${v.after != null ? ` · after expiry ${Math.round(v.after)} MW` : ''}`
+      : `Gives up about ${yen(v.forgone)} in sales at today's price, plus two Logistics shifts. Free stock now ${Math.floor(pr.free)} (floor ${pr.floor}, held ${Math.floor(pr.res)}).`;
+    return `<div class="pl" style="display:block;border:1px solid ${on ? 'var(--y)' : 'var(--line2)'};padding:10px;margin-bottom:10px"><div><b class="kj" style="font-size:16px">${C.j}</b> <span class="lb">${C.en} · ${yen(o.cost)}</span></div>
+      <p style="color:#B8BCC6;margin:6px 0;font-size:11px">${esc(C.d(P, TO))}</p><div class="lb" style="text-transform:none;letter-spacing:.03em">${esc(eff)}</div>${on ? '' : opt}
+      ${on ? `<div class="lb" style="color:var(--y);margin-top:6px">RUNNING · ${k === 'standby' ? `${S.standby ? S.standby.left : 0} SIMULATED HOURS LEFT` : (() => { const l = S.lots.find(z => z.id === c.id); return l ? `${l.sent}/40 DELIVERED · ${l.held} HELD · ${40 - l.sent - l.held} WAITING` : ''; })()}</div><button type="button" data-ret="1" style="margin-top:6px;background:transparent;color:var(--ink);border:1px solid var(--red);padding:6px 10px;font:700 10px var(--mono);cursor:pointer">RETIRE EARLY · ${k === 'standby' ? 'FORFEITS THE HOURS LEFT' : 'RELEASES HELD GOODS · HANDLING NOT REFUNDED · NO BONUS'}</button>`
+      : `<button type="button" data-com="${k}" ${o.ok ? '' : 'disabled'} style="width:100%;margin-top:4px;background:${o.ok ? 'var(--y)' : '#333'};color:#000;border:0;padding:9px;font:700 11px var(--mono);letter-spacing:.08em;cursor:${o.ok ? 'pointer' : 'not-allowed'}">SIGN · ${yen(o.cost)} · LEAVES ${yen(sp - o.cost)} SPENDABLE</button>${o.ok ? '' : `<div class="lb" style="margin-top:4px;text-transform:none">${esc(o.why)}</div>`}`}</div>`; };
+  const quarterOpen = TR.projectsOpen(save, X);
+  return `<div class="mgp" style="left:0;top:0;width:500px;height:634px;overflow:auto"><div class="ph"><span><b>今日</b> TODAY'S OPERATION · ONE COMMISSION AT A TIME</span><span>RATE ¥${T.quote.ref}/H · Q${T.quote.q}</span></div><div class="in">${card('standby')}${card('community')}
+      <div class="lb" style="text-transform:none;letter-spacing:.03em">Prices are reference hours at a rate frozen for the quarter; your balance never changes them. Nothing renews by itself.</div></div></div>
+    <div class="mgp" style="left:512px;top:0;width:330px;height:634px"><div class="ph"><span><b>今期</b> THIS QUARTER'S PROJECT</span><span>${quarterOpen ? 'OPEN' : 'LOCKED'}</span></div><div class="in">
+      <p style="color:#B8BCC6">${quarterOpen ? 'Capital projects (a municipal freight depot, an engineering test bay, a worker training annex) are being built into the next update. One at a time; each changes how an existing building operates.' : 'Opens after the first night-line review, or at N3. One capital project at a time: a depot, a test bay or a training annex.'}</p></div></div>
+    <div class="mgp" style="left:854px;top:0;width:386px;height:634px;overflow:auto"><div class="ph"><span><b>約束済</b> MONEY ALREADY PROMISED</span></div><div class="in">
+      <div class="pl"><span>資金 Gross funds</span><b>${yen(pr.funds)}</b></div><div class="pl"><span>予備 Reserve</span><b>− ${yen(pr.reserve)}</b></div><div class="pl"><span>使用可 Spendable</span><b style="color:var(--y)">${yen(sp)}</b></div>
+      <div class="lb" style="margin:10px 0 4px">ESCROW ${yen(pr.escrow)}</div>${pr.lines.map(l => `<div class="pl"><span style="font-size:11px">${esc(l.why)}</span><b>${yen(l.amt)}</b></div>`).join('') || '<div class="lb">NONE</div>'}
+      <div class="lb" style="margin:10px 0 4px">GOODS EARMARKED (REQUIRED · HELD · DELIVERED)</div>${pr.lots.map(l => `<div class="pl"><span class="kj" style="font-size:12px">${esc(l.j || l.id)}</span><b>${l.need} · ${l.held} · ${l.sent}</b></div>`).join('') || '<div class="lb">NONE</div>'}
+      <div class="lb" style="margin:10px 0 4px">RECURRING</div><div class="pl"><span>Project upkeep</span><b>${yen(pr.upkeep)}/h</b></div>
+      <div class="lb" style="margin:10px 0 4px">RECENT COMMISSIONS</div>${T.done.slice(-5).reverse().map(d => `<div class="pl"><span>${esc(TR.COM[d.k].en)}</span><b class="lb">${d.how.toUpperCase()}</b></div>`).join('') || '<div class="lb">NONE YET</div>'}</div></div>`;
+}
+function wireTre(B) {
+  const { save, ctx } = M.c;
+  B.querySelectorAll('[data-to]').forEach(x => x.onchange = () => { TO[x.dataset.to] = x.checked; render(); });
+  B.querySelectorAll('[data-com]').forEach(x => x.onclick = () => { const k = x.dataset.com, r = TR.sign(save, ctx(), k, k === 'standby' ? { calib: TO.calib } : { manifest: TO.manifest }, k + ':' + save.sim.t + ':' + (TR.trOf(save).done.length)); if (!r.ok) alert(r.why); M.c.persist(); M.fc = null; render(); });
+  B.querySelectorAll('[data-ret]').forEach(x => x.onclick = () => { if (confirm('Retire this commission early? Unused benefits are forfeited; handling already paid is not refunded.')) { TR.retire(save); M.c.persist(); render(); } });
 }
 function log() {
   const S = M.c.save.sim;

@@ -414,7 +414,7 @@ function pledgeOK(save, ctx, p) {
   const S = save.sim, b = p.base;
   if (p.clause === 'inspect') return S.runs - b.runs >= 6;
   if (p.clause === 'retrain') return S.retr - b.retr >= p.terms.places;
-  if (p.clause === 'report') return S.aired - b.aired >= 1 || ctx.tier < 2;
+  if (p.clause === 'report') return S.aired - b.aired + (p.clip || 0) >= 1 || ctx.tier < 2;   // clip: an audited delivery manifest (treasury)
   return true;
 }
 const partial = (S, p) => p.clause === 'retrain' && S.retr - p.base.retr >= p.terms.places / 2;
@@ -422,7 +422,7 @@ function pledgeLine(S, p) {
   const b = p.base;
   if (p.clause === 'inspect') return `Inspection after six runs: ${Math.min(6, S.runs - b.runs)}/6`;
   if (p.clause === 'retrain') return `Workers moved into funded roles: ${Math.floor(S.retr - b.retr)}/${p.terms.places}`;
-  if (p.clause === 'report') return `Public report: ${S.aired - b.aired >= 1 ? 'aired' : 'not aired yet (Broadcast)'}`;
+  if (p.clause === 'report') return `Public report: ${S.aired - b.aired + (p.clip || 0) >= 1 ? (p.clip ? 'filed (delivery manifest)' : 'aired') : 'not aired yet (Broadcast)'}`;
   return 'Staged: automatic';
 }
 function settleAll(save, ctx, C, api) {
