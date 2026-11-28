@@ -2,16 +2,14 @@
    cavity wall is its memory, a keyboard of every JLPT kanji. Two views: the base view (the AI and the corporation's
    panels) and the wall view (on the gantry, looking around the wall). Clicking a key presses it and opens its file. */
 import * as THREE from '../vendor/three.module.min.js';
-import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=21';
-import * as store from './store.js?v=21';
-import { files, updateFlags } from './evidence.js?v=21';
-import { openAudit } from './audit.js?v=21';
-import { leafSVG, leafFavicon } from './leaf.js?v=21';
-import { mountLeafLogo } from './leaf-logo.js?v=21';
-import { advance, hourOf } from './sim.js?v=21';
-import { openMgmt, briefing, decide, mgmtOpen, refreshMgmt } from './mgmt.js?v=21';
-import './rivals.js?v=21';
-import { visit, progress as govProgress, inbox, govOf } from './gov.js?v=21';
+import { loadKanji, keyStates, progress, TIERS, LEVELS } from './model.js?v=23';
+import * as store from './store.js?v=23';
+import { files, updateFlags } from './evidence.js?v=23';
+import { openAudit } from './audit.js?v=23';
+import { leafSVG, leafFavicon } from './leaf.js?v=23';
+import { mountLeafLogo } from './leaf-logo.js?v=23';
+import { openMgmt, mgmtOpen } from './mgmt.js?v=23';
+import './rivals.js?v=23';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;   // embed: opened over the site from Tau Jeffy VI
@@ -20,7 +18,7 @@ const sm5 = t => { t = Math.min(1, Math.max(0, t)); return t * t * t * (t * (t *
 
 /* ---------------- renderer, scene ---------------- */
 const canvas = $('#k3');
-/* without WebGL the core still works in 2D: the panels, Management and the audit room are HTML; only the cavity is skipped */
+/* without WebGL the core still works in 2D: the panels, Factions and the audit room are HTML; only the cavity is skipped */
 let renderer, NO3D = false;
 try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); }
 catch (e) { NO3D = true; renderer = { setPixelRatio() {}, setSize() {}, render() {} }; document.body.classList.add('no3d'); }
@@ -437,7 +435,7 @@ function summary() {
   const div = {}; for (const v of Object.values(PROG.div)) (div[v.l] = div[v.l] || [])[v.d] = Math.round(v.a / v.n * 100) / 100;
   const counts = [0, 0, 0, 0, 0]; S.forEach(s => counts[s.lvl]++);
   if (DEMO) return;                                                       // the demo never speaks for the real save
-  try { localStorage.setItem('karatto.summary', JSON.stringify({ t: Date.now(), tier: PROG.tier, lev, div, counts, corp: SAVE.corp, ctx: SAVE.sim ? simCtx() : null })); } catch (e) {}
+  try { localStorage.setItem('karatto.summary', JSON.stringify({ t: Date.now(), tier: PROG.tier, lev, div, counts, corp: SAVE.corp, ctx: simCtx() })); } catch (e) {}
 }
 
 /* ---------------- the corporation's panels ---------------- */
@@ -452,14 +450,12 @@ function ui() {
   const fb = cur ? WALL.L.sections[LEVELS.indexOf(cur.l)].blocks[cur.d] : null;
   if (fb) VIEW.front = WALL.L.angle((fb.c0 + fb.c1) / 2, 0).t;
   $('#divn').textContent = cur ? 'N' + cur.l + ' division ' + (cur.d + 1) + ' · ' + Math.round(cur.a / cur.n * 100) + '%' : 'All divisions held';
-  const c = SAVE.corp, Sm = SAVE.sim; $('#r-funds').textContent = (c.funds < 0 ? '−¥' : '¥') + Math.abs(Math.round(c.funds)).toLocaleString(); $('#r-fame').textContent = fame.toLocaleString(); $('#r-data').textContent = Math.floor(c.data).toLocaleString(); $('#r-stab').textContent = Math.round(c.stability);
-  if (Sm) { $('#r-share').textContent = '¥' + Sm.share.toLocaleString(); $('#r-pop').textContent = Math.round(Sm.pop.w + Sm.pop.c + Sm.pop.e).toLocaleString(); }
-  const ne = Sm ? Sm.ev.length : 0; $('#b-mgmt').innerHTML = `経営${ne ? `<i>${ne}</i>` : ''}<small>Management${ne ? ' · ' + ne + ' decision' + (ne > 1 ? 's' : '') : ''}</small>`;
+  $('#r-fame').textContent = fame.toLocaleString(); $('#r-mem').textContent = cert.size.toLocaleString(); $('#r-keys').textContent = (counts[2] + counts[3] + counts[4]).toLocaleString();
   const deckN = (DECK || []).length;
   $('#dirs').innerHTML = (tier < 0 ? [
     `創業: found the corporation. Commit your first 100 words to memory (${cert.size}/100).`,
     `Hold the N5 board: 80% of its keys acquired (${lv[5] ? Math.round(lv[5].a / lv[5].n * 100) : 0}%).`,
-  ] : [`Advance the next division.`]).concat(Sm && Sm.dir ? [`取締役会: ${simDir()}`] : []).map(t => `<li>${t}</li>`).join('');
+  ] : [`Advance the next division.`]).map(t => `<li>${t}</li>`).join('');
   $('#mem').innerHTML = [`Deck: ${deckN} words${DEMO ? ' (demo)' : ''}`, `In memory: ${cert.size}`, `Keys: ${counts[2]} acquired · ${counts[3]} integrated · ${counts[4]} mastered`, `Uncharted keys: ${counts[0]}`].map(t => `<li>${t}</li>`).join('');
   $('#jump').innerHTML = WALL.L.sections.map((s, i) => { const L2 = lv[s.lv] || { a: 0, n: 1 }; return `<button class="btn" data-s="${i}">N${s.lv}<span class="tn"> ${TIERS[i].name}</span><i><s style="width:${Math.round(L2.a / L2.n * 100)}%"></s></i></button>`; }).join('');
   $('#jump').querySelectorAll('button').forEach(b => b.onclick = () => { const s = WALL.L.sections[+b.dataset.s]; VIEW.yaw = WALL.L.angle((s.c0 + Math.min(s.c1, s.c0 + 20)) / 2, 0).t; VIEW.pitch = 0; });
@@ -518,25 +514,16 @@ $('#b-audit').onclick = () => audit();
 /* ---------------- the living planet: the simulation, the console, briefings and decisions ---------------- */
 function fameOf() {
   const cert = certifiedSet(), counts = [0, 0, 0, 0, 0]; S.forEach(s => counts[s.lvl]++);
-  return cert.size * 10 + counts[2] * 5 + counts[3] * 15 + counts[4] * 40 + Math.round((SAVE.sim && SAVE.sim.fameB) || 0);
+  return cert.size * 10 + counts[2] * 5 + counts[3] * 15 + counts[4] * 40;
 }
 function simCtx() {
   const counts = [0, 0, 0, 0, 0], fc = SAVE.corp.factory || {}; S.forEach(s => counts[s.lvl]++);
   return { mem: certifiedSet().size, acq: counts[2] + counts[3] + counts[4], tier: PROG.tier, div: Object.values(PROG.div).filter(d => d.a / d.n >= .8).length, up: (fc.conv ? 1 : 0) + (fc.qc ? 1 : 0) + (fc.ext ? 1 : 0), fu: { conv: !!fc.conv, qc: !!fc.qc, ext: !!fc.ext }, fame: fameOf(), tech: SAVE.corp.tech || {} };
 }
-function simDir() { const d = SAVE.sim.dir; return { funds: `funds ¥${d.goal.toLocaleString()}`, stab: `stability ${d.goal}+`, ship: `ship ${d.goal} products`, mem: `${d.goal} words in memory`, poll: `pollution ≤ ${d.goal}` }[d.k] + ' this quarter'; }
-const busy = () => document.body.classList.contains('audit') || mgmtOpen() || (document.getElementById('mgm') || { classList: { contains: () => false } }).classList.contains('on');
-/* no pop-up chain: decisions wait at the counter in 派閥 (Factions); the core only points at them */
-function nextDecision() { if (!SAVE.sim || busy()) return; const I = inbox(SAVE, simCtx()); const n = (I.major ? 1 : 0) + I.routine.length; if (n && nextDecision.n !== n) { nextDecision.n = n; toast(`派閥 · ${I.major ? I.major.m.title[0] + ' and ' : ''}${I.routine.length} decision${I.routine.length === 1 ? '' : 's'} waiting at the counter (経営 → 派閥).`, 6000); } }
-function mgmt(tab) {
-  closeFile(); document.body.classList.add('audit');
-  visit(SAVE, simCtx()); persist();                                        // opening Management is an attended visit (once per day)
-  openMgmt({ save: SAVE, ctx: simCtx, persist, tab, demo: DEMO, onClose: () => { document.body.classList.remove('audit'); ui(); nextDecision(); } });
-}
+const busy = () => document.body.classList.contains('audit') || mgmtOpen();
+function mgmt() { closeFile(); document.body.classList.add('audit'); openMgmt({ onClose: () => { document.body.classList.remove('audit'); ui(); } }); }
 $('#b-mgmt').onclick = () => mgmt();
-/* every half minute: run the hours that have passed */
-setInterval(() => { if (!SAVE || !SAVE.sim || !PROG) return; if (hourOf(Date.now()) > SAVE.sim.t) { advance(SAVE, simCtx(), Date.now(), true); persist(); ui(); refreshMgmt(); nextDecision(); breachAlert(); } }, 30000);
-function breachAlert() { const b = SAVE.sim && SAVE.sim.breach && SAVE.sim.breach.open; if (b && breachAlert.t !== b.t) { breachAlert.t = b.t; toast(`侵入警報 BREACH · ${b.rival}'s AI is attacking the memory. Defend it in 保安部 (Security) on the surface.`, 9000); } }
+$('#b-hack').onclick = () => { persist(); location.href = `hack/?v=23${DEMO ? '&demo' : ''}${EMBED ? '&embed=1' : ''}`; };
 $('#b-wall').onclick = () => go('wall'); $('#b-base').onclick = () => go('base');
 
 /* ---------------- demo deck: for previews before Anki is connected ---------------- */
@@ -601,13 +588,9 @@ function bootLogo() {
   updateFlags(SAVE); if (!DEMO && DECK) persist();
   ANKI_OK = await store.ankiAvailable();
   applyState();
-  /* the hours since the last visit */
-  if (DEMO) advance(SAVE, simCtx(), Date.now() - 30 * 3600e3);
-  const sum = advance(SAVE, simCtx(), Date.now(), false); govProgress(SAVE, simCtx()); persist(); ui();
-  if (DEMO && QS.get('arc')) { const { demoArc } = await import('./bureau.js?v=21'); demoArc(SAVE, simCtx(), QS.get('arc')); }
-  if (sum.hours >= 2 && !QS.has('audit')) briefing(sum, nextDecision, inbox(SAVE, simCtx())); else nextDecision();
+  persist(); ui();
   if (!DECK && !DEMO) toast(ANKI_OK ? 'Anki found: open Settings to read your deck.' : 'No deck yet: open Anki, then Settings → Read the deck.', 6000);
   if (EMBED) parent.postMessage('karatto:ready', location.origin);
   if (QS.has('audit')) audit();
-  window.__k = { go, pressKey, audit, mgmt, ctx: () => simCtx(), no3d: NO3D, save: () => SAVE, advance: h => { advance(SAVE, simCtx(), Date.now() + h * 3600e3, true); ui(); refreshMgmt(); }, view: VIEW, state: () => ({ tier: PROG.tier, deck: (DECK || []).length }), yaw: (y, p, f) => { VIEW.yaw = y; VIEW.pitch = p || 0; if (f) VIEW.fov = f; }, sec: i => { const s = WALL.L.sections[i]; return WALL.L.angle(s.c0 + 8, 0).t; } };
+  window.__k = { go, pressKey, audit, mgmt, ctx: () => simCtx(), no3d: NO3D, save: () => SAVE, view: VIEW, state: () => ({ tier: PROG.tier, deck: (DECK || []).length }), yaw: (y, p, f) => { VIEW.yaw = y; VIEW.pitch = p || 0; if (f) VIEW.fov = f; }, sec: i => { const s = WALL.L.sections[i]; return WALL.L.angle(s.c0 + 8, 0).t; } };
 })();

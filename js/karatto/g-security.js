@@ -2,7 +2,7 @@
    you committed to memory (weighted toward old ones you rarely see): type its reading before the encryption bar
    fills. A word lost in a real breach becomes compromised until you prove it again in any game. Without a breach
    on the planet, the room runs drills (nothing is lost). Skill: reading, typed. */
-import { game, panel, typer, sameReading, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=21';
+import { game, panel, typer, sameReading, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=23';
 
 let TG = [], k = 0, enc = 0, fw = 100, T, real = false, rival = '', done = false, FX = [], RACK = [];
 const ENC = api => 7 * (api.tech.fire ? 1.3 : 1);
@@ -36,7 +36,7 @@ game({
   how: [['TARGET · 標的', '古い記憶から', 'Words you committed long ago and rarely see are attacked first.'], ['TYPE · 入力', '暗号化の前に', 'Romaji → kana. Seven seconds a key (Firewall tech: nine).'], ['FIREWALL · 防壁', '残り %', 'Each miss −6%. At zero the rest of the keys are lost.']],
   stats: [['防壁', 'FIREWALL', () => fw + '%'], ['防衛', 'HELD', () => TG.filter(t => t.st === 'held').length], ['喪失', 'LOST', () => TG.filter(t => t.st === 'lost').length]],
   goLabel: '防衛開始 · Defend',
-  notes(api) { const b = api.SAVE.sim && api.SAVE.sim.breach && api.SAVE.sim.breach.open; real = !!b && !api.preview; rival = b ? b.rival : '';
+  notes(api) { const b = null; real = !!b && !api.preview; rival = b ? b.rival : '';
     return real ? `<div class="note r"><b class="r">侵入警報 BREACH IN PROGRESS</b> · ${esc(rival)}'s AI is encrypting your memory. Words lost here become compromised.</div>` : '<div class="note">演習 DRILL · no breach on the planet right now. Nothing can be lost; the evidence still counts.</div>'; },
   clock: () => real ? 'BREACH' : 'DRILL',
   init(api) {
@@ -46,7 +46,7 @@ game({
     for (let i = 0; i < 2; i++) for (let j = 0; j < 30; j++) RACK.push({ x: i ? 1050 + (j % 3) * 70 : 30 + (j % 3) * 70, y: 66 + Math.floor(j / 3) * 22, p: Math.random() * 6 });
   },
   start(api) {
-    const b = api.SAVE.sim && api.SAVE.sim.breach && api.SAVE.sim.breach.open; real = !!b && !api.preview; rival = b ? b.rival : 'TRAINING AI';
+    const b = null; real = !!b && !api.preview; rival = b ? b.rival : 'TRAINING AI';
     if (!api.MEM.length && !api.LEARN.length) return;
     TG = targets(api); k = 0; fw = 100; done = false; FX = []; $('#g-log').innerHTML = ''; T.focus(); next(api);
     $('#p-atk').innerHTML = `<div class="lb">SOURCE</div><div class="kj" style="font-size:20px;color:${real ? 'var(--red)' : 'var(--y)'}">${esc(rival)}</div><div class="lb" style="margin-top:8px">${real ? 'REAL BREACH · LOSSES COMPROMISE WORDS' : 'DRILL · NOTHING CAN BE LOST'}</div><div class="lb" style="margin-top:8px">${TG.length} KEYS TARGETED</div>`;

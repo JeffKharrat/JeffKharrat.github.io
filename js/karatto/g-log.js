@@ -4,11 +4,8 @@
    A wrong shop is a misdelivery: the truck goes there and back for nothing, and that skill's evidence is wiped.
    A rival AI works the same district from its own depot at the top of the map: if its truck reaches a shop first, the
    order is theirs (横取り). The faster you read, the fewer they take. */
-import { game, panel, esc, clamp, ease, Y, RED, OK, sfx, $, overlap } from './game.js?v=21';
-import { available } from './sim.js?v=21';
-import { activeLot, sendLot } from './gov.js?v=21';
-import './treasury.js?v=21';                                                 // its delivery hook (community deliveries)
-import { RIVALS, LINES, rubyHTML, pickRival, matchResult, rivalDef } from './rivals.js?v=21';
+import { game, panel, esc, clamp, ease, Y, RED, OK, sfx, $, overlap } from './game.js?v=23';
+import { RIVALS, LINES, rubyHTML, pickRival, matchResult, rivalDef } from './rivals.js?v=23';
 
 const COLS = [400, 640, 880], ROWS = [150, 310, 470], VX = [520, 520, 760], DEP = { x: 640, y: 616 };
 const shopPos = n => ({ c: n % 3, r: 2 - Math.floor(n / 3) });                       // numpad: 1 2 3 bottom row, 7 8 9 top
@@ -44,7 +41,7 @@ function slips(api) {
   P.innerHTML = ORD.map((o, i) => { const left = Math.max(0, o.T - (api.t - o.born));
     return `<div class="slip${i === sel ? ' on' : ''}${o.seen ? '' : ' new'}" data-i="${i}"><div class="sh"><span>伝票 #${String(Math.floor(o.id * 9000 + 1000))}</span><span>${o.skill === 'reading' ? '読み READING' : '意味 MEANING'}</span></div>
       <div class="dest ${o.skill === 'reading' ? 'kj' : 'en'}">${esc(o.skill === 'reading' ? o.w.r : o.w.s)}</div>
-      <div class="sf"><span>¥${o.fee}</span><span class="tm"><s style="width:${left / o.T * 100}%"></s></span><span class="sec">${Math.ceil(left)}s</span></div></div>`; }).join('') || '<div class="m" style="padding:10px 4px">待機中 · waiting for orders</div>';
+      <div class="sf"><span>+${o.fee}</span><span class="tm"><s style="width:${left / o.T * 100}%"></s></span><span class="sec">${Math.ceil(left)}s</span></div></div>`; }).join('') || '<div class="m" style="padding:10px 4px">待機中 · waiting for orders</div>';
   ORD.forEach(o => o.seen = true);
   P.querySelectorAll('.slip').forEach(d => d.onclick = () => { sel = +d.dataset.i; slips(api); });
 }
@@ -73,9 +70,8 @@ game({
   skills: ['reading', 'recall'],
   lead: 'Order slips come in on the left: a destination given as a <b>reading</b> or a <b>meaning</b>, with a time window and a fee. Find the shop whose sign is that word and press its numpad key (or click it). A free truck takes the route. A wrong shop is a misdelivery: the trip is wasted and that skill\'s evidence for the word is wiped.',
   how: [['READING · 読み', '読み → 看板', 'The slip shows the reading: find the written word on the signs.'], ['MEANING · 意味', '意味 → 看板', 'The slip shows the meaning: find the word it names.'], ['FLEET · 車両', '三台の車', 'Three trucks. Tab switches slips; late deliveries pay half. The district is re-signed as you go.']],
-  stats: [['配達', 'DEL', () => st.del], ['誤配', 'MIS', () => st.mis], ['¥', '', a => a.G.yen.toLocaleString()]],
-  notes: api => { const S = api.SAVE.sim, L = S && S.v === 2 ? activeLot(S) : null, fr = S && S.v === 2 ? Math.floor(available(S) / 4) : 0;
-    return `<div class="note">${L ? `<b class="y">契約 ${esc(L.j || L.id)}</b> · ${Math.ceil((L.qty - L.sent) / L.units)} deliveries left on a ${L.kind} lot (${L.held} goods held${L.pay ? `, ¥${L.pay} on completion` : ''}). They go first. ` : ''}Warehouse: ${fr} freight loads free above the household floor${fr ? '' : ' (deliveries beyond them are training runs at a 40% service fee)'}.</div>`; },
+  stats: [['配達', 'DEL', () => st.del], ['誤配', 'MIS', () => st.mis], ['点', 'PTS', a => a.G.yen.toLocaleString()]],
+  notes: () => '<div class="note">Every delivery is freight: read the word, send the truck to the right shop.</div>',
   shop: [{ id: 'truck4', name: '四台目', en: 'A fourth truck', cost: 700, d: 'One more truck in the fleet.' }, { id: 'fast', name: '高速トラック', en: 'Faster trucks', cost: 600, d: 'Trucks drive a third faster.' }, { id: 'longer', name: 'シフト延長', en: 'Longer shift', cost: 500, d: 'Shifts run 4 minutes.' }],
   init(api) {
     const css = document.createElement('style'); css.textContent = `
@@ -100,8 +96,7 @@ game({
   start(api) {
     signAll(api); ORD = []; FX = []; sel = 0; spawnT = 1; st = { del: 0, mis: 0, late: 0, lot: 0, fr: 0, tr: 0 };
     /* the cargo for this shift: a contract lot that's held in the warehouse, then the free stock above the household floor */
-    const S = api.SAVE.sim, L = S && S.v === 2 && !api.preview ? activeLot(S) : null;
-    FR = { id: L ? L.id : null, name: L ? `${L.j || L.id} (${L.en || ''})` : '', lot: L ? Math.min(Math.floor((L.held || 0) / L.units), Math.ceil((L.qty - L.sent) / L.units)) : 0, stock: S && S.v === 2 && !api.preview ? Math.floor(available(S) / 4) : 0 };
+    FR = { id: null, name: '', lot: 0, stock: Infinity };
     RV = { k: pickRival(api.U.shifts), mine: 0, theirs: 0, trucks: [], said: {}, line: null };
     RV.a = .75 + rivalDef(api.SAVE, RV.k, api.summary && api.summary.ctx) * .07; rtalk(api, 'hello');
     TR = Array.from({ length: api.U.truck4 ? 4 : 3 }, (_, i) => ({ st: 'idle', i })); newOrder(api); fleet(api); $('#g-log').innerHTML = '';
@@ -139,10 +134,10 @@ game({
     if (e.key === 'Tab') { sel = ORD.length ? (sel + 1) % ORD.length : 0; slips(api); return true; }
   },
   end(api) {
-    return { title: st.del >= 10 ? '配送完了' : '業務終了', rows: [['delivered', st.del, 'y'], ['misdelivered', st.mis, st.mis ? 'r' : ''], [st.lot ? 'contract lot' : 'training runs', st.lot ? st.lot : st.tr]], effect: { delivered: st.del, freight: st.fr, lot: st.lot, training: st.tr, lotId: FR.id, rival: RV.k, mine: RV.mine, theirs: RV.theirs },
+    return { title: st.del >= 10 ? '配送完了' : '業務終了', rows: [['delivered', st.del, 'y'], ['misdelivered', st.mis, st.mis ? 'r' : ''], ['freight', st.fr]], effect: { delivered: st.del, freight: st.fr, lot: st.lot, training: st.tr, lotId: FR.id, rival: RV.k, mine: RV.mine, theirs: RV.theirs },
       extra: `<div class="note">競合 <b class="kj" style="color:${RIVALS[RV.k].col}">${RIVALS[RV.k].corp}</b> · you ${RV.mine} · them ${RV.theirs} · ${RV.mine > RV.theirs ? '<b class="y">the district is yours</b>' : '<b class="r">they took the district</b>'}<br><span class="kj">${rubyHTML(LINES[RV.k][RV.mine > RV.theirs ? 'lose' : 'win'].jp)}</span> <span class="m">${LINES[RV.k][RV.mine > RV.theirs ? 'lose' : 'win'].en}</span></div><div class="note">${st.lot ? `<b class="y">契約 ${st.lot} contract deliveries</b> against ${esc(FR.name)}. ` : ''}${st.fr} freight deliveries from the warehouse${st.tr ? `; ${st.tr} training runs (no stock to carry: a 40% service fee)` : ''}.</div>` };
   },
-  settle(api, res, rid) { if (res.effect.lot && FR.id) sendLot(api.SAVE, FR.id, res.effect.lot, rid); matchResult(api.SAVE, RV.k, RV.mine > RV.theirs, '物流 Logistics');
+  settle(api, res, rid) { matchResult(api.SAVE, RV.k, RV.mine > RV.theirs, '物流 Logistics');
   },
   draw(cx, t, dt, api) { scene(cx, t, api); }
 });
@@ -153,7 +148,7 @@ function arrive(api, t) {
     /* what the truck carried: a contract lot first, then freight from the warehouse, else a training run at a service fee */
     const kind = FR.lot > 0 ? 'lot' : FR.stock > 0 ? 'freight' : 'training'; if (kind === 'lot') { FR.lot--; st.lot++; } else if (kind === 'freight') { FR.stock--; st.fr++; } else st.tr++;
     const late = api.t - o.born > o.T, base = late ? Math.round(o.fee / 2) : o.fee, fee = Math.round(base * (o.rate || 1) * (kind === 'training' ? .4 : 1));
-    api.G.yen += fee; st.del++; FX.push({ k: 'pay', n: o.dest, t: 0, txt: '+¥' + fee }); sfx('coin'); api.log(o.w.w, (o.skill === 'reading' ? '読み ✓' : '意味 ✓') + ' · ' + { lot: '契約 LOT', freight: '貨物 FREIGHT', training: '訓練 TRAINING' }[kind], '+¥' + fee, kind === 'training' ? 'm' : 'y');
+    api.G.yen += fee; st.del++; FX.push({ k: 'pay', n: o.dest, t: 0, txt: '+' + fee }); sfx('coin'); api.log(o.w.w, (o.skill === 'reading' ? '読み ✓' : '意味 ✓') + ' · ' + { lot: '契約 LOT', freight: '貨物 FREIGHT', training: '訓練 TRAINING' }[kind], '+' + fee, kind === 'training' ? 'm' : 'y');
     if (Math.random() < .55) setTimeout(() => resign(api, o.dest), 700); }
   else { st.mis++; FX.push({ k: 'miss', n: o.dest, t: 0 }); }
   fleet(api);

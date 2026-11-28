@@ -2,7 +2,7 @@
    boilers and the turbine below, fuel rods rolling in on the conveyor, each one a word. Type the front rod's reading
    (romaji turns into kana) and Enter: it burns and adds power for a few seconds. Keep the output inside the band
    round the demand. A wrong reading misfires and the rod goes to the back of the line. Skill: reading, typed. */
-import { game, panel, typer, sameReading, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=21';
+import { game, panel, typer, sameReading, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=23';
 
 const BASE = 300, BURN = 9;
 let RODS = [], LIT = [], WAIT = [], HIST = [], SMOKE = [], inBand = 0, total = 0, burned = 0, misfire = 0, T, rot = 0;
@@ -32,8 +32,8 @@ game({
   id: 'power', site: 'power', tier: 1, code: 'PWR-04', jp: '発電所', en: 'Power plant', sub: 'THE CONTROL ROOM · THE DEMAND WALL', title: '中央制御室', dur: 180,
   skills: ['reading'],
   lead: 'Words roll in on the conveyor as fuel rods. Type the front rod\'s <b>reading</b> in romaji (it turns into kana as you type) and press Enter: it burns and adds power for nine seconds. Keep the output inside the band round the planet\'s demand as its day passes. A wrong reading misfires: no power, the rod goes to the back. Tab skips a rod.',
-  how: [['TYPE · 入力', '読みを打つ', 'Romaji → kana, no IME. Every rod is a word from the deck.'], ['BURN · 燃焼', '難しいほど強い', 'Harder words burn hotter: N5 40 MW, N3 70 MW, N1 100 MW.'], ['GRID · 送電', '帯の中に', 'Time inside the ±8% band is the score; it powers the planet for a day.']],
-  stats: [['送電', 'GRID', () => (total ? Math.round(inBand / total * 100) : 100) + '%'], ['燃焼', 'BURNED', () => burned], ['¥', '', a => Math.round(a.G.yen).toLocaleString()]],
+  how: [['TYPE · 入力', '読みを打つ', 'Romaji → kana, no IME. Every rod is a word from the deck.'], ['BURN · 燃焼', '難しいほど強い', 'Harder words burn hotter: N5 40 MW, N3 70 MW, N1 100 MW.'], ['GRID · 送電', '帯の中に', 'Time inside the ±8% band is the score.']],
+  stats: [['送電', 'GRID', () => (total ? Math.round(inBand / total * 100) : 100) + '%'], ['燃焼', 'BURNED', () => burned], ['点', 'PTS', a => Math.round(a.G.yen).toLocaleString()]],
   shop: [{ id: 'boiler3', name: '三号ボイラー', en: 'Boiler 3', cost: 800, d: 'Three rods can burn at once.' }, { id: 'fuel', name: '高品位燃料', en: 'Fuel mix', cost: 600, d: 'Every rod burns 20% hotter.' }, { id: 'longer', name: 'シフト延長', en: 'Longer shift', cost: 500, d: 'Shifts run 4 minutes.' }],
   init(api) {
     const lg = panel('pg', { x: 1006, y: 316, w: 262, h: 150 }, '記録 · LOG', 'LOG'); lg.id = 'g-log'; lg.classList.add('log');
@@ -57,7 +57,7 @@ game({
   end(api) {
     const grid = total ? Math.round(inBand / total * 100) : 0; api.G.yen = Math.round(api.G.yen);
     return { title: grid >= 70 ? '送電安定' : grid >= 40 ? '業務終了' : '電力不足', rows: [['grid in band', grid + '%', grid >= 70 ? 'y' : grid < 40 ? 'r' : ''], ['rods burned', burned, 'y'], ['misfires', misfire, misfire ? 'r' : '']], effect: { grid },
-      extra: `<div class="note">The grid ran ${grid}% of the day inside the band: +${Math.round(grid * .8)} MW of supply on the planet for the next 24 hours.</div>` };
+      extra: `<div class="note">The grid ran ${grid}% of the day inside the band.</div>` };
   },
   draw(cx, t, dt, api) { scene(cx, t, api); }
 });

@@ -2,8 +2,8 @@
    deck, in its own audio when Anki is open, the browser's Japanese voice otherwise. Pick the word you heard among four
    that sound close. Right: the clip airs. Wrong: a correction goes out. One replay per clip, at half the reward.
    Skill: listening. */
-import { game, panel, keycaps, esc, clamp, Y, RED, OK, sfx, audio, $, furi } from './game.js?v=21';
-import { ankiAvailable, ankiAudio } from './store.js?v=21';
+import { game, panel, keycaps, esc, clamp, Y, RED, OK, sfx, audio, $, furi } from './game.js?v=23';
+import { ankiAvailable, ankiAudio } from './store.js?v=23';
 
 let cur = null, phase = 'idle', K, aired = 0, pulled = 0, aud = 8, n = 0, gap = 0, env = 0, ANKI = false, noise = null, replayed = false, speaking = 0;
 const PROG = ['天気 WEATHER', 'スポーツ SPORTS', '社内広報 COMPANY PR', 'ニュース NEWS', '交通 TRAFFIC', '経済 MARKETS', '地域 LOCAL', '文化 CULTURE'];
@@ -36,7 +36,7 @@ function answer(api, i) {
   if (phase !== 'answer' || !cur) return; const o = cur.opts[i]; if (!o) return; K.press(i);
   const ok = o.right; api.record(cur.w, 'listen', ok, 'pick');
   cur.opts.forEach((x, k) => x.right && K.mark(k, 'good')); if (!ok) K.mark(i, 'bad');
-  if (ok) { aired++; const fee = api.pay(replayed ? 30 : 60); api.G.yen += fee; aud = clamp(aud + (replayed ? .6 : 1.2), 0, 40); sfx('ok'); api.log(cur.w.w, '聴解 ✓' + (replayed ? ' (replay)' : ''), '+¥' + fee, 'y'); }
+  if (ok) { aired++; const fee = api.pay(replayed ? 30 : 60); api.G.yen += fee; aud = clamp(aud + (replayed ? .6 : 1.2), 0, 40); sfx('ok'); api.log(cur.w.w, '聴解 ✓' + (replayed ? ' (replay)' : ''), '+' + fee, 'y'); }
   else { pulled++; aud = clamp(aud - 1.5, 0, 40); sfx('ng'); api.log(cur.w.w, '✗ heard ' + o.w, 'correction', 'r'); }
   phase = 'shown'; gap = ok ? 1.6 : 2.8; staticOn(0);
   $('#p-tr').innerHTML = `<div class="kj" style="font-size:26px">${esc(cur.w.w)}</div><div>${esc(cur.w.r)} · ${esc(cur.w.s)}</div>${cur.sent ? `<div class="kj" style="margin-top:8px;font-size:14px;color:#C9CDD6">${esc(furi(cur.sent.jp).replace(/⟦|⟧/g, ''))}</div>` : ''}`;
@@ -49,7 +49,7 @@ game({
   skills: ['listen'],
   lead: 'A clip plays through static: a word from your deck (its example sentence\'s own audio when Anki is open, the browser\'s Japanese voice otherwise). Pick the word you heard among four that sound close (<span class="key">1</span>–<span class="key">4</span>). Right: it airs. Wrong: a correction goes out. <span class="key">R</span> replays once, for half the reward. The transcript shows only after the answer.',
   how: [['LISTEN · 聴く', '雑音の中で', 'New words come through clean; words in memory come through more static.'], ['PICK · 選ぶ', '似た音', 'Four candidates that sound close, never two with the same reading.'], ['AIR · 放送', '視聴率', 'Aired clips raise the audience, the residents\' mood and the corporation\'s fame.']],
-  stats: [['放送', 'AIRED', () => aired], ['訂正', 'PULLED', () => pulled], ['視聴率', 'AUD', () => aud.toFixed(1) + '%'], ['¥', '', a => a.G.yen.toLocaleString()]],
+  stats: [['放送', 'AIRED', () => aired], ['訂正', 'PULLED', () => pulled], ['視聴率', 'AUD', () => aud.toFixed(1) + '%'], ['点', 'PTS', a => a.G.yen.toLocaleString()]],
   init(api) {
     ankiAvailable().then(v => ANKI = v);
     panel('pq', { x: 1040, y: 62, w: 228, h: 200 }, '放送予定 · QUEUE', 'Q').id = 'p-q';

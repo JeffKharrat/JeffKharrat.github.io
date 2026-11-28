@@ -7,15 +7,13 @@
    evidence for the word; a late one scraps it with no change to the evidence. Words already in memory are handled by
    the AI's own robots (blue, 自動). First attempt per word and skill in a shift only. At the end of the shift: the daily
    report, the yen, and the files the evidence now supports, sent to the audit in the core. */
-import { loadKanji } from './model.js?v=21';
-import * as store from './store.js?v=21';
-import { deckWord, buildPool, traps, shuffle } from './words.js?v=21';
-import { record, updateFlags, SKILL_J, day, payRate } from './evidence.js?v=21';
-import { addShift, book } from './sim.js?v=21';
-import './rivals.js?v=21';
-import { once, visit, progress, price } from './gov.js?v=21';
-import { RIVALS, LINES, rubyHTML, pickRival, matchResult, rivalDef, refOf } from './rivals.js?v=21';
-import { leafSVG, leafFavicon } from './leaf.js?v=21';
+import { loadKanji } from './model.js?v=23';
+import * as store from './store.js?v=23';
+import { deckWord, buildPool, traps, shuffle } from './words.js?v=23';
+import { record, updateFlags, SKILL_J, day, payRate } from './evidence.js?v=23';
+import { once } from './journal.js?v=23';
+import { RIVALS, LINES, rubyHTML, pickRival, matchResult, rivalDef } from './rivals.js?v=23';
+import { leafSVG, leafFavicon } from './leaf.js?v=23';
 
 const $ = s => document.querySelector(s);
 const QS = new URLSearchParams(location.search), DEMO = QS.has('demo'), EMBED = QS.has('embed') && parent !== window;
@@ -373,8 +371,8 @@ function resolve(c, kind, bi = -1) {
   const stamp = document.createElement('div');
   if (kind === 'ok' || kind === 'auto') {
     stamp.className = 'ok'; stamp.innerHTML = `<div class="sx"><span>${kind === 'auto' ? 'AUTO // HANDLED BY THE AI' : 'PASS // PART FITTED'}</span><b>${kind === 'auto' ? '自動' : '良品'}</b></div>${ans('')}`;
-    if (kind === 'ok') { G.streak++; G.best = Math.max(G.best, G.streak); const y = Math.round((15 + (5 - lvlOf(w)) * 5) * payRate(r)); if (r !== 'new') G.prac = (G.prac || 0) + 1; G.yen += y; logL(w.w, SKILL_J[s.skill], '+¥' + y, 'y'); sfx('ok'); }
-    else { G.yen += 10; G.auto++; logL(w.w, '自動', '+¥10', 'a'); }
+    if (kind === 'ok') { G.streak++; G.best = Math.max(G.best, G.streak); const y = Math.round((15 + (5 - lvlOf(w)) * 5) * payRate(r)); if (r !== 'new') G.prac = (G.prac || 0) + 1; G.yen += y; logL(w.w, SKILL_J[s.skill], '+' + y, 'y'); sfx('ok'); }
+    else { G.yen += 10; G.auto++; logL(w.w, '自動', '+10', 'a'); }
     launch(s, c, bi);
   } else {
     stamp.className = 'ng'; stamp.innerHTML = `<div class="sx"><span>${kind === 'ng' ? 'FAULT // WRONG PART' : 'TIMEOUT // LATE'}</span><b>${kind === 'ng' ? '不良' : '遅延'}</b></div>${ans('')}`;
@@ -450,7 +448,7 @@ function tick(now) {
     if (st && st.prod && st.prod !== p) nx = Math.min(nx, st.x - 104);
     if (nx > p.x + .01) moving = true; p.x = Math.max(p.x, nx); ahead = p.x - 104;
     if (st && Math.abs(p.x - st.x) < .5 && !st.prod && G.run) { st.prod = p; p.state = 'work'; spawnCard(st); }
-    if (!st && p.x > W + 60) { p.gone = true; G.ship++; const y = RF.cut > 0 ? 20 : 30; G.yen += y; sfx('ship'); logL('製品 #' + p.id, '出荷', '+¥' + y + (RF.cut > 0 ? ' (undercut)' : ''), 'y'); }
+    if (!st && p.x > W + 60) { p.gone = true; G.ship++; const y = RF.cut > 0 ? 20 : 30; G.yen += y; sfx('ship'); logL('製品 #' + p.id, '出荷', '+' + y + (RF.cut > 0 ? ' (undercut)' : ''), 'y'); }
   }
   PRODS = PRODS.filter(p => !p.gone && !(p.state === 'scrap' && p.y > BELT + 160));
   if (moving) BOFF += speed * dt;
@@ -475,7 +473,7 @@ function tick(now) {
   if (G.run) {
     RF.acc += dt * RF.rate * (RF.rush > 0 ? 1.3 : 1); while (RF.acc >= 1) { RF.acc--; RF.ship++; }
     RF.cut = Math.max(0, RF.cut - dt); RF.rush = Math.max(0, RF.rush - dt);
-    if (RF.ship >= G.ship + 2 && !RF.said.undercut) { RF.cut = 15; rtalk('undercut'); logL(RIVALS[RF.k].corp, '値下げ', '¥20 a product for 15 s', 'r'); }
+    if (RF.ship >= G.ship + 2 && !RF.said.undercut) { RF.cut = 15; rtalk('undercut'); logL(RIVALS[RF.k].corp, '値下げ', '20 points a product for 15 s', 'r'); }
     else if (RF.ship >= G.ship + 1 && !RF.said.lead && G.T < G.T0 - 30) rtalk('lead');
     if (G.ship >= RF.ship + 3 && !RF.said.behind) { RF.rush = 20; rtalk('behind'); logL(RIVALS[RF.k].corp, '増産', 'their line speeds up', 'r'); }
   }
@@ -495,7 +493,7 @@ function race(force) {
   el.innerHTML = `<div class="hd"><span class="lb">受注競争 · CONTRACT RACE</span></div>
     <div class="kj" style="font-size:15px;color:${P.col}">${P.corp} <span class="lb">AI ${P.ai}</span></div>
     <div style="display:flex;justify-content:space-between;font:700 12px var(--num)"><span>YOU ${G.ship}</span><span style="color:${P.col}">THEM ${RF.ship}</span></div>${bar(G.ship, '#FFE600')}${bar(RF.ship, P.col)}
-    ${RF.cut > 0 ? '<div style="color:#FF3B30;font-size:10px">値下げ UNDERCUT · ¥20 A PRODUCT</div>' : ''}${RF.rush > 0 ? '<div style="color:#FF3B30;font-size:10px">増産 THEIR LINE SPEEDS UP</div>' : ''}
+    ${RF.cut > 0 ? '<div style="color:#FF3B30;font-size:10px">値下げ UNDERCUT · 20 POINTS A PRODUCT</div>' : ''}${RF.rush > 0 ? '<div style="color:#FF3B30;font-size:10px">増産 THEIR LINE SPEEDS UP</div>' : ''}
     ${RF.line ? `<div class="kj" style="font-size:13px;line-height:1.9;margin-top:4px">${rubyHTML(RF.line.jp)}</div><div style="font-size:10px;color:#9AA0AB">${RF.line.en}</div>` : ''}`;
 }
 function hud() {
@@ -508,9 +506,9 @@ function hud() {
 
 /* ---------------- the shift: brief, start, end, report ---------------- */
 const UPG = [
-  { id: 'conv', name: '高速コンベア', en: 'Fast conveyor', cost: 600, d: 'Plates come in faster: more cards, more yen. On the planet: +8% production.' },
-  { id: 'qc', name: '品質管理', en: 'Quality control', cost: 900, d: 'The first defect of a shift costs no yen. Evidence is still wiped. On the planet: +5% on the sale price.' },
-  { id: 'ext', name: 'シフト延長', en: 'Longer shift', cost: 500, d: 'Shifts run 4 minutes instead of 3. On the planet: +50 factory jobs.' }];
+  { id: 'conv', name: '高速コンベア', en: 'Fast conveyor', cost: 600, d: 'Plates come in faster: more cards, more points.' },
+  { id: 'qc', name: '品質管理', en: 'Quality control', cost: 900, d: 'The first defect of a shift costs no points. Evidence is still wiped.' },
+  { id: 'ext', name: 'シフト延長', en: 'Longer shift', cost: 500, d: 'Shifts run 4 minutes instead of 3.' }];
 function left() {
   const nW = LEARN.length, nM = MEM.length;
   $('#left').innerHTML = `<div class="hd"><span class="lb">LINE 01 · SHIFT ${String(FC.shifts + 1).padStart(3, '0')}</span><span class="bc"></span></div>
@@ -521,15 +519,14 @@ function left() {
 function brief() {
   const nW = LEARN.length, today = day();
   const evT = Object.values(SAVE.words).reduce((n, w) => n + (w.ev ? Object.values(w.ev).filter(e => e.d && e.d.includes(today)).length : 0), 0);
-  const none = !DECK.length, strike = SAVE.sim && SAVE.sim.strike > Date.now();
+  const none = !DECK.length;
   $('#brief').innerHTML = `<div class="bar"><span>FAC-01 // 大工場 GREAT FACTORY // LINE 01</span><span>BRIEFING 始業前</span></div><h2>始業前ミーティング</h2>
     <div style="color:#C9CDD6;font-size:13px;max-width:640px">Plates come in from the left and stop at three stations. Each posts a kanban card; pick the right part from the bins below, laid out like the numpad (<span class="key">4 5 6</span> over <span class="key">1 2 3</span>) before its ring closes. The card you are on runs at full speed, the others at 0.4×. A wrong part scraps the product and wipes that skill's evidence for the word. Words already in memory are handled by the AI's robots.</div>
     <div class="how">${ST.map(s => `<div><em>ST-0${s.i + 1} // ${s.en.toUpperCase()}</em><b>${s.name} <span class="m" style="font:500 11px var(--mono)">${s.en}</span></b>${s.rule} · ${SKILL_J[s.skill]}<br><span class="m">${s.show === 'kana' ? 'a reading: pick the written word' : s.show === 'en' ? 'a meaning: pick the written word' : 'a written word: pick its meaning'}</span></div>`).join('')}</div>
-    <div class="row"><div class="stat"><span class="lb">training</span><b>${nW}</b></div><div class="stat"><span class="lb">in memory</span><b style="color:#8C98FF">${MEM.length}</b></div><div class="stat"><span class="lb">evidence today</span><b>${evT}</b></div><div class="stat"><span class="lb">funds</span><b>¥${(SAVE.corp.funds || 0).toLocaleString()}</b></div></div>
+    <div class="row"><div class="stat"><span class="lb">training</span><b>${nW}</b></div><div class="stat"><span class="lb">in memory</span><b style="color:#8C98FF">${MEM.length}</b></div><div class="stat"><span class="lb">evidence today</span><b>${evT}</b></div></div>
     ${none ? `<div class="files" style="border-color:var(--red)">No deck yet. Open the core, Settings → Read the deck (Anki must be running). Or <a href="?demo${EMBED ? '&embed=1' : ''}" style="color:var(--y)">run a demo shift</a>.</div>` : ''}
     ${DEMO ? '<div class="files">Demo shift: a made-up deck, nothing is saved.</div>' : ''}
-    ${strike ? `<div class="files" style="border-color:var(--red)">ストライキ中 STRIKE · the union has stopped the line for ${Math.ceil((SAVE.sim.strike - Date.now()) / 3600e3)} more hours. Settle it in the core (経営).</div>` : ''}
-    <div class="acts">${none || strike ? '' : '<button class="go" id="b-go" type="button">始業 · Start the shift <span class="key" style="border-color:#111;color:#111">Enter</span></button>'}<button class="go2" id="b-out" type="button">Back to the surface</button></div>`;
+    <div class="acts">${none ? '' : '<button class="go" id="b-go" type="button">始業 · Start the shift <span class="key" style="border-color:#111;color:#111">Enter</span></button>'}<button class="go2" id="b-out" type="button">Back to the surface</button></div>`;
   $('#ov-brief').classList.add('on'); left();
   if ($('#b-go')) $('#b-go').onclick = start; $('#b-out').onclick = exit;
 }
@@ -551,12 +548,12 @@ function endShift() {
   const answers = [...G.touched.values()].reduce((n, x) => n + Object.values(x.res).filter(v => v !== 'miss').length, 0);
   /* the shift's result applies once (reloads, a second click): goods, shipments, fees, then the governance clock */
   /* the contract: whoever shipped more this shift wins it */
-  const won = G.ship > RF.ship, ctx0 = summaryCtx(), bonus = won ? (SAVE.sim && SAVE.sim.v === 2 && ctx0 ? price(refOf(SAVE, ctx0))(2) : 150) : 0;
+  const won = G.ship > RF.ship, bonus = won ? 150 : 0;
   G.yen += bonus; G.race = { won, bonus, mine: G.ship, theirs: RF.ship, k: RF.k }; rtalk(won ? 'lose' : 'win');
-  if (!DEMO) once(SAVE, 'game:' + G.rid, () => { matchResult(SAVE, RF.k, won, '大工場 Great Factory'); addShift(SAVE, G.ship, answers, G.yen); const ctx = summaryCtx(); if (ctx) { visit(SAVE, ctx); progress(SAVE, ctx); } });
-  else addShift(SAVE, G.ship, answers, G.yen);
+  if (!DEMO) once(SAVE, 'game:' + G.rid, () => { matchResult(SAVE, RF.k, won, '大工場 Great Factory'); });
   FC.shifts++; FC.best = Math.max(FC.best || 0, G.ship);
-  (SAVE.log = SAVE.log || []).push({ t: Date.now(), k: 'factory', ship: G.ship, def: G.def, yen: G.yen, flagged: flagged.length }); if (SAVE.log.length > 200) SAVE.log.splice(0, SAVE.log.length - 200);
+  UPG.forEach((u, i) => { if (FC.shifts >= (i + 1) * 3) FC[u.id] = 1; });   // upgrades are earned by playing: one every three shifts
+  (SAVE.log = SAVE.log || []).push({ t: Date.now(), k: 'factory', ship: G.ship, def: G.def, score: G.yen, flagged: flagged.length }); if (SAVE.log.length > 200) SAVE.log.splice(0, SAVE.log.length - 200);
   persist();
   setTimeout(() => report(flagged), 1100);
 }
@@ -566,17 +563,16 @@ function report(flagged) {
   const ok = rows.reduce((n, x) => n + Object.values(x.res).filter(v => v !== 'miss').length, 0), ng = rows.reduce((n, x) => n + Object.values(x.res).filter(v => v === 'miss').length, 0);
   const byId = new Map(DECK.map(w => [w.id, w]));
   $('#report').innerHTML = `<div class="bar"><span>FAC-01 // 日報 DAILY REPORT // SHIFT ${String(FC.shifts).padStart(3, '0')}</span><span class="bc" style="opacity:.8"></span></div><h2>${G.ship >= G.target ? '目標達成' : '目標未達'}</h2>
-    <div class="row"><div class="stat"><span class="lb">shipped</span><b>${G.ship}<span class="m" style="font-size:16px"> / ${G.target}</span></b></div><div class="stat"><span class="lb">defects</span><b style="color:${G.def ? RED : 'inherit'}">${G.def}</b></div><div class="stat"><span class="lb">earned</span><b style="color:${Y}">¥${G.yen.toLocaleString()}</b></div><div class="stat"><span class="lb">best streak</span><b>${G.best}</b></div></div>
-    <div class="lb">evidence · ${ok} clean, ${ng} wiped${G.auto ? ` · ${G.auto} handled by the AI` : ''}${G.prac ? ` · ${G.prac} repeat${G.prac > 1 ? 's' : ''} at the practice rate` : ''}${G.ship >= 5 ? ' · <span style="color:#FFE600">shipment run counted</span>' : ' · 5 shipped makes a shipment run'}</div>
+    <div class="row"><div class="stat"><span class="lb">shipped</span><b>${G.ship}<span class="m" style="font-size:16px"> / ${G.target}</span></b></div><div class="stat"><span class="lb">defects</span><b style="color:${G.def ? RED : 'inherit'}">${G.def}</b></div><div class="stat"><span class="lb">score</span><b style="color:${Y}">${G.yen.toLocaleString()}</b></div><div class="stat"><span class="lb">best streak</span><b>${G.best}</b></div></div>
+    <div class="lb">evidence · ${ok} clean, ${ng} wiped${G.auto ? ` · ${G.auto} handled by the AI` : ''}${G.prac ? ` · ${G.prac} repeat${G.prac > 1 ? 's' : ''} at the practice rate` : ''}</div>
     <div class="ev">${rows.slice(0, 16).map(x => `<div><span><span class="kj">${esc(x.w.w)}</span> <span class="m">${esc(x.w.r)}</span></span><span>${Object.entries(x.res).map(([k, v]) => SKILL_J[k] + ' ' + cell(v)).join(' · ')}</span></div>`).join('') || '<div class="m">No card answered.</div>'}</div>
-    ${G.race ? `<div class="files" style="border-color:${G.race.won ? '#FFE600' : RIVALS[G.race.k].col}">受注競争 · you ${G.race.mine}, ${RIVALS[G.race.k].corp} ${G.race.theirs} · ${G.race.won ? `<b style="color:#FFE600">the contract is yours: +¥${G.race.bonus.toLocaleString()}</b>` : '<b>they took the contract</b>'}<br><span class="kj">${rubyHTML(LINES[G.race.k][G.race.won ? 'lose' : 'win'].jp)}</span> <span class="m">${LINES[G.race.k][G.race.won ? 'lose' : 'win'].en}</span></div>` : ''}
+    ${G.race ? `<div class="files" style="border-color:${G.race.won ? '#FFE600' : RIVALS[G.race.k].col}">受注競争 · you ${G.race.mine}, ${RIVALS[G.race.k].corp} ${G.race.theirs} · ${G.race.won ? `<b style="color:#FFE600">the contract is yours: +${G.race.bonus.toLocaleString()}</b>` : '<b>they took the contract</b>'}<br><span class="kj">${rubyHTML(LINES[G.race.k][G.race.won ? 'lose' : 'win'].jp)}</span> <span class="m">${LINES[G.race.k][G.race.won ? 'lose' : 'win'].en}</span></div>` : ''}
     ${flagged.length ? `<div class="files"><b class="a">${flagged.length} file${flagged.length > 1 ? 's' : ''} sent to the audit</b> · the AI thinks you know <span class="kj">${flagged.slice(0, 6).map(id => esc((byId.get(id) && deckWord(byId.get(id), KD).w) || '')).join('、')}${flagged.length > 6 ? '…' : ''}</span>. Commit or reject them in the core (審査).</div>` : ''}
-    <div class="lb" style="margin-top:16px">設備投資 · upgrades · funds ¥${(SAVE.corp.funds || 0).toLocaleString()}</div>
-    <div class="shop">${UPG.map(u => `<button type="button" data-u="${u.id}" ${FC[u.id] || (SAVE.corp.funds || 0) < u.cost ? 'disabled' : ''}><b>${u.name}</b>${u.en} · ${FC[u.id] ? 'installed' : '¥' + u.cost}<br><span class="m">${u.d}</span></button>`).join('')}</div>
+    <div class="lb" style="margin-top:16px">設備 · upgrades · one opens every three shifts</div>
+    <div class="shop">${UPG.map((u, i) => `<button type="button" disabled><b>${u.name}</b>${u.en} · ${FC[u.id] ? 'installed' : `at shift ${(i + 1) * 3}`}<br><span class="m">${u.d}</span></button>`).join('')}</div>
     <div class="acts"><button class="go" id="b-again" type="button">次のシフト · Next shift <span class="key" style="border-color:#111;color:#111">Enter</span></button><button class="go2" id="b-out2" type="button">Back to the surface</button></div>`;
   $('#ov-report').classList.add('on');
   $('#b-again').onclick = start; $('#b-out2').onclick = exit;
-  $('#report').querySelectorAll('[data-u]').forEach(b => b.onclick = () => { const u = UPG.find(x => x.id === b.dataset.u); if (FC[u.id] || SAVE.corp.funds < u.cost) return; if (SAVE.sim && SAVE.sim.v === 2) book(SAVE.sim, SAVE.corp, 'cap', -u.cost, `設備投資 ${u.name} ¥${u.cost.toLocaleString()}`); else SAVE.corp.funds -= u.cost; FC[u.id] = 1; persist(); report(flagged); });
 }
 function persist() { if (!DEMO) store.store(SAVE, null); }
 function summaryCtx() { try { return (JSON.parse(localStorage.getItem('karatto.summary') || '{}')).ctx || null; } catch (e) { return null; } }

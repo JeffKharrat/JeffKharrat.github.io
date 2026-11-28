@@ -32,7 +32,7 @@ export function leafGrid(N = 31) {
 const COL = { 1: '#A3ABBA', 2: '#2A2E36', 4: '#FFE600' };
 /* an SVG of the leaf. mono: every cell in currentColor, the artery still yellow (for small marks on dark UIs) */
 /* Jeff's own pixel leaf (Nov 27): the emblem is his image, as is (karatto/leaf.png); the procedural grid above is kept unused */
-const SRC = new URL('../../karatto/leaf.png?v=21', import.meta.url).href, SRC64 = new URL('../../karatto/leaf-64.png?v=21', import.meta.url).href;
+const SRC = new URL('../../karatto/leaf.png?v=23', import.meta.url).href, SRC64 = new URL('../../karatto/leaf-64.png?v=23', import.meta.url).href;
 let IMG = null; const img = () => { if (!IMG && typeof Image !== 'undefined') { IMG = new Image(); IMG.src = SRC; } return IMG; };
 export function leafSVG(size = 24) { return `<img class="leaf" src="${size <= 64 ? SRC64 : SRC}" width="${size}" height="${size}" alt="" style="image-rendering:auto;display:inline-block;vertical-align:middle">`; }
 /* on a canvas: the same footprint as before (N cells of s pixels) */

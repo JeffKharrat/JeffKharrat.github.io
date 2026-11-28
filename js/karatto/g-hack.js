@@ -1,13 +1,12 @@
 /* 紅葉重工: 侵入, the intrusion. カラット breaks into a rival megacorporation's network in real time. Their structure is a
    map of nodes (gateways, firewalls, data vaults, ICE, their core); every node is locked by a word: type its reading
    for walls and gates, pick its meaning for vaults and ICE. Meanwhile their AI traces you, patches nodes behind your
-   back and sends hunters down your path. Money buys the entry and proxies, Data buys zero-days and decoys. Reach the
-   core and breach it: their money and data are yours, and they will remember. Traced at 100%: disconnected.
+   back and sends hunters down your path. Up to three of each tool per run, free. Reach the
+   core and breach it: they harden for next time. Traced at 100%: disconnected.
    Skills: reading (typed), meaning. */
-import { game, panel, typer, keycaps, sameReading, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=21';
-import { RIVALS, IDS, rivOf, costs, canStart, pay, settleRaid, lootOf, defOf, TOOLS } from './rivals.js?v=21';
-import { spendable } from './gov.js?v=21';
-import { drawLeaf } from './leaf.js?v=21';
+import { game, panel, typer, keycaps, sameReading, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=23';
+import { RIVALS, IDS, rivOf, settleRaid, defOf, TOOLS } from './rivals.js?v=23';
+import { drawLeaf } from './leaf.js?v=23';
 
 const QS = new URLSearchParams(location.search);
 let TGT = IDS.includes(QS.get('target')) ? QS.get('target') : 'kurogane', KIT = { proxy: 1, zero: 0, decoy: 0 };
@@ -85,7 +84,7 @@ function side(api) {
   $('#hk-tg').innerHTML = `<div class="kj" style="font-size:22px;color:${R.col}">${R.corp}</div><div class="lb">${R.en}</div>
     <div style="margin-top:8px"><span class="lb">AI</span> <span class="kj" style="font-size:16px"><ruby>${R.ai}<rt>${R.air}</rt></ruby></span> <span class="lb">${R.aien}</span></div>
     <div class="m" style="margin:6px 0">${esc(R.style)}</div>
-    <div class="lb">DEFENSE ${'■'.repeat(D)}${'□'.repeat(9 - D)} · GRUDGE ${Math.round(r.grudge)} · INTEL ${Math.round(r.intel)}</div>
+    <div class="lb">DEFENSE ${'■'.repeat(D)}${'□'.repeat(9 - D)} · CORES ${r.cores} · INTEL ${Math.round(r.intel)}</div>
     <div class="lb" style="margin-top:10px">TOOLS</div>${['zero', 'proxy', 'decoy'].map((k, i) => `<button type="button" class="hk-t" data-k="${k}" ${KIT[k] ? '' : 'disabled'}><span class="key">F${i + 1}</span> <b class="kj">${TOOLS[k][0]}</b> ${TOOLS[k][1]} ×${KIT[k]}</button>`).join('')}
     <div class="lb" style="margin-top:10px">F4 · JACK OUT WITH WHAT YOU HAVE · ↑↓ CHOOSE A NODE</div>`;
   document.querySelectorAll('.hk-t').forEach(b => b.onclick = () => tool(api, b.dataset.k));
@@ -96,19 +95,19 @@ game({
   id: 'hack', site: 'hack', tier: 1, code: 'INT-10', jp: '侵入', en: 'Intrusion', sub: 'カラット AGAINST THE RIVAL AIs', title: '侵入作戦', dur: 0,
   skills: ['reading', 'meaning'],
   lead: 'カラット breaks into a rival megacorporation. Their network is a map of nodes, each locked by a word: <b>type the reading</b> for gateways and firewalls, <b>pick the meaning</b> (<span class="key">1</span>–<span class="key">4</span>) for vaults and ICE. Their AI traces you the whole time, patches nodes and sends hunters down your path. Reach the core and breach it (three words, from your own memory) to take their money and data. At 100% trace you are disconnected, and they will answer.',
-  how: [['WALLS · 読み', '関門と防壁', 'Gateways and firewalls: type the reading. A thick firewall has two layers.'], ['VAULTS · 意味', '金庫と迎撃', 'Vaults pay out; ICE fires if you are slow. Pick the meaning.'], ['THE CORE · 中枢', '三語の鍵', 'Reading, meaning, reading: three words from your memory. Their money and data are yours.']],
+  how: [['WALLS · 読み', '関門と防壁', 'Gateways and firewalls: type the reading. A thick firewall has two layers.'], ['VAULTS · 意味', '金庫と迎撃', 'Vaults hold their secrets; ICE fires if you are slow. Pick the meaning.'], ['THE CORE · 中枢', '三語の鍵', 'Reading, meaning, reading: three words from your memory. Their money and data are yours.']],
   stats: [['逆探知', 'TRACE', () => Math.round(trace) + '%'], ['突破', 'NODES', () => run.nodes], ['金庫', 'VAULTS', () => run.vaults]],
   goLabel: '侵入開始 · Jack in', againLabel: '再侵入 · Again', clock: () => phase === 'run' ? '侵入中' : '待機',
   notes(api) {
-    const ctx = ctxOf(api), S = api.SAVE.sim; window.__hk = { pick: k => { TGT = k; side(api); api.brief(); }, kit: (k, d) => { KIT[k] = clamp(KIT[k] + d, 0, 3); side(api); api.brief(); } };
-    const kitHTML = () => { if (!S || S.v !== 2) return '<div class="note r" id="hk-kit">The planet\'s simulation hasn\'t started: open the core once.</div>'; D = defOf(api.SAVE, TGT, ctx); const c = costs(api.SAVE, TGT, ctx), ok = api.preview ? { ok: true, yen: 0, data: 0 } : canStart(api.SAVE, TGT, ctx, KIT, spendable(api.SAVE));
+    const ctx = ctxOf(api); window.__hk = { pick: k => { TGT = k; side(api); api.brief(); }, kit: (k, d) => { KIT[k] = clamp(KIT[k] + d, 0, 3); side(api); api.brief(); } };
+    const kitHTML = () => { D = defOf(api.SAVE, TGT, ctx);
       return `<div class="note" id="hk-kit"><div style="display:flex;gap:6px;margin-bottom:8px">${IDS.map(k => `<button type="button" class="go2" style="${k === TGT ? 'border-color:var(--y);color:var(--y)' : ''}" onclick="__hk.pick('${k}')">${RIVALS[k].corp} · ${RIVALS[k].aien}</button>`).join('')}</div>
-        TARGET <b class="kj" style="color:${RIVALS[TGT].col}">${RIVALS[TGT].corp}</b> · defense ${D}/9 · entry <b>¥${c.entry.toLocaleString()}</b><br>
-        ${['proxy', 'zero', 'decoy'].map(k => `<span style="display:inline-block;margin:4px 12px 0 0"><button type="button" class="go2" style="padding:2px 8px" onclick="__hk.kit('${k}',-1)">−</button> ${TOOLS[k][1]} ×${KIT[k]} <button type="button" class="go2" style="padding:2px 8px" onclick="__hk.kit('${k}',1)">+</button> <span class="m">${k === 'proxy' ? '¥' + c.proxy.toLocaleString() : (k === 'zero' ? c.zero : c.decoy) + ' DATA'}</span></span>`).join('')}<br>
-        ${api.preview ? 'PREVIEW: nothing is paid, nothing is taken; evidence still counts.' : `This run costs <b>¥${ok.yen.toLocaleString()}</b> and <b>${ok.data} Data</b> (you have ${Math.floor(api.SAVE.corp.data)}).`} ${ok.ok ? '' : `<b class="r">${esc(ok.why)}</b>`}</div>`; };
+        TARGET <b class="kj" style="color:${RIVALS[TGT].col}">${RIVALS[TGT].corp}</b> · defense ${D}/9<br>
+        ${['proxy', 'zero', 'decoy'].map(k => `<span style="display:inline-block;margin:4px 12px 0 0"><button type="button" class="go2" style="padding:2px 8px" onclick="__hk.kit('${k}',-1)">−</button> ${TOOLS[k][1]} ×${KIT[k]} <button type="button" class="go2" style="padding:2px 8px" onclick="__hk.kit('${k}',1)">+</button></span>`).join('')}<br>
+        <span class="m">Tools are free: up to three of each per run.</span></div>`; };
     return kitHTML();
   },
-  blocked(api) { const S = api.SAVE.sim; if (!S || S.v !== 2) return true; if (api.preview) return false; return !canStart(api.SAVE, TGT, ctxOf(api), KIT, spendable(api.SAVE)).ok; },
+  blocked: () => false,
   init(api) {
     const css = document.createElement('style'); css.textContent = `
       #hk-ai .ln { padding:6px 0 7px; border-bottom:1px solid #15171B; } #hk-ai .kj { font-size:15px; line-height:1.9; } #hk-ai ruby rt { font-size:8.5px; } #hk-ai .m { font-size:10.5px; color:#9AA0AB; }
@@ -127,7 +126,6 @@ game({
   },
   start(api) {
     const ctx = ctxOf(api); D = defOf(api.SAVE, TGT, ctx);
-    if (!api.preview) { pay(api.SAVE, TGT, ctx, KIT); api.persist(); }
     build(api); trace = 0; HUNT = []; FX = []; said = {}; outcome = null; run = { nodes: 0, vaults: 0 }; huntT = 6; patchT = 10; SEL = 0; cur = null; phase = 'run';
     $('#g-log').innerHTML = ''; $('#hk-ai').innerHTML = ''; talk('start', 1, true); side(api); arm(api);
   },
@@ -156,12 +154,11 @@ game({
   end(api) {
     phase = 'idle'; T.el.style.display = 'none'; K.el.style.display = 'none'; $('#hk-q').innerHTML = '';
     const res = { nodes: run.nodes, vaults: run.vaults, core: outcome === 'core', traced: outcome === 'traced', out: outcome !== 'core' && outcome !== 'traced' };
-    const L1 = api.preview ? { yen: 0, data: 0 } : lootOf(api.SAVE, TGT, ctxOf(api), res), R = RIVALS[TGT], l = LINES[TGT][res.core ? 'win' : res.traced ? 'lose' : 'out'];
-    api.G.yen = L1.yen;                                                  // their money, booked with the run's result
-    return { title: res.core ? '中枢侵害 · CORE BREACHED' : res.traced ? '逆探知 · TRACED' : '離脱 · JACKED OUT', rows: [['nodes broken', res.nodes, 'y'], ['vaults', res.vaults], ['data taken', api.preview ? '—' : L1.data, res.core ? 'y' : '']],
-      effect: { target: TGT, ...res }, extra: `<div class="note"><b class="kj" style="color:${R.col}">${R.ai}</b> <span class="kj">${rb(l.jp)}</span><br><span class="m">${esc(l.en)}</span>${res.traced ? '<br><b class="r">They traced you: expect an answer at your next visit (a breach, sabotage or a price war).</b>' : ''}</div>` };
+    const R = RIVALS[TGT], l = LINES[TGT][res.core ? 'win' : res.traced ? 'lose' : 'out'];
+    return { title: res.core ? '中枢侵害 · CORE BREACHED' : res.traced ? '逆探知 · TRACED' : '離脱 · JACKED OUT', rows: [['nodes broken', res.nodes, 'y'], ['vaults', res.vaults], ['core', res.core ? '中枢侵害' : '—', res.core ? 'y' : '']],
+      effect: { target: TGT, ...res }, extra: `<div class="note"><b class="kj" style="color:${R.col}">${R.ai}</b> <span class="kj">${rb(l.jp)}</span><br><span class="m">${esc(l.en)}</span>${res.traced ? '<br><b class="r">They traced you: disconnected.</b>' : ''}</div>` };
   },
-  settle(api, res) { settleRaid(api.SAVE, TGT, ctxOf(api), res.effect, false); },
+  settle(api, res) { settleRaid(api.SAVE, TGT, ctxOf(api), res.effect); },
   draw(cx, t, dt, api) {
     const R = RIVALS[TGT], col = R.col;
     cx.fillStyle = '#050506'; cx.fillRect(0, 0, 1280, 720);
@@ -170,7 +167,7 @@ game({
     cx.font = '700 9px "M PLUS 1 Code"'; cx.fillStyle = '#8A909C'; cx.fillText(`NETWORK // ${R.en} // DEFENSE ${D}`, 280, 80);
     /* you: the leaf, at the entry */
     cx.fillStyle = '#0B0C0F'; cx.fillRect(282, 280, 40, 40); drawLeaf(cx, 284, 282, 36 / 31); cx.fillStyle = Y; cx.fillText('カラット', 280, 334);
-    if (!N.length) { cx.fillStyle = '#8A909C'; cx.font = '700 11px "M PLUS 1 Code"'; cx.fillText('待機 · NO LINK. CHOOSE A TARGET, BUY THE KIT, JACK IN.', 380, 300); return; }
+    if (!N.length) { cx.fillStyle = '#8A909C'; cx.font = '700 11px "M PLUS 1 Code"'; cx.fillText('待機 · NO LINK. CHOOSE A TARGET AND THE KIT, JACK IN.', 380, 300); return; }
     /* edges */
     const F = frontier(), sel = F[SEL];
     for (const [a, b] of E) { const A = N[a], B = N[b], o = A.st === 'open', ob = B.st === 'open'; cx.strokeStyle = o && ob ? Y : o ? 'rgba(255,230,0,.45)' : '#2A2E36'; cx.lineWidth = o && ob ? 2 : 1; cx.setLineDash(o && !ob ? [5, 5] : []); cx.lineDashOffset = -t * 20; cx.beginPath(); cx.moveTo(A.x, A.y); cx.lineTo(B.x, B.y); cx.stroke(); }

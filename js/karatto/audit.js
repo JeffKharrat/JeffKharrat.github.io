@@ -5,10 +5,10 @@
      申告 Claim         a word you know that the games haven't proven: always spot-checked. 40 a day after the founding.
      創業監査 Founding  before the corporation exists: your deck's easiest words, 20 at a time, each one spot-checked.
    The AI argues; Jeff decides. Nothing here touches Anki. */
-import { deckWord, buildPool, traps, shuffle } from './words.js?v=21';
-import { toKana, sameReading } from './kana.js?v=21';
-import { leafSVG } from './leaf.js?v=21';
-import { SKILLS, SKILL_J, files, commit, snooze, record, claimsLeft, useClaim, skillsClean, day, compromised, reverify, eligible as eligibleNow } from './evidence.js?v=21';
+import { deckWord, buildPool, traps, shuffle } from './words.js?v=23';
+import { toKana, sameReading } from './kana.js?v=23';
+import { leafSVG } from './leaf.js?v=23';
+import { SKILLS, SKILL_J, files, commit, snooze, record, claimsLeft, useClaim, skillsClean, day, compromised, reverify, eligible as eligibleNow } from './evidence.js?v=23';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const SK_EN = { meaning: 'Meaning', reading: 'Reading', recall: 'Recall', context: 'Context', listen: 'Listening' };

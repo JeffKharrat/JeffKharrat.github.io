@@ -1,7 +1,7 @@
 /* カラット: 取引所, the exchange. News flashes come off the wire: your deck's example sentences with the card's word
    blanked. Fill the blank (1–4) before the rival AI trades on the same news: first takes the whole move, second only
    half; a wrong fill is a bad trade. H shows the English, at half the move. Skill: context. */
-import { game, panel, keycaps, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=21';
+import { game, panel, keycaps, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=23';
 
 const RIV = [{ n: '黒鉄重工', en: 'Kurogane Heavy', c: '#8A909C', p: 960 }, { n: '白鷺HD', en: 'Shirasagi', c: '#5CFFA0', p: 1200 }];
 let cur = null, phase = 'idle', K, gap = 0, hint = false, me = 1000, P0 = 1000, HIST = [], won = 0, lost = 0, late = 0, wire = [], tick0 = 0;
@@ -32,7 +32,7 @@ game({
   skills: ['context'],
   lead: 'News flashes come off the wire: your deck\'s example sentences, the card\'s word blanked. Fill the blank (<span class="key">1</span>–<span class="key">4</span>). Right: the trade goes through and 紅葉重工\'s share moves. The rival AIs trade on the same news on their own clock: answer before them for the whole move, after them for half. Wrong: a bad trade. <span class="key">H</span> shows the English, at half the move.',
   how: [['CONTEXT · 文脈', '文が決める', 'The four choices share a kanji or a field: only the sentence decides.'], ['RIVALS · 競合', '黒鉄重工 · 白鷺HD', 'The rival AIs trade on the news too. Beat their clock.'], ['SHARE · 株価', 'カラット', 'The session\'s move feeds the corporation\'s fame.']],
-  stats: [['紅葉重工', 'SHARE', () => `${me.toFixed(0)} ${me >= P0 ? '▲' : '▼'}${Math.abs((me / P0 - 1) * 100).toFixed(1)}%`], ['先行', 'FIRST', () => won], ['¥', '', a => a.G.yen.toLocaleString()]],
+  stats: [['紅葉重工', 'SHARE', () => `${me.toFixed(0)} ${me >= P0 ? '▲' : '▼'}${Math.abs((me / P0 - 1) * 100).toFixed(1)}%`], ['先行', 'FIRST', () => won], ['点', 'PTS', a => a.G.yen.toLocaleString()]],
   init(api) {
     const css = document.createElement('style'); css.textContent = `
       #p-news { padding:14px 18px; } #p-news .nh { display:flex; justify-content:space-between; font:700 10px var(--mono); letter-spacing:.16em; color:var(--y); margin-bottom:12px; }
@@ -47,7 +47,7 @@ game({
     K = keycaps({ x: 240, y: 560, w: 800, h: 140, cols: 2 }, 4, i => answer(api, i));
   },
   start(api) {
-    P0 = me = Math.round((api.SAVE.sim && api.SAVE.sim.share) || 1000); RIV.forEach(r => r.p0 = r.p = r.p || 1000); HIST = []; won = lost = late = 0; wire = []; $('#g-log').innerHTML = ''; $('#p-wire').innerHTML = ''; load(api);
+    P0 = me = 1000; RIV.forEach(r => r.p0 = r.p = r.p || 1000); HIST = []; won = lost = late = 0; wire = []; $('#g-log').innerHTML = ''; $('#p-wire').innerHTML = ''; load(api);
   },
   tick(dt, api) {
     if (!api.G.run) return;

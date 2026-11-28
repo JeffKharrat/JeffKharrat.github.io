@@ -1,12 +1,11 @@
 /* カラット: 研究所, the R&D lab. An intercepted word resolves cell by cell on the holo table. Buzz (Space) the
    moment you recognise it, then pick its meaning (1–4): the earlier the buzz, the more research. A wrong buzz costs
    more than waiting. Research buys techs that change the other buildings. Skill: meaning (form recognition). */
-import { game, panel, keycaps, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=21';
+import { game, panel, keycaps, esc, clamp, Y, RED, OK, sfx, $ } from './game.js?v=23';
 
 const CW = 9, GW = 72, GH = 38, REVEAL = 8;
 let cur = null, cells = [], order = [], phase = 'idle', tt = 0, res = 0, hits = 0, miss = 0, K, RAIN = [], gap = 0;
 const TECH = [
-  { id: 'auto1', j: '自動化 I', en: 'Automation I', cost: 300, d: 'Robots work 15% more (the planet).' },
   { id: 'fire', j: '防壁', en: 'Firewall', cost: 250, d: 'Breach encryption runs 30% slower (保安部).' },
   { id: 'fleet', j: '配車計画', en: 'Fleet planning', cost: 200, d: 'Order windows last 25% longer (物流).' }];
 const off = document.createElement('canvas'); off.width = GW * CW; off.height = GH * CW; const oc = off.getContext('2d', { willReadFrequently: true });
@@ -42,8 +41,8 @@ game({
   id: 'lab', site: 'lab', tier: 2, code: 'LAB-05', jp: '研究所', en: 'R&D lab', sub: 'THE DECRYPTION TABLE · THE TECH TREE', title: '復号室', dur: 120,
   skills: ['meaning'],
   lead: 'An intercepted word resolves on the table, cell by cell, over eight seconds. Buzz (<span class="key">Space</span>) as soon as you recognise its shape, then pick its meaning (<span class="key">1</span>–<span class="key">4</span>). The earlier the buzz, the bigger the multiplier. A wrong buzz costs more than a late one, so buzz when you\'re sure. Research buys techs (right).',
-  how: [['BUZZ · 解答', 'Space で止める', 'The multiplier falls from ×3 to ×0.5 as the word resolves.'], ['MEANING · 意味', '四択', 'Four meanings, none of them a synonym of the right one.'], ['TECH · 技術', '研究を使う', 'Automation, firewalls, fleet planning: research changes the other buildings.']],
-  stats: [['研究', 'RESEARCH', () => '+' + res], ['命中', 'HITS', () => hits], ['¥', '', a => a.G.yen.toLocaleString()]],
+  how: [['BUZZ · 解答', 'Space で止める', 'The multiplier falls from ×3 to ×0.5 as the word resolves.'], ['MEANING · 意味', '四択', 'Four meanings, none of them a synonym of the right one.'], ['TECH · 技術', '研究を使う', 'Firewalls and fleet planning: research changes the other buildings.']],
+  stats: [['研究', 'RESEARCH', () => '+' + res], ['命中', 'HITS', () => hits], ['点', 'PTS', a => a.G.yen.toLocaleString()]],
   init(api) {
     const css = document.createElement('style'); css.textContent = `
       .tech { display:block; width:100%; text-align:left; background:#0B0C0E; border:1px solid var(--line2); color:var(--ink); padding:9px 10px; margin-bottom:8px; cursor:pointer; font:500 11px var(--mono); }
@@ -70,7 +69,8 @@ game({
   },
   end(api) {
     phase = 'idle'; K.off();
-    if (!api.preview && !(api.SAVE.sim && api.SAVE.sim.v === 2)) api.SAVE.corp.research = (api.SAVE.corp.research || 0) + res;
+
+    if (!api.preview) api.SAVE.corp.research = (api.SAVE.corp.research || 0) + res;   // research is the lab's own: it buys the techs below
     return { title: '解析完了', rows: [['research', '+' + res, 'y'], ['hits', hits, 'y'], ['wrong buzzes', miss, miss ? 'r' : '']], effect: { research: res } };
   },
   draw(cx, t, dt, api) {

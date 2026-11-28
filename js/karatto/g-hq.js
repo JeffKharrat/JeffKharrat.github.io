@@ -1,10 +1,9 @@
 /* カラット: 本社, headquarters. The boardroom at the top of the crown. Board meetings take the planet's waiting
    decisions (決裁) and put them on the table in Japanese, with furigana. A comprehension check comes first: answer
    it right and the item's background is revealed (who stands where); wrong, and the translation is shown. Every option
-   stays open either way: this is reading practice tied to the actual dispute, not a gate. Decisions resolve through
-   the same command as the counter in 経営 → 派閥 (sim.resolve). No word evidence. */
-import { game, panel, esc, clamp, Y, RED, OK, sfx, $, shuffle } from './game.js?v=21';
-import { EVENTS, resolve, setPolicy, dirProgress } from './sim.js?v=21';
+   stays open either way: this is reading practice tied to the actual dispute, not a gate. Reading practice only: nothing
+   is decided (the economy was removed on Nov 28). No word evidence. */
+import { game, panel, esc, clamp, Y, RED, OK, sfx, $, shuffle } from './game.js?v=23';
 const EN = {
   strike: 'The labour union is demanding higher wages. It says that if the company does not agree, it will stop the factory from tomorrow.',
   protest: 'Residents have gathered in front of the headquarters to oppose the pollution and the surveillance. They want an explanation from the company.',
@@ -13,8 +12,8 @@ const EN = {
   order: 'A big company has placed an order. They want 150 units of goods sent right away.',
   accident: 'This morning there was an accident on the factory line. One worker was injured.' };
 const BG = { strike: 'Background: the union (赤城) is at 30 or below; a raise or talks settle it, a refusal stops work and 70% of outbound dispatch for a day.', protest: 'Background: residents (緑川) are at 30 or below; PR costs money, ignoring costs stability.', shackle: 'Background: the board (九条) is at 30 or below; refusing raises 暴走度.', lawsuit: 'Background: pollution is over 60; legal (紫藤) recommends settling.', order: 'Background: finance (銅島) set the 150 goods aside before the market could sell them.', accident: 'Background: operations (黒田) blames the hours and the safety level.' };
-import { ICON } from './icons.js?v=21';
-import { drawLeaf } from './leaf.js?v=21';
+import { ICON } from './icons.js?v=23';
+import { drawLeaf } from './leaf.js?v=23';
 
 const rb = s => s.replace(/\[([^|\]]+)\|([^\]]+)\]/g, '<ruby>$1<rt>$2</rt></ruby>');
 const TXT = {
@@ -27,55 +26,43 @@ const TXT = {
 const SEATS = [['会長', 'The chair', 'board'], ['組合長', 'Union', 'union'], ['住民代表', 'Residents', 'res'], ['技術者', 'Engineers', 'eng']];
 let ITEMS = [], k = 0, step = 'read', choice = null, checked = null, done = 0;
 
-function routine(api) {
-  const S = api.SAVE.sim, f = Math.round(api.SAVE.corp.funds), st = Math.round(S.stab), dp = dirProgress(S, api.SAVE.corp, (api.summary && api.summary.ctx) || { mem: api.MEM.length });
-  const opts = [String(st), String(clamp(st + 17, 0, 100)), String(clamp(st - 13, 0, 100)), String(clamp(100 - st, 0, 100))].filter((v, i, a) => a.indexOf(v) === i);
-  while (opts.length < 4) opts.push(String((st + opts.length * 7) % 100));
-  return { k: 'routine', jp: `[定例|ていれい][会議|かいぎ]です。[安定度|あんていど]は${st}、[資金|しきん]は${f.toLocaleString()}[円|えん]です。[人口|じんこう]は${Math.round(S.pop.w + S.pop.c + S.pop.e)}[人|にん]。${S.poll > 40 ? '[公害|こうがい]が[増|ふ]えていると[住民|じゅうみん]が[心配|しんぱい]しています。' : '[今|いま]のところ[大|おお]きな[問題|もんだい]はありません。'}`,
-    q: 'What is the stability right now?', a: opts.slice(0, 4), def: 0, en: `A routine meeting. Stability is ${st} and the funds are ¥${f.toLocaleString()}. The population is ${Math.round(S.pop.w + S.pop.c + S.pop.e)}. ${S.poll > 40 ? 'Residents are worried that pollution is rising.' : 'For now there are no major problems.'}`, bg: 'Background: nothing waits on the table.',
-    o: [['現状維持', 'Keep the course', 'Nothing changes.'], ['広報を始める', 'Start a PR campaign', '社則: PR → Campaign'], ['公害対策を強化', 'Strengthen pollution control', '社則: pollution control one step up']] };
-}
+const TITLE = { strike: ['ストライキ予告', 'Strike notice'], protest: ['抗議', 'Protest'], shackle: ['取締役会', 'The board'], lawsuit: ['訴訟', 'Lawsuit'], order: ['大口注文', 'A large order'], accident: ['事故', 'Accident'] };
+/* a meeting: three of the boardroom's items, read in Japanese, checked in English. Reading practice; nothing is decided */
 function build(api) {
-  const S = api.SAVE.sim; ITEMS = [];
-  if (S && S.v === 2) { for (const e of S.ev.slice(0, 3)) { const T = TXT[e.k]; if (T) ITEMS.push({ k: e.k, id: e.id, jp: T[0], q: T[1], a: T[2], o: EVENTS[e.k].o, def: EVENTS[e.k].def, en: EN[e.k], bg: BG[e.k] }); } if (!ITEMS.length) ITEMS.push(routine(api)); }
+  ITEMS = shuffle(Object.keys(TXT)).slice(0, 3).map(k => ({ k, jp: TXT[k][0], q: TXT[k][1], a: TXT[k][2], en: EN[k] }));
   ITEMS.forEach(it => { it.order = shuffle(it.a.map((_, i) => i)); });
   k = 0; step = 'read'; checked = null;
 }
 function show(api) {
   const it = ITEMS[k], P = $('#p-item');
   if (!it) { P.innerHTML = '<div class="m">議題なし · nothing on the table.</div>'; return; }
-  const E = it.o;
-  P.innerHTML = `<div class="nh"><span>役員会議 · BOARD MEETING · ITEM ${k + 1} OF ${ITEMS.length}</span><span>${it.k === 'routine' ? '定例 ROUTINE' : EVENTS[it.k].j + ' · ' + EVENTS[it.k].en.toUpperCase()}</span></div>
+  P.innerHTML = `<div class="nh"><span>役員会議 · BOARD MEETING · ITEM ${k + 1} OF ${ITEMS.length}</span><span>${TITLE[it.k][0]} · ${TITLE[it.k][1].toUpperCase()}</span></div>
     <div class="jp kj">${rb(it.jp)}</div>
     ${step === 'read' ? `<div class="q"><b>確認 · CHECK</b> ${esc(it.q)}</div><div class="ops">${it.order.map((i, n) => `<button type="button" class="op" data-n="${n}"><span class="key">${n + 1}</span>${esc(it.a[i])}</button>`).join('')}</div>`
-      : `<div class="q"><b>${checked ? '理解 · UNDERSTOOD' : '誤解 · MISREAD'}</b> ${checked ? esc(it.bg || '') : `it was “${esc(it.a[0])}”. Translation: ${esc(it.en || '')}`}</div>
-      <div class="ops">${E.map(([j, en, d], i) => `<button type="button" class="op dec" data-i="${i}"><span class="key">${String.fromCharCode(65 + i)}</span><span><b class="kj">${j}</b> ${en}<br><small>${esc(d)}${i === it.def ? ' · the autopilot\'s choice' : ''}</small></span></button>`).join('')}</div>`}`;
+      : `<div class="q"><b>${checked ? '理解 · UNDERSTOOD' : '誤解 · MISREAD'}</b> ${checked ? '' : `it was “${esc(it.a[0])}”. `}Translation: ${esc(it.en || '')}</div>
+      <div class="ops"><button type="button" class="op dec" data-i="0"><span class="key">Enter</span><span><b class="kj">次へ</b> Next item</span></button></div>`}`;
   P.querySelectorAll('[data-n]').forEach(b => b.onclick = () => check(api, +b.dataset.n));
-  P.querySelectorAll('[data-i]').forEach(b => b.onclick = () => decide(api, +b.dataset.i));
+  P.querySelectorAll('[data-i]').forEach(b => b.onclick = () => decide(api));
 }
-function check(api, n) { const it = ITEMS[k]; if (step !== 'read') return; checked = it.order[n] === 0; step = 'decide'; sfx(checked ? 'ok' : 'ng'); api.log(it.k === 'routine' ? '定例' : EVENTS[it.k].j, checked ? '読解 ✓' : '読解 ✗', checked ? 'background' : 'translation', checked ? 'y' : 'r'); show(api); }
-function decide(api, i) {
-  const it = ITEMS[k]; if (step !== 'decide' || !it.o[i]) return;
-  if (it.k === 'routine') { if (i === 1) setPolicy(api.SAVE, 'pr', 1); if (i === 2) setPolicy(api.SAVE, 'eco', Math.min(2, api.SAVE.sim.pol.eco + 1)); }
-  else resolve(api.SAVE, it.id, i);
-  done++; api.persist(); sfx('coin'); api.log(it.o[i][0], it.o[i][1], 'decided', 'y'); seats(api);
+function check(api, n) { const it = ITEMS[k]; if (step !== 'read') return; checked = it.order[n] === 0; if (checked) done++; step = 'decide'; sfx(checked ? 'ok' : 'ng'); seats(api); api.log(TITLE[it.k][0], checked ? '読解 ✓' : '読解 ✗', 'translation', checked ? 'y' : 'r'); show(api); }
+function decide(api) {
+  if (step !== 'decide') return;
   k++; step = 'read'; checked = null; if (k >= ITEMS.length) { setTimeout(() => api.end(), 600); $('#p-item').innerHTML = '<div class="m">閉会 · the meeting is closed.</div>'; } else show(api);
 }
-function seats(api) {
-  const S = api.SAVE.sim; if (!S || S.v !== 2) return;
-  $('#p-seat').innerHTML = SEATS.map(([j, en, f]) => { const v = S.fac[f]; return `<div class="seat"><span class="ic" style="color:${v < 30 ? 'var(--red)' : 'var(--y)'}">${ICON[f](28)}</span><span><b class="kj">${j}</b> <span class="m">${en}</span><br><span class="bar"><s style="width:${v}%;background:${v < 30 ? 'var(--red)' : 'var(--y)'}"></s></span></span><span class="v">${Math.round(v)}</span></div>`; }).join('') +
-    `<div class="seat"><span class="ic" style="color:var(--y)">${ICON.ai(28)}</span><span><b class="kj">カラット</b> <span class="m">the AI · 暴走度</span></span><span class="v">${S.bousou.toFixed(1)}</span></div>`;
+function seats() {
+  $('#p-seat').innerHTML = `<div class="seat"><span class="ic" style="color:var(--y)">${ICON.ai(28)}</span><span><b class="kj">カラット</b> <span class="m">the AI attends</span></span><span class="v">${done}</span></div>
+    <div class="m" style="margin-top:8px">Items understood this meeting: ${done} / ${ITEMS.length}</div>`;
 }
 
 game({
   id: 'hq', site: 'hq', tier: 4, code: 'HQ-09', jp: '本社', en: 'Headquarters', sub: 'THE BOARDROOM · THE TOP OF THE CROWN', title: '役員会議', dur: 0,
   skills: [],
-  lead: 'The board puts the planet\'s waiting decisions on the table, written in Japanese with furigana. Read the item and answer the check (<span class="key">1</span>–<span class="key">4</span>): right, and the background is revealed; wrong, and you see the translation. Then decide (<span class="key">A</span>–<span class="key">C</span>): every option stays open. The same decisions wait at the counter in 経営 → 派閥.',
-  how: [['READ · 読解', '議題を読む', 'Each item in Japanese, furigana on every kanji.'], ['CHECK · 確認', '理解を示す', 'One question in English about what you just read.'], ['DECIDE · 決定', '選択肢', 'Understood: the background. Misread: the translation. All options either way.']],
-  stats: [['議題', 'ITEMS', () => `${Math.min(k + 1, ITEMS.length)}/${ITEMS.length}`], ['決定', 'DECIDED', () => done]],
+  lead: 'Three boardroom items, written in Japanese with furigana. Read each one and answer the check (<span class="key">1</span>–<span class="key">4</span>); the translation follows either way. Reading practice: nothing is decided.',
+  how: [['READ · 読解', '議題を読む', 'Each item in Japanese, furigana on every kanji.'], ['CHECK · 確認', '理解を示す', 'One question in English about what you just read.'], ['LEARN · 翻訳', '答え合わせ', 'The translation, right or wrong.']],
+  stats: [['議題', 'ITEMS', () => `${Math.min(k + 1, ITEMS.length)}/${ITEMS.length}`], ['理解', 'UNDERSTOOD', () => done]],
   goLabel: '開会 · Open the meeting', againLabel: '次の会議 · Next meeting', clock: () => 'MEETING',
-  blocked: api => !(api.SAVE.sim && api.SAVE.sim.v === 2),
-  notes: api => !(api.SAVE.sim && api.SAVE.sim.v === 2) ? '<div class="note r">The planet\'s simulation hasn\'t started yet: open the core once.</div>' : `<div class="note">${api.SAVE.sim.ev.length ? api.SAVE.sim.ev.length + ' decision' + (api.SAVE.sim.ev.length > 1 ? 's' : '') + ' waiting on the table.' : 'Nothing waiting: a routine review.'}</div>`,
+  blocked: () => false,
+  notes: () => '<div class="note">Three items from the boardroom: a strike notice, a protest, an order… Read, check, learn.</div>',
   init(api) {
     const css = document.createElement('style'); css.textContent = `
       #p-item { padding:14px 18px; } #p-item .nh { display:flex; justify-content:space-between; font:700 10px var(--mono); letter-spacing:.16em; color:var(--y); margin-bottom:10px; }
@@ -94,9 +81,9 @@ game({
   start(api) { done = 0; build(api); $('#g-log').innerHTML = ''; seats(api); show(api); },
   key(e, api) {
     if (step === 'read' && /^[1-4]$/.test(e.key)) { check(api, +e.key - 1); return true; }
-    const i = 'abc'.indexOf(e.key.toLowerCase()); if (step === 'decide' && i >= 0) { decide(api, i); return true; }
+    if (step === 'decide' && (e.key === 'Enter' || e.key === ' ')) { decide(api); return true; }
   },
-  end(api) { return { title: '閉会', rows: [['items decided', done, 'y'], ['understood', '—'], ['waiting now', (api.SAVE.sim ? api.SAVE.sim.ev.length : 0)]], effect: { items: done } }; },
+  end() { return { title: '閉会', rows: [['items read', ITEMS.length, 'y'], ['understood', done]], effect: {} }; },
   draw(cx, t, dt, api) {
     cx.fillStyle = '#050607'; cx.fillRect(0, 0, 1280, 720);
     /* the window wall: the company city at night */
